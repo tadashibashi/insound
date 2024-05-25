@@ -11,7 +11,7 @@ namespace insound {
 
     void pushError(Error::Code code, const std::string &message)
     {
-#if INSOUND_DEBUG
+#if INSOUND_DEBUG || INSOUND_LOG_ERRORS
         fprintf(stderr, "MACH ERROR: %s\n", s_errors.emplace(code, message).message.c_str());
 #else
         s_errors.emplace(code, message);

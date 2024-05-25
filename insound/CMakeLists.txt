@@ -38,9 +38,9 @@ add_library(insound
 target_link_libraries(insound PRIVATE SDL2::SDL2-static)
 target_include_directories(insound PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 if ("${CMAKE_BUILD_TYPE}" MATCHES "Deb")
-    target_compile_definitions(insound PRIVATE -DMACH_DEBUG=1)
+    target_compile_definitions(insound PRIVATE -DINSOUND_DEBUG=1)
 else()
-    target_compile_definitions(insound PRIVATE -DMACH_DEBUG=0)
+    target_compile_definitions(insound PRIVATE -DINSOUND_DEBUG=0)
 endif()
 
 if (EMSCRIPTEN)
