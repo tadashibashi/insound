@@ -29,6 +29,8 @@ namespace insound {
         /// Insert effect into effect chain, 0 is the first effect and effectCount - 1 is the last
         IEffect *insertEffect(IEffect *effect, int position);
 
+        void removeEffect(IEffect *effect);
+
         [[nodiscard]]
         auto effectCount() const { return m_effects.size(); }
 

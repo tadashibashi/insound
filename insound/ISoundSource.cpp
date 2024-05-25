@@ -40,8 +40,13 @@ namespace insound {
 
     IEffect * ISoundSource::insertEffect(IEffect *effect, int position)
     {
-        Command::makeSourceEffect(this, true, effect, position);
+        m_engine->pushCommand(Command::makeSourceEffect(this, true, effect, position));
         return effect;
+    }
+
+    void ISoundSource::removeEffect(IEffect *effect)
+    {
+        m_engine->pushCommand(Command::makeSourceEffect(this, false, effect, -1)); // -1 is discarded in applyCommand
     }
 
     void ISoundSource::applyCommand(const Command &command)
