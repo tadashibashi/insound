@@ -1,0 +1,12 @@
+# IDE-related files
+.idea/
+.vscode/
+.vs/
+
+# Build directories
+out/
+build/
+cmake-build*/
+
+# OS-related files
+.DS_Store
