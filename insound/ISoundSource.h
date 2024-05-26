@@ -10,7 +10,7 @@ namespace insound {
     class ISoundSource {
     public:
         explicit ISoundSource(Engine *engine, uint32_t parentClock, bool paused = false) :
-            m_paused(paused), m_effects(), m_engine(engine), m_clock(), m_parentClock(parentClock),
+            m_paused(paused), m_effects(), m_engine(engine), m_clock(0), m_parentClock(parentClock),
             m_pauseClock(-1), m_unpauseClock(-1)
         { }
 
@@ -19,13 +19,12 @@ namespace insound {
         /// Get the current pointer position
         /// @param pcmPtr      pointer to receive pointer to data
         /// @param length      requested bytes
-        /// @param parentClock caller's current clock time; the caller is usually the parent summing bus
         /// @returns the amount of bytes available or length arg, whichever is smaller
-        int read(const uint8_t **pcmPtr, int length, uint32_t parentClock);
+        int read(const uint8_t **pcmPtr, int length);
 
         [[nodiscard]]
         bool paused() const { return m_paused; }
-        void paused(bool value, int clockOffset = 0);
+        void paused(bool value, uint32_t clock = UINT32_MAX);
 
         /// Insert effect into effect chain, 0 is the first effect and effectCount - 1 is the last
         IEffect *insertEffect(IEffect *effect, int position);
@@ -46,6 +45,8 @@ namespace insound {
         auto clock() const { return m_clock; }
         [[nodiscard]]
         auto parentClock() const { return m_parentClock; }
+
+        virtual void updateParentClock(uint32_t parentClock) { m_parentClock = parentClock; }
     private:
         virtual int readImpl(uint8_t *pcmPtr, int length) = 0;
         bool m_paused;

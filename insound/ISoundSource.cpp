@@ -12,7 +12,7 @@ namespace insound {
         }
     }
 
-    int ISoundSource::read(const uint8_t **pcmPtr, int length, uint32_t parentClock)
+    int ISoundSource::read(const uint8_t **pcmPtr, int length)
     {
         if (m_inBuffer.size() < length)
         {
@@ -26,43 +26,39 @@ namespace insound {
 
         std::memset(m_outBuffer.data(), 0, m_outBuffer.size());
 
-        m_parentClock = parentClock;
+        int64_t unpauseClock = (int64_t)m_unpauseClock - (int64_t)m_parentClock;
+        int64_t pauseClock = (int64_t)m_pauseClock - (int64_t)m_parentClock;
 
         for (int i = 0; i < length;)
         {
             if (m_paused)
             {
                 // if next unpause occurs within this chunk
-                if (m_unpauseClock < length - i && m_unpauseClock > -1)
+                if (unpauseClock < (length - i) / (2 * sizeof(float)) && unpauseClock > -1)
                 {
-                    i += m_unpauseClock;
+                    i += (int)unpauseClock;
 
-                    if (m_pauseClock < m_unpauseClock) // if pause clock comes before unpause, unset it, it's redundant
+                    if (pauseClock < unpauseClock) // if pause clock comes before unpause, unset it, it's redundant
                     {
                         m_pauseClock = -1;
                     }
 
-                    if (m_pauseClock > -1)
-                        m_pauseClock -= m_unpauseClock / (2 * sizeof(float)); // 2 for eachchannel
+                    if (pauseClock > -1)
+                        pauseClock -= unpauseClock;
 
                     m_unpauseClock = -1;
                     m_paused = false;
                 }
                 else
                 {
-                    // done reading if paused entire buffer
-                    if (m_pauseClock > -1)
-                        m_pauseClock -= (length - i) / (2 * sizeof(float)); // 2 for each channel
-                    if (m_unpauseClock > -1)
-                        m_unpauseClock -= (length - i) / (2 * sizeof(float)); // 2 for each channel
                     break;
                 }
             }
             else
             {
                 // check if there is an pause clock ahead to see how many samples to read until then
-                bool pauseThisFrame = (m_pauseClock < length - i && m_pauseClock > -1);
-                int bytesToRead = pauseThisFrame ? m_pauseClock : length - i;
+                bool pauseThisFrame = (pauseClock < (length - i) / (2 * sizeof(float)) && pauseClock > -1);
+                int bytesToRead = pauseThisFrame ? pauseClock : length - i;
 
                 // read bytes here
                 readImpl(m_outBuffer.data() + i, bytesToRead);
@@ -71,7 +67,7 @@ namespace insound {
 
                 if (pauseThisFrame)
                 {
-                    if (m_unpauseClock < m_pauseClock)
+                    if (unpauseClock < pauseClock)
                     {
                         m_unpauseClock = -1;
                     }
@@ -80,13 +76,11 @@ namespace insound {
                     m_pauseClock = -1;
                 }
 
-                if (m_pauseClock > -1)
-                    m_pauseClock -= bytesToRead / (2 * sizeof(float)); // 2 for each channel
-                if (m_unpauseClock > -1)
-                    m_unpauseClock -= bytesToRead / (2 * sizeof(float)); // 2 for each channel
+                if (pauseClock > -1)
+                    pauseClock -= bytesToRead / (2 * sizeof(float)); // 2 for each channel
+                if (unpauseClock > -1)
+                    unpauseClock -= bytesToRead / (2 * sizeof(float)); // 2 for each channel
             }
-
-
         }
 
         const auto sampleCount = length / sizeof(float);
@@ -101,13 +95,13 @@ namespace insound {
 
         *pcmPtr = m_outBuffer.data();
 
-        m_clock += length;
+        m_clock += length / (2 * sizeof(float));
         return length;
     }
 
-    void ISoundSource::paused(const bool value, const int clockOffset)
+    void ISoundSource::paused(const bool value, const uint32_t clock)
     {
-        m_engine->pushCommand(Command::makeSourcePause(this, value, clockOffset));
+        m_engine->pushImmediateCommand(Command::makeSourcePause(this, value, clock == UINT32_MAX ? m_parentClock : clock));
     }
 
     IEffect * ISoundSource::insertEffect(IEffect *effect, int position)
@@ -149,11 +143,11 @@ namespace insound {
             {
                 if (command.data.source.data.pause.value)
                 {
-                    m_pauseClock = command.data.source.data.pause.clockOffset;
+                    m_pauseClock = command.data.source.data.pause.clock;
                 }
                 else
                 {
-                    m_unpauseClock = command.data.source.data.pause.clockOffset;
+                    m_unpauseClock = command.data.source.data.pause.clock;
                 }
             } break;
 

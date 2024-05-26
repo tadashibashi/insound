@@ -9,6 +9,17 @@ namespace insound {
         m_panner = (PanEffect *)insertEffect(new PanEffect(engine), 0);
     }
 
+    void Bus::updateParentClock(uint32_t parentClock)
+    {
+        ISoundSource::updateParentClock(parentClock);
+
+        const auto curClock = clock();
+        for (auto &source : m_sources) // recursively update all busses and sources
+        {
+            source->updateParentClock(curClock);
+        }
+    }
+
     int Bus::readImpl(uint8_t *pcmPtr, int length)
     {
         // resize buffer if necessary
@@ -24,7 +35,7 @@ namespace insound {
         for (const auto &source : m_sources)
         {
             const float *data;
-            auto floatsToRead = source->read((const uint8_t **)&data, length, clock()) / sizeof(float);
+            auto floatsToRead = source->read((const uint8_t **)&data, length) / sizeof(float);
 
             float *head = m_buffer.data();
             for (const float *ptr = data, *end = data + floatsToRead;

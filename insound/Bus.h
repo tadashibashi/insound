@@ -30,7 +30,9 @@ namespace insound {
         [[nodiscard]]
         const PanEffect *panner() const { return m_panner; }
 
+        void updateParentClock(uint32_t parentClock) override;
     private:
+
         int readImpl(uint8_t *pcmPtr, int length) override;
         std::vector<ISoundSource *> m_sources;
         std::vector<float> m_buffer; ///< temp buffer to calculate mix

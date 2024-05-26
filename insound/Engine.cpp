@@ -15,7 +15,8 @@ namespace insound {
     struct Engine::Impl {
     public:
         explicit Impl(Engine *engine) :
-            m_engine(engine), m_spec(), m_deviceID(), m_clock(), m_masterBus(), m_mixMutex(), m_commands()
+            m_engine(engine), m_spec(), m_deviceID(), m_clock(), m_masterBus(), m_mixMutex(),
+            m_deferredCommands(), m_immediateCommands()
         { }
 
         ~Impl()
@@ -131,22 +132,28 @@ namespace insound {
         void update()
         {
             std::lock_guard lockGuard(m_mixMutex);
-            processCommands();
+            processCommands(m_deferredCommands);
         }
 
         void pushCommand(const Command &command)
         {
             std::lock_guard lockGuard(m_mixMutex);
-            m_commands.emplace_back(command);
+            m_deferredCommands.emplace_back(command);
+        }
+
+        void pushImmediateCommand(const Command &command)
+        {
+            std::lock_guard lockGuard(m_mixMutex);
+            m_immediateCommands.emplace_back(command);
         }
 
     private:
-        void processCommands()
+        static void processCommands(std::vector<Command> &commands)
         {
-            if (m_commands.empty())
+            if (commands.empty())
                 return;
 
-            for (auto &command : m_commands)
+            for (auto &command : commands)
             {
                 switch(command.type)
                 {
@@ -167,16 +174,21 @@ namespace insound {
                     } break;
                 }
             }
-            m_commands.clear();
+            commands.clear();
         }
 
         static void audioCallback(void *userptr, uint8_t *stream, int length)
         {
             auto engine = (Engine::Impl *)userptr;
+
             std::lock_guard lockGuard(engine->m_mixMutex);
 
+
+            Engine::Impl::processCommands(engine->m_immediateCommands); // process any commands that
+
             const uint8_t *mixPtr;
-            const auto bytesRead = engine->m_masterBus->read(&mixPtr, length, 0);
+            const auto bytesRead = engine->m_masterBus->read(&mixPtr, length);
+            engine->m_masterBus->updateParentClock(engine->m_clock);
 
             // set stream to zero
             std::memset(stream, 0, length);
@@ -184,7 +196,7 @@ namespace insound {
             // copy mix into result
             std::memcpy(stream, mixPtr, bytesRead);
 
-            engine->m_clock += length;
+            engine->m_clock += length / (2 * sizeof(float));
         }
 
         Engine *m_engine;
@@ -194,7 +206,8 @@ namespace insound {
 
         Bus *m_masterBus;
         std::mutex m_mixMutex;
-        std::vector<Command> m_commands;
+        std::vector<Command> m_deferredCommands;
+        std::vector<Command> m_immediateCommands;
     };
 
     Engine::Engine() : m(new Impl(this))
@@ -243,6 +256,11 @@ namespace insound {
     void Engine::pushCommand(const Command &command)
     {
         m->pushCommand(command);
+    }
+
+    void Engine::pushImmediateCommand(const Command &command)
+    {
+        m->pushImmediateCommand(command);
     }
 
     void Engine::update()

@@ -113,7 +113,7 @@ int main()
 
                         case SDL_SCANCODE_P:
                         {
-                            masterBus->paused(!masterBus->paused(), spec.freq * 2);
+                            masterBus->paused(!masterBus->paused(), masterBus->parentClock() + spec.freq);
                         } break;
 
                         case SDL_SCANCODE_Z:

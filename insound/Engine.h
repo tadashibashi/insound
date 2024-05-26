@@ -34,6 +34,7 @@ namespace insound {
         bool getMasterBus(Bus **bus);
 
         void pushCommand(const Command &command);
+        void pushImmediateCommand(const Command &command);
 
         void update();
 

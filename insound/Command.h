@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 
 namespace insound {
 
@@ -29,7 +30,7 @@ namespace insound {
                 union {
                     struct {
                         bool value;
-                        int clockOffset;
+                        uint32_t clock;
                     } pause;
                     struct {
                         class IEffect *effect;
@@ -50,14 +51,14 @@ namespace insound {
             return c;
         }
 
-        static Command makeSourcePause(class ISoundSource *source, bool paused, int clockOffset = 0)
+        static Command makeSourcePause(class ISoundSource *source, bool paused, uint32_t clock)
         {
             Command c{};
             c.type = SoundSource;
             c.data.source.type = SourceCommandType::SetPause;
             c.data.source.source = source;
             c.data.source.data.pause.value = paused;
-            c.data.source.data.pause.clockOffset = clockOffset;
+            c.data.source.data.pause.clock = clock;
             return c;
         }
 
