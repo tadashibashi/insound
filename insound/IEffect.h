@@ -9,7 +9,7 @@ namespace insound {
         explicit IEffect(Engine *engine) : m_engine(engine) { }
         virtual ~IEffect() = default;
 
-        virtual void process(float *samples, int count) = 0;
+        virtual void process(float *input, float *output, int count) = 0;
 
         /// Override this if you need to process parameter sets.
         /// Don't set member parameters directly as it may occur during audio thread.

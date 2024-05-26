@@ -4,15 +4,15 @@
 #include "insound/Error.h"
 
 namespace insound {
-    void PanEffect::process(float *samples, const int count)
+    void PanEffect::process(float *input, float *output, const int count)
     {
         for (int i = 0; i + 1 < count; i += 2)
         {
-            const auto leftChan = (samples[i + 1] * (1.f - m_right)) + (samples[i] * m_left);
-            const auto rightChan = (samples[i] * (1.f - m_left)) + (samples[i + 1] * m_right);
+            const auto leftChan = (input[i + 1] * (1.f - m_right)) + (input[i] * m_left);
+            const auto rightChan = (input[i] * (1.f - m_left)) + (input[i + 1] * m_right);
 
-            samples[i] = leftChan;
-            samples[i + 1] = rightChan;
+            output[i]     = leftChan;
+            output[i + 1] = rightChan;
         }
     }
 

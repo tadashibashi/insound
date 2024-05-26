@@ -14,7 +14,7 @@ namespace insound {
 
         explicit PanEffect(Engine *engine) : IEffect(engine), m_left(1.f), m_right(1.f) { }
 
-        void process(float *samples, int count) override;
+        void process(float *input, float *output, int count) override;
         void receiveParam(int index, float value) override;
 
         void left(float value);

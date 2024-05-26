@@ -14,7 +14,8 @@ static int getDefaultSampleRate();
 namespace insound {
     struct Engine::Impl {
     public:
-        Impl(Engine *engine) : m_engine(engine), m_spec(), m_deviceID(), m_clock(), m_masterBus(), m_mixMutex(), m_commands()
+        explicit Impl(Engine *engine) :
+            m_engine(engine), m_spec(), m_deviceID(), m_clock(), m_masterBus(), m_mixMutex(), m_commands()
         { }
 
         ~Impl()

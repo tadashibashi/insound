@@ -31,7 +31,7 @@ namespace insound {
         const PanEffect *panner() const { return m_panner; }
 
     private:
-        int readImpl(uint8_t **pcmPtr, int length) override;
+        int readImpl(uint8_t *pcmPtr, int length) override;
         std::vector<ISoundSource *> m_sources;
         std::vector<float> m_buffer; ///< temp buffer to calculate mix
         Bus *m_parent;

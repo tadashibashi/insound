@@ -29,6 +29,7 @@ namespace insound {
                 union {
                     struct {
                         bool value;
+                        int clockOffset;
                     } pause;
                     struct {
                         class IEffect *effect;
@@ -49,13 +50,14 @@ namespace insound {
             return c;
         }
 
-        static Command makeSourcePause(class ISoundSource *source, bool paused)
+        static Command makeSourcePause(class ISoundSource *source, bool paused, int clockOffset = 0)
         {
             Command c{};
             c.type = SoundSource;
             c.data.source.type = SourceCommandType::SetPause;
             c.data.source.source = source;
             c.data.source.data.pause.value = paused;
+            c.data.source.data.pause.clockOffset = clockOffset;
             return c;
         }
 

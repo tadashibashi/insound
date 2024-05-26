@@ -54,11 +54,11 @@ int main()
     sounds[3].load("assets/snare-hat.wav", spec);
 
     PCMSource *sources[4]; // using PCMSource ptrs here is error prone, because engine will delete ones that end
-    sources[0] = engine.playSound(&sounds[0], true);
+    //sources[0] = engine.playSound(&sounds[0], true);
     sources[1] = engine.playSound(&sounds[1], true);
     sources[1]->paused(false);
-    sources[2] = engine.playSound(&sounds[2], true);
-    sources[3] = engine.playSound(&sounds[3], true);
+    //sources[2] = engine.playSound(&sounds[2], true);
+    //sources[3] = engine.playSound(&sounds[3], true);
 
     // for (auto source : sources)
     // {
@@ -113,7 +113,7 @@ int main()
 
                         case SDL_SCANCODE_P:
                         {
-                            masterBus->paused(!masterBus->paused());
+                            masterBus->paused(!masterBus->paused(), spec.freq * 2);
                         } break;
 
                         case SDL_SCANCODE_Z:

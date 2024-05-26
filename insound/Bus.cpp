@@ -9,7 +9,7 @@ namespace insound {
         m_panner = (PanEffect *)insertEffect(new PanEffect(engine), 0);
     }
 
-    int Bus::readImpl(uint8_t **pcmPtr, int length)
+    int Bus::readImpl(uint8_t *pcmPtr, int length)
     {
         // resize buffer if necessary
         if (m_buffer.size() * sizeof(float) < length)
@@ -35,7 +35,7 @@ namespace insound {
             }
         }
 
-        *pcmPtr = (uint8_t *)m_buffer.data();
+        std::memcpy(pcmPtr, m_buffer.data(), length);
         return (int)(m_buffer.size() * sizeof(float));
     }
 

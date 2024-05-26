@@ -21,7 +21,7 @@ namespace insound {
     private:
         /// Get the current pointer position
         /// @returns the amount of bytes available or length arg, whichever is smaller
-        int readImpl(uint8_t **pcmPtr, int length) override;
+        int readImpl(uint8_t *pcmPtr, int length) override;
         const SoundBuffer *m_buffer;
         uint32_t m_position;
     };

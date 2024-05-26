@@ -8,14 +8,19 @@ namespace insound {
     {
     }
 
-    int PCMSource::readImpl(uint8_t **pcmPtr, int length)
+    int PCMSource::readImpl(uint8_t *pcmPtr, int length)
     {
         const auto bytesLeft = (int)m_buffer->size() - (int)m_position;
         if (bytesLeft <= 0)
             return 0;
 
         const auto toRead = std::min((int)bytesLeft, length);
-        *pcmPtr = (uint8_t *)m_buffer->data() + m_position;
+
+        // clear the buffer
+        std::memset(pcmPtr, 0, length);
+
+        // copy data to the buffer
+        std::memcpy(pcmPtr, m_buffer->data() + m_position, toRead);
 
         m_position += toRead;
         return toRead;

@@ -10,7 +10,8 @@ namespace insound {
     class ISoundSource {
     public:
         explicit ISoundSource(Engine *engine, uint32_t parentClock, bool paused = false) :
-            m_paused(paused), m_effects(), m_engine(engine), m_clock(), m_parentClock(parentClock)
+            m_paused(paused), m_effects(), m_engine(engine), m_clock(), m_parentClock(parentClock),
+            m_pauseClock(-1), m_unpauseClock(-1)
         { }
 
         virtual ~ISoundSource();
@@ -24,7 +25,7 @@ namespace insound {
 
         [[nodiscard]]
         bool paused() const { return m_paused; }
-        void paused(bool value);
+        void paused(bool value, int clockOffset = 0);
 
         /// Insert effect into effect chain, 0 is the first effect and effectCount - 1 is the last
         IEffect *insertEffect(IEffect *effect, int position);
@@ -46,11 +47,13 @@ namespace insound {
         [[nodiscard]]
         auto parentClock() const { return m_parentClock; }
     private:
-        virtual int readImpl(uint8_t **pcmPtr, int length) = 0;
+        virtual int readImpl(uint8_t *pcmPtr, int length) = 0;
         bool m_paused;
 
         std::vector<IEffect * >m_effects;
         Engine *m_engine;
         uint32_t m_clock, m_parentClock;
+        int m_pauseClock, m_unpauseClock;
+        std::vector<uint8_t> m_outBuffer, m_inBuffer;
     };
 }
