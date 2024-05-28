@@ -21,7 +21,7 @@ namespace insound {
         [[nodiscard]]
         const Engine *engine() const { return m_engine; }
     protected:
-        void setParam(int index, float value);
+        void sendParam(int index, float value);
 
     private:
         Engine *m_engine;

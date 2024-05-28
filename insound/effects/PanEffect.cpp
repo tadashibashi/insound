@@ -39,11 +39,11 @@ namespace insound {
 
     void PanEffect::left(const float value)
     {
-        setParam(Param::Left, mathf::clamp(value, 0, 1.f));
+        sendParam(Param::Left, mathf::clamp(value, 0, 1.f));
     }
 
     void PanEffect::right(float value)
     {
-        setParam(Param::Right, mathf::clamp(value, 0, 1.f));
+        sendParam(Param::Right, mathf::clamp(value, 0, 1.f));
     }
 } // insound
