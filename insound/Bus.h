@@ -25,11 +25,6 @@ namespace insound {
         /// Mix lock should be appied.
         void update();
 
-        [[nodiscard]]
-        PanEffect *panner() { return m_panner; }
-        [[nodiscard]]
-        const PanEffect *panner() const { return m_panner; }
-
         void updateParentClock(uint32_t parentClock) override;
     private:
 

@@ -3,17 +3,15 @@
 #include <vector>
 
 namespace insound {
+    class VolumeEffect;
+    class PanEffect;
     struct Command;
     class Engine;
     class IEffect;
 
     class ISoundSource {
     public:
-        explicit ISoundSource(Engine *engine, uint32_t parentClock, bool paused = false) :
-            m_paused(paused), m_effects(), m_engine(engine), m_clock(0), m_parentClock(parentClock),
-            m_pauseClock(-1), m_unpauseClock(-1)
-        { }
-
+        explicit ISoundSource(Engine *engine, uint32_t parentClock, bool paused = false);
         virtual ~ISoundSource();
 
         /// Get the current pointer position
@@ -47,6 +45,15 @@ namespace insound {
         auto parentClock() const { return m_parentClock; }
 
         virtual void updateParentClock(uint32_t parentClock) { m_parentClock = parentClock; }
+
+        [[nodiscard]]
+        PanEffect *panner() { return m_panner; }
+        [[nodiscard]]
+        const PanEffect *panner() const { return m_panner; }
+
+        [[nodiscard]]
+        float volume() const;
+        void volume(float value);
     private:
         virtual int readImpl(uint8_t *pcmPtr, int length) = 0;
         bool m_paused;
@@ -56,5 +63,8 @@ namespace insound {
         uint32_t m_clock, m_parentClock;
         int m_pauseClock, m_unpauseClock;
         std::vector<uint8_t> m_outBuffer, m_inBuffer;
+
+        PanEffect *m_panner;
+        VolumeEffect *m_volume;
     };
 }

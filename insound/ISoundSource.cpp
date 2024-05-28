@@ -1,9 +1,22 @@
 #include "ISoundSource.h"
+
+#include <iostream>
+
 #include "IEffect.h"
 #include "Engine.h"
 #include "Command.h"
+#include "effects/PanEffect.h"
+#include "effects/VolumeEffect.h"
 
 namespace insound {
+    ISoundSource::ISoundSource(Engine *engine, uint32_t parentClock, bool paused): m_paused(paused),
+        m_effects(), m_engine(engine), m_clock(0), m_parentClock(parentClock),
+        m_pauseClock(-1), m_unpauseClock(-1), m_panner(nullptr), m_volume(nullptr)
+    {
+        m_panner = (PanEffect *)insertEffect(new PanEffect(engine), 0);
+        m_volume = (VolumeEffect *)insertEffect(new VolumeEffect(engine), 1);
+    }
+
     ISoundSource::~ISoundSource()
     {
         for (const auto &effect : m_effects)
@@ -33,19 +46,20 @@ namespace insound {
         {
             if (m_paused)
             {
-                // if next unpause occurs within this chunk
+                // next unpause occurs within this chunk
                 if (unpauseClock < (length - i) / (2 * sizeof(float)) && unpauseClock > -1)
                 {
                     i += (int)unpauseClock;
 
-                    if (pauseClock < unpauseClock) // if pause clock comes before unpause, unset it, it's redundant
-                    {
-                        m_pauseClock = -1;
-                    }
+                    // if (pauseClock < unpauseClock) // if pause clock comes before unpause, unset it, it's redundant
+                    // {
+                    //     m_pauseClock = -1;
+                    //     pauseClock = -1;
+                    // }
 
                     if (pauseClock > -1)
                         pauseClock -= unpauseClock;
-
+                    std::cout << "Unpause occured at clock: " << m_parentClock + unpauseClock << '\n';
                     m_unpauseClock = -1;
                     m_paused = false;
                 }
@@ -67,11 +81,12 @@ namespace insound {
 
                 if (pauseThisFrame)
                 {
-                    if (unpauseClock < pauseClock)
-                    {
-                        m_unpauseClock = -1;
-                    }
-
+                    // if (unpauseClock < pauseClock)
+                    // {
+                    //     m_unpauseClock = -1;
+                    //     unpauseClock = -1;
+                    // }
+                    std::cout << "Pause occured at clock: " << m_parentClock + pauseClock << '\n';
                     m_paused = true;
                     m_pauseClock = -1;
                 }
@@ -155,5 +170,15 @@ namespace insound {
             {
             } break;
         }
+    }
+
+    float ISoundSource::volume() const
+    {
+        return m_volume->volume();
+    }
+
+    void ISoundSource::volume(const float value)
+    {
+        m_volume->volume(value);
     }
 }
