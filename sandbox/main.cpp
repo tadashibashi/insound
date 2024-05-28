@@ -54,11 +54,10 @@ int main()
     sounds[3].load("assets/snare-hat.wav", spec);
 
     PCMSource *sources[4]; // using PCMSource ptrs here is error prone, because engine will delete ones that end
-    //sources[0] = engine.playSound(&sounds[0], true);
-    sources[1] = engine.playSound(&sounds[1], true);
-    sources[1]->paused(false);
-    //sources[2] = engine.playSound(&sounds[2], true);
-    //sources[3] = engine.playSound(&sounds[3], true);
+    sources[0] = engine.playSound(&sounds[0], false);
+    sources[1] = engine.playSound(&sounds[1], false);
+    sources[2] = engine.playSound(&sounds[2], false);
+    sources[3] = engine.playSound(&sounds[3], false);
 
     // for (auto source : sources)
     // {
@@ -70,6 +69,8 @@ int main()
 
     bool isRunning = true;
     int channelSelect = 0;
+
+    bool paused = false;
 
 #ifdef __EMSCRIPTEN__
     emMainLoopCallback = [&]() {
@@ -91,6 +92,13 @@ int main()
                 {
                     switch(e.key.keysym.scancode)
                     {
+                        case SDL_SCANCODE_Q:
+                        {
+                                isRunning = false;
+#ifdef __EMSCRIPTEN__
+                                emscripten_force_exit(0);
+#endif
+                        } break;
                         case SDL_SCANCODE_1:
                         {
                             channelSelect = 0;
@@ -113,7 +121,9 @@ int main()
 
                         case SDL_SCANCODE_P:
                         {
-                            masterBus->paused(!masterBus->paused(), masterBus->parentClock() + spec.freq);
+                            std::cout << "Send pause command at " << masterBus->parentClock() << '\n';
+                            masterBus->paused(!paused, masterBus->parentClock() + spec.freq);
+                            paused = !paused;
                         } break;
 
                         case SDL_SCANCODE_Z:
@@ -141,13 +151,13 @@ int main()
                         case SDL_SCANCODE_UP:
                         {
                             auto source = sources[channelSelect];
-                            //source->volume(source->volume() + .1f);
+                            source->volume(source->volume() + .1f);
                         } break;
 
                         case SDL_SCANCODE_DOWN:
                         {
                             auto source = sources[channelSelect];
-                            //source->volume(source->volume() - .1f);
+                            source->volume(source->volume() - .1f);
                         } break;
 
                         default:
