@@ -33,7 +33,9 @@ add_library(insound
     ISoundSource.cpp
     mathf.cpp
     mathf.h
-    Command.h)
+    Command.h
+    effects/VolumeEffect.cpp
+    effects/VolumeEffect.h)
 
 target_link_libraries(insound PRIVATE SDL2::SDL2-static)
 target_include_directories(insound PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
