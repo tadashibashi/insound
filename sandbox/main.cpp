@@ -124,7 +124,21 @@ int main()
                         case SDL_SCANCODE_P:
                         {
                             std::cout << "Send pause command at " << masterBus->parentClock() << '\n';
-                            masterBus->paused(!paused, masterBus->parentClock() + spec.freq);
+                            if (paused)
+                            {
+                                masterBus->paused(false, masterBus->parentClock());
+                                masterBus->paused(true, 0); // cancel pause TODO: this is an unclear way to clear timed pause
+                                masterBus->addFadePoint(masterBus->parentClock(), 0);
+                                masterBus->addFadePoint(masterBus->parentClock() + spec.freq, 1.f);
+                            }
+                            else
+                            {
+                                masterBus->paused(true, masterBus->parentClock() + spec.freq);
+                                masterBus->paused(false, 0);
+                                masterBus->addFadePoint(masterBus->parentClock(), 1.f);
+                                masterBus->addFadePoint(masterBus->parentClock() + spec.freq, 0);
+                            }
+
                             paused = !paused;
                         } break;
 

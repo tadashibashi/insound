@@ -5,13 +5,14 @@
 #include "IEffect.h"
 #include "Engine.h"
 #include "Command.h"
+
 #include "effects/PanEffect.h"
 #include "effects/VolumeEffect.h"
 
 namespace insound {
-    ISoundSource::ISoundSource(Engine *engine, uint32_t parentClock, bool paused): m_paused(paused),
-        m_effects(), m_engine(engine), m_clock(0), m_parentClock(parentClock),
-        m_pauseClock(-1), m_unpauseClock(-1), m_panner(nullptr), m_volume(nullptr)
+    ISoundSource::ISoundSource(Engine *engine, uint32_t parentClock, bool paused) :
+        m_paused(paused), m_effects(), m_engine(engine), m_clock(0), m_parentClock(parentClock),
+        m_pauseClock(-1), m_unpauseClock(-1), m_fadePoints(), m_fadeValue(1.f), m_panner(nullptr), m_volume(nullptr)
     {
         m_panner = (PanEffect *)insertEffect(new PanEffect(engine), 0);
         m_volume = (VolumeEffect *)insertEffect(new VolumeEffect(engine), 1);
@@ -23,6 +24,33 @@ namespace insound {
         {
             delete effect;
         }
+    }
+
+    /// Find starting fade point index, if there is no fade, e.g. < 2 points available, or the last fadepoint clock time
+    /// was surpassed, -1 is returned.
+    /// @param points list of points to check, must be sorted by clock time, low to high
+    /// @param clock  current clock point to check
+    /// @param outIndex [out] index to retrieve - this value is the last fadepoint that is less than `clock`, thus the
+    ///                       first of two points to interpolate the resulting fade value.
+    /// @returns whether there is a next available fade at the index after `outIndex`. Since there must be a second
+    ///          fade point to interpolate between, this also means whether to perform the fade or not.
+    static bool findFadePointIndex(const std::vector<FadePoint> &points, const uint32_t clock, int *outIndex)
+    {
+        int res = -1;
+        for (const auto &point : points)
+        {
+            if (point.clock > clock)
+            {
+                break;
+            }
+
+            ++res;
+        }
+
+        if (outIndex)
+            *outIndex = res;
+
+        return res + 1 < points.size();
     }
 
     int ISoundSource::read(const uint8_t **pcmPtr, int length)
@@ -51,11 +79,11 @@ namespace insound {
                 {
                     i += (int)unpauseClock;
 
-                    // if (pauseClock < unpauseClock) // if pause clock comes before unpause, unset it, it's redundant
-                    // {
-                    //     m_pauseClock = -1;
-                    //     pauseClock = -1;
-                    // }
+                    if (pauseClock < unpauseClock) // if pause clock comes before unpause, unset it, it's redundant
+                    {
+                        m_pauseClock = -1;
+                        pauseClock = -1;
+                    }
 
                     if (pauseClock > -1)
                         pauseClock -= unpauseClock;
@@ -70,7 +98,7 @@ namespace insound {
             }
             else
             {
-                // check if there is an pause clock ahead to see how many samples to read until then
+                // check if there is a pause clock ahead to see how many samples to read until then
                 bool pauseThisFrame = (pauseClock < (length - i) / (2 * sizeof(float)) && pauseClock > -1);
                 int bytesToRead = pauseThisFrame ? pauseClock : length - i;
 
@@ -81,11 +109,12 @@ namespace insound {
 
                 if (pauseThisFrame)
                 {
-                    // if (unpauseClock < pauseClock)
-                    // {
-                    //     m_unpauseClock = -1;
-                    //     unpauseClock = -1;
-                    // }
+                    if (unpauseClock < pauseClock) // if unpause clock comes before pause, unset it, it's redundant
+                    {
+                        m_unpauseClock = -1;
+                        unpauseClock = -1;
+                    }
+
                     std::cout << "Pause occured at clock: " << m_parentClock + pauseClock << '\n';
                     m_paused = true;
                     m_pauseClock = -1;
@@ -107,6 +136,37 @@ namespace insound {
             effect->process((float *)m_outBuffer.data(), (float *)m_inBuffer.data(), (int)sampleCount);
             std::swap(m_outBuffer, m_inBuffer);
         }
+
+        // Apply fade points
+        int fadeIndex = -1;
+        uint32_t fadeClock = m_parentClock;
+
+        for (auto sample = (float *)m_outBuffer.data(), end = (float *)(m_outBuffer.data() + m_outBuffer.size());
+            sample != end;
+            ++sample)
+        {
+            if (findFadePointIndex(m_fadePoints, fadeClock, &fadeIndex)) // calculate fade value
+            {
+                const auto clock0 = m_fadePoints[fadeIndex].clock;
+                const auto clock1 = m_fadePoints[fadeIndex + 1].clock;
+                const float amount = (float)(fadeClock - clock0) / (float)(clock1 - clock0);
+
+                const auto value0 = m_fadePoints[fadeIndex].value;
+                const auto value1 = m_fadePoints[fadeIndex + 1].value;
+
+                m_fadeValue =  (value1 - value0) * amount + value0;
+            }
+
+            // apply fade on sample
+            *sample *= m_fadeValue;
+
+            ++fadeClock;
+        }
+
+        // Remove all fade points that have been passed
+        if (fadeIndex > 0)
+            m_fadePoints.erase(m_fadePoints.begin(), m_fadePoints.begin() + (fadeIndex - 1));
+
 
         *pcmPtr = m_outBuffer.data();
 
@@ -233,5 +293,12 @@ namespace insound {
     {
         // pushed immeidately due to need for immediate sample clock accuracy
         m_engine->pushImmediateCommand(Command::makeSourceRemoveFadePoint(this, start, end));
+    }
+
+    bool ISoundSource::getFadeValue(float *outValue) const
+    {
+        if (outValue)
+            *outValue = m_fadeValue;
+        return true;
     }
 }

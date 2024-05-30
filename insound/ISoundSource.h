@@ -69,6 +69,8 @@ namespace insound {
         /// @param start starting point at which to remove fadepoints (inclusive)
         /// @param end   ending point at which to remove fadepoints (up until, but not including)
         void removeFadePoints(uint32_t start, uint32_t end = UINT32_MAX);
+
+        bool getFadeValue(float *outValue) const;
     private:
         virtual int readImpl(uint8_t *pcmPtr, int length) = 0;
         bool m_paused;
@@ -82,6 +84,7 @@ namespace insound {
         std::vector<FadePoint> m_fadePoints;
         float m_fadeValue;
 
+        // default effects included in each SoundSource
         PanEffect *m_panner;
         VolumeEffect *m_volume;
     };
