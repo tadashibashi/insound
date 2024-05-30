@@ -9,6 +9,11 @@ namespace insound {
     class Engine;
     class IEffect;
 
+    struct FadePoint {
+        uint32_t clock;
+        float value;
+    };
+
     class ISoundSource {
     public:
         explicit ISoundSource(Engine *engine, uint32_t parentClock, bool paused = false);
@@ -54,6 +59,16 @@ namespace insound {
         [[nodiscard]]
         float volume() const;
         void volume(float value);
+
+        /// Add a linear fade point. Two must exist for it to be applied.
+        /// @param clock parent clocks in samples
+        /// @param value value to fade to
+        void addFadePoint(uint32_t clock, float value);
+
+        /// Remove fade points between start (inclusive) and end (exclusive), in parent clocks
+        /// @param start starting point at which to remove fadepoints (inclusive)
+        /// @param end   ending point at which to remove fadepoints (up until, but not including)
+        void removeFadePoints(uint32_t start, uint32_t end = UINT32_MAX);
     private:
         virtual int readImpl(uint8_t *pcmPtr, int length) = 0;
         bool m_paused;
@@ -63,6 +78,9 @@ namespace insound {
         uint32_t m_clock, m_parentClock;
         int m_pauseClock, m_unpauseClock;
         std::vector<uint8_t> m_outBuffer, m_inBuffer;
+
+        std::vector<FadePoint> m_fadePoints;
+        float m_fadeValue;
 
         PanEffect *m_panner;
         VolumeEffect *m_volume;

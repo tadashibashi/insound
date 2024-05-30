@@ -13,8 +13,9 @@ namespace insound {
     {
         ISoundSource::updateParentClock(parentClock);
 
+        // Recursively update all sub-sources
         const auto curClock = clock();
-        for (auto &source : m_sources) // recursively update all busses and sources
+        for (auto &source : m_sources)
         {
             source->updateParentClock(curClock);
         }

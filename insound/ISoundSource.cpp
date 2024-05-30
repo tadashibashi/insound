@@ -166,6 +166,47 @@ namespace insound {
                 }
             } break;
 
+            case SourceCommandType::AddFadePoint:
+            {
+                const auto clock = command.data.source.data.addfadepoint.clock;
+                const auto value = command.data.source.data.addfadepoint.value;
+
+                bool didInsert = false;
+                for (auto it = m_fadePoints.begin(); it != m_fadePoints.end(); ++it)
+                {
+                    if (clock == it->clock) // replace the value
+                    {
+                        it->value = value;
+                        didInsert = true;
+                        break;
+                    }
+
+                    if (clock < it->clock)
+                    {
+                        m_fadePoints.insert(it, FadePoint{.clock=clock, .value=value});
+                        didInsert = true;
+                        break;
+                    }
+                }
+
+                if (!didInsert)
+                {
+                    m_fadePoints.emplace_back(FadePoint{.clock=clock, .value=value});
+                }
+            } break;
+
+            case SourceCommandType::RemoveFadePoint:
+            {
+                const auto start = command.data.source.data.removefadepoint.begin;
+                const auto end = command.data.source.data.removefadepoint.end;
+
+                // remove-erase idiom on all fadepoints that match criteria
+                m_fadePoints.erase(std::remove_if(m_fadePoints.begin(), m_fadePoints.end(), [start, end](const FadePoint &point) {
+                    return point.clock >=  start && point.clock < end;
+                }), m_fadePoints.end());
+
+            } break;
+
             default:
             {
             } break;
@@ -180,5 +221,17 @@ namespace insound {
     void ISoundSource::volume(const float value)
     {
         m_volume->volume(value);
+    }
+
+    void ISoundSource::addFadePoint(const uint32_t clock, const float value)
+    {
+        // pushed immediately due to need for immediate sample clock accuracy
+        m_engine->pushImmediateCommand(Command::makeSourceAddFadePoint(this, clock, value));
+    }
+
+    void ISoundSource::removeFadePoints(const uint32_t start, const uint32_t end)
+    {
+        // pushed immeidately due to need for immediate sample clock accuracy
+        m_engine->pushImmediateCommand(Command::makeSourceRemoveFadePoint(this, start, end));
     }
 }

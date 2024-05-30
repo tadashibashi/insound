@@ -7,7 +7,9 @@ namespace insound {
         enum Enum {
             SetPause,
             AddEffect,
-            RemoveEffect
+            RemoveEffect,
+            AddFadePoint,
+            RemoveFadePoint,
         };
     };
 
@@ -36,11 +38,19 @@ namespace insound {
                         class IEffect *effect;
                         int position;
                     } effect;
+                    struct {
+                        uint32_t clock;
+                        float value;
+                    } addfadepoint;
+                    struct {
+                        uint32_t begin;
+                        uint32_t end;
+                    } removefadepoint;
                 } data;
             } source;
         } data;
 
-        static Command makeEffectParamSet(class IEffect *effect, int index, float value)
+        static Command makeEffectParamSet(class IEffect *effect, const int index, const float value)
         {
             Command c{};
             c.type = EffectParamSet;
@@ -51,7 +61,7 @@ namespace insound {
             return c;
         }
 
-        static Command makeSourcePause(class ISoundSource *source, bool paused, uint32_t clock)
+        static Command makeSourcePause(class ISoundSource *source, const bool paused, const uint32_t clock)
         {
             Command c{};
             c.type = SoundSource;
@@ -62,7 +72,7 @@ namespace insound {
             return c;
         }
 
-        static Command makeSourceEffect(class ISoundSource *source, bool addEffect, class IEffect *effect, int position)
+        static Command makeSourceEffect(class ISoundSource *source, const bool addEffect, class IEffect *effect, const int position)
         {
             Command c{};
             c.type = SoundSource;
@@ -70,6 +80,30 @@ namespace insound {
             c.data.source.source = source;
             c.data.source.data.effect.effect = effect;
             c.data.source.data.effect.position = position;
+
+            return c;
+        }
+
+        static Command makeSourceAddFadePoint(class ISoundSource *source, const uint32_t clock, const float value)
+        {
+            Command c{};
+            c.type = SoundSource;
+            c.data.source.source = source;
+            c.data.source.type = SourceCommandType::AddFadePoint;
+            c.data.source.data.addfadepoint.clock = clock;
+            c.data.source.data.addfadepoint.value = value;
+
+            return c;
+        }
+
+        static Command makeSourceRemoveFadePoint(class ISoundSource *source, const uint32_t begin, const uint32_t end)
+        {
+            Command c{};
+            c.type = SoundSource;
+            c.data.source.source = source;
+            c.data.source.type = SourceCommandType::RemoveFadePoint;
+            c.data.source.data.removefadepoint.begin = begin;
+            c.data.source.data.removefadepoint.end = end;
 
             return c;
         }
