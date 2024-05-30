@@ -1,7 +1,10 @@
 #include "Engine.h"
-#include "SoundBuffer.h"
+
+#include "AudioSpec.h"
 #include "Bus.h"
+#include "Error.h"
 #include "PCMSource.h"
+#include "SoundBuffer.h"
 
 #include <SDL2/SDL_audio.h>
 
@@ -9,15 +12,18 @@
 #include <mutex>
 #include <vector>
 
+
+
 static int getDefaultSampleRate();
 
 namespace insound {
     struct Engine::Impl {
     public:
-        explicit Impl(Engine *engine) :
-            m_engine(engine), m_spec(), m_deviceID(), m_clock(), m_masterBus(), m_mixMutex(),
-            m_deferredCommands(), m_immediateCommands()
-        { }
+        explicit Impl(Engine *engine) : m_engine(engine), m_spec(), m_deviceID(), m_clock(), m_masterBus(),
+                                        m_mixMutex(),
+                                        m_deferredCommands(), m_immediateCommands(), m_bufferSize(0)
+        {
+        }
 
         ~Impl()
         {
@@ -42,10 +48,15 @@ namespace insound {
                 return false;
             }
 
-            m_spec = obtained;
+            m_spec.channels = obtained.channels;
+            m_spec.freq = obtained.freq;
+            m_spec.format = SampleFormat(SDL_AUDIO_BITSIZE(obtained.format), SDL_AUDIO_ISFLOAT(obtained.format),
+                SDL_AUDIO_ISBIGENDIAN(obtained.format), SDL_AUDIO_ISSIGNED(obtained.format));
+
             m_deviceID = tempDeviceID;
             m_clock = 0;
             m_masterBus = new Bus(m_engine, nullptr);
+            m_bufferSize = obtained.size;
 
             SDL_PauseAudioDevice(tempDeviceID, SDL_FALSE);
             return true;
@@ -66,6 +77,21 @@ namespace insound {
                 }
 
             }
+        }
+
+        [[nodiscard]]
+        bool getBufferSize(uint32_t *outSize) const
+        {
+            if (!isOpen())
+            {
+                pushError(Error::LogicErr, "Couldn't retrieve buffer size: audio device was not open");
+                return false;
+            }
+
+            if (outSize)
+                *outSize = m_bufferSize;
+
+            return true;
         }
 
         [[nodiscard]]
@@ -91,17 +117,21 @@ namespace insound {
             return newSource;
         }
 
+        /// non-zero positive number if open, zero if not
         [[nodiscard]]
         uint32_t deviceID() const
         {
             return m_deviceID;
         }
 
-        bool getSpec(SDL_AudioSpec *outSpec) const
+        /// Get audio specification data
+        /// @param outSpec spec to receive
+        /// @returns true on success, false on error
+        bool getSpec(AudioSpec *outSpec) const
         {
             if (!isOpen())
             {
-                printf("Couldn't retrieve audio spec: audio device was not open\n");
+                pushError(Error::LogicErr, "Couldn't retrieve audio spec: audio device was not open");
                 return false;
             }
 
@@ -200,7 +230,7 @@ namespace insound {
         }
 
         Engine *m_engine;
-        SDL_AudioSpec m_spec;
+        AudioSpec m_spec;
         SDL_AudioDeviceID m_deviceID;
         uint32_t m_clock;
 
@@ -208,6 +238,7 @@ namespace insound {
         std::mutex m_mixMutex;
         std::vector<Command> m_deferredCommands;
         std::vector<Command> m_immediateCommands;
+        uint32_t m_bufferSize;
     };
 
     Engine::Engine() : m(new Impl(this))
@@ -243,12 +274,17 @@ namespace insound {
         return m->deviceID();
     }
 
-    bool Engine::getSpec(SDL_AudioSpec *outSpec) const
+    bool Engine::getSpec(AudioSpec *outSpec) const
     {
         return m->getSpec(outSpec);
     }
 
-    bool Engine::getMasterBus(Bus **bus)
+    bool Engine::getBufferSize(uint32_t *outSize) const
+    {
+        return m->getBufferSize(outSize);
+    }
+
+    bool Engine::getMasterBus(Bus **bus) const
     {
         return m->getMasterBus(bus);
     }

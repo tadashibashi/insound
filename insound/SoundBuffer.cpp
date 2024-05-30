@@ -1,8 +1,10 @@
 #include "SoundBuffer.h"
+#include "AudioSpec.h"
+
 #include <SDL_audio.h>
 
 namespace insound {
-    SoundBuffer::SoundBuffer() : m_byteLength(), m_buffer(), m_freq(0), m_channels(0), m_format(0)
+    SoundBuffer::SoundBuffer() : m_byteLength(), m_buffer(), m_freq(0), m_spec()
     {
     }
 
@@ -11,7 +13,7 @@ namespace insound {
         unload();
     }
 
-    bool SoundBuffer::load(const fs::path &filepath, const SDL_AudioSpec &targetSpec)
+    bool SoundBuffer::load(const fs::path &filepath, const AudioSpec &targetSpec)
     {
         SDL_AudioSpec spec;
         uint32_t length;
@@ -25,7 +27,7 @@ namespace insound {
         SDL_AudioCVT cvt;
         const auto cvtResult = SDL_BuildAudioCVT(&cvt,
             spec.format, spec.channels, spec.freq,
-            targetSpec.format, targetSpec.channels, targetSpec.freq);
+            targetSpec.format.flags(), targetSpec.channels, targetSpec.freq);
 
         if (cvt.needed == SDL_FALSE || cvtResult < 0)
         {
@@ -55,9 +57,8 @@ namespace insound {
         // Success!
         m_buffer = cvt.buf;
         m_byteLength = cvt.len_cvt;
-        m_freq = targetSpec.freq;
-        m_format = targetSpec.format;
-        m_channels = targetSpec.channels;
+
+        m_spec = targetSpec;
         return true;
     }
 
@@ -70,43 +71,5 @@ namespace insound {
             m_byteLength = 0;
         }
     }
-
-    bool SoundBuffer::isInt() const
-    {
-        return SDL_AUDIO_ISINT(m_format);
-    }
-
-    bool SoundBuffer::isFloat() const
-    {
-        return SDL_AUDIO_ISFLOAT(m_format);
-    }
-
-    bool SoundBuffer::isSigned() const
-    {
-        return SDL_AUDIO_ISSIGNED(m_format);
-    }
-
-    bool SoundBuffer::isUnsigned() const
-    {
-        return SDL_AUDIO_ISUNSIGNED(m_format);
-    }
-
-    int SoundBuffer::samplerate() const
-    {
-        return m_freq;
-    }
-
-    int SoundBuffer::bitSize() const
-    {
-        return SDL_AUDIO_BITSIZE(m_format);
-    }
-
-    uint8_t SoundBuffer::channels() const
-    {
-        return m_channels;
-    }
-
-
-
 }
 

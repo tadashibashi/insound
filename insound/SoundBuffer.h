@@ -3,6 +3,9 @@
 #include <filesystem>
 #include <vector>
 
+#include "AudioSpec.h"
+#include "SampleFormat.h"
+
 namespace fs = std::filesystem;
 
 struct SDL_AudioSpec;
@@ -18,7 +21,7 @@ namespace insound {
         /// @param filepath    path to the sound file (only WAV supported for now)
         /// @param targetSpec  the specification to convert this buffer to on load, usually of the opened audio device
         ///                    to match the output type
-        bool load(const fs::path &filepath, const SDL_AudioSpec &targetSpec);
+        bool load(const fs::path &filepath, const AudioSpec &targetSpec);
 
         /// Free sound buffer resources
         void unload();
@@ -42,25 +45,7 @@ namespace insound {
         const uint8_t *data() const { return m_buffer; }
 
         [[nodiscard]]
-        bool isInt() const;
-
-        [[nodiscard]]
-        bool isFloat() const;
-
-        [[nodiscard]]
-        bool isSigned() const;
-
-        [[nodiscard]]
-        bool isUnsigned() const;
-
-        [[nodiscard]]
-        int samplerate() const;
-
-        [[nodiscard]]
-        int bitSize() const;
-
-        [[nodiscard]]
-        uint8_t channels() const;
+        const AudioSpec &spec() const { return m_spec; }
     private:
         // buffer
         uint32_t m_byteLength;
@@ -68,9 +53,7 @@ namespace insound {
 
         // buffer specs
         int m_freq;
-        uint8_t m_channels;
-        uint16_t m_format;
-
+        AudioSpec m_spec;
     };
 
 }

@@ -8,6 +8,8 @@
 
 #include <iostream>
 
+#include "insound/AudioSpec.h"
+
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
 #include <functional>
@@ -44,7 +46,7 @@ int main()
         return -1;
     }
 
-    SDL_AudioSpec spec;
+    AudioSpec spec;
     engine.getSpec(&spec);
 
     SoundBuffer sounds[4];

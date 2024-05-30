@@ -1,9 +1,9 @@
 #pragma once
 #include "Command.h"
 #include <cstdint>
-struct SDL_AudioSpec;
 
 namespace insound {
+    struct AudioSpec;
     class Bus;
     class SoundBuffer;
     class PCMSource;
@@ -28,10 +28,14 @@ namespace insound {
         [[nodiscard]]
         uint32_t deviceID() const;
 
-        /// TODO: create our own spec object or make individual getters
-        bool getSpec(SDL_AudioSpec *outSpec) const;
+        /// Get audio spec
+        bool getSpec(AudioSpec *outSpec) const;
 
-        bool getMasterBus(Bus **bus);
+        /// Get the size of audio buffer in bytes
+        [[nodiscard]]
+        bool getBufferSize(uint32_t *outSize) const;
+
+        bool getMasterBus(Bus **bus) const;
 
         void pushCommand(const Command &command);
         void pushImmediateCommand(const Command &command);
