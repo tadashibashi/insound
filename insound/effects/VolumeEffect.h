@@ -10,13 +10,14 @@ namespace insound {
         }
 
         void process(float *input, float *output, int count) override;
-        void receiveParam(int index, float value) override;
 
         [[nodiscard]]
         float volume() const { return m_volume; }
         void volume(float value);
 
     private:
+        void receiveParam(int index, float value) override;
+
         struct Param {
             enum Enum {
                 Volume,

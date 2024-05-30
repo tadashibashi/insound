@@ -1,5 +1,4 @@
 #pragma once
-#include <cstdint>
 
 namespace insound {
     class Engine;
@@ -11,11 +10,6 @@ namespace insound {
 
         virtual void process(float *input, float *output, int count) = 0;
 
-        /// Override this if you need to process parameter sets.
-        /// Don't set member parameters directly as it may occur during audio thread.
-        /// Instead set via `setParam` and apply changes in `receiveParam`.
-        virtual void receiveParam(int index, float value) {}
-
         [[nodiscard]]
         Engine *engine() { return m_engine; }
         [[nodiscard]]
@@ -23,7 +17,13 @@ namespace insound {
     protected:
         void sendParam(int index, float value);
 
+        /// Override this if you need to process parameter sets.
+        /// Don't set member parameters directly as it may occur during audio thread.
+        /// Instead set via `setParam` and apply changes in `receiveParam`.
+        virtual void receiveParam(int index, float value) {}
+
     private:
+        friend class Engine;
         Engine *m_engine;
     };
 }
