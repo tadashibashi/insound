@@ -1,5 +1,6 @@
 #pragma once
 #include "Command.h"
+
 #include <cstdint>
 
 namespace insound {
@@ -28,7 +29,12 @@ namespace insound {
         /// @param looping whether to loop sound
         /// @param oneshot whether to release sound resources at end, (will not auto-release while looping is true)
         /// @param bus     bus this source should output to; left null the master bus will be used
-        SourceHandle<PCMSource> playSound(const SoundBuffer *buffer, bool paused = false, bool looping = false, bool oneshot = false, Bus *bus = nullptr);
+        SourceHandle<PCMSource> playSound(const SoundBuffer *buffer, bool paused, bool looping, bool oneshot, SourceHandle<Bus> bus);
+
+        /// Create a new bus to use in the mixing graph
+        /// @param paused whether bus should start off paused on initialization
+        /// @param output output bus to feed this bus to, if nullptr, the master Bus will be used
+        SourceHandle<Bus> createBus(bool paused, Bus *output = nullptr);
 
         [[nodiscard]]
         uint32_t deviceID() const;

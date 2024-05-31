@@ -15,6 +15,12 @@ namespace insound {
         };
     };
 
+    struct BusCommandType {
+        enum Enum {
+            SetOutput,
+        };
+    };
+
     struct PCMSourceCommandType {
         enum Enum {
             SetPosition
@@ -26,6 +32,7 @@ namespace insound {
             EffectParamSet, ///< effect data
             SoundSource,    ///< source data
             PCMSource,      ///< pcmsource data
+            Bus,
         } type;
 
         union {
@@ -67,6 +74,16 @@ namespace insound {
                     } setposition;
                 } data;
             } pcmsource;
+
+            struct {
+                class Bus *bus;
+                BusCommandType::Enum type;
+                union {
+                    struct {
+                        class Bus *output;
+                    } setoutput;
+                } data;
+            } bus;
         } data;
 
         static Command makeEffectParamSet(class Effect *effect, const int index, const float value)
@@ -134,6 +151,17 @@ namespace insound {
             c.data.pcmsource.type = PCMSourceCommandType::SetPosition;
             c.data.pcmsource.source = source;
             c.data.pcmsource.data.setposition.position = position;
+
+            return c;
+        }
+
+        static Command makeBusSetOutput(class Bus *bus, class Bus *output)
+        {
+            Command c{};
+            c.type = Type::Bus;
+            c.data.bus.bus = bus;
+            c.data.bus.type = BusCommandType::SetOutput;
+            c.data.bus.data.setoutput.output = output;
 
             return c;
         }

@@ -51,6 +51,8 @@ int main()
     AudioSpec spec;
     engine.getSpec(&spec);
 
+    auto myBus = engine.createBus(false);
+
     SoundBuffer sounds[4];
     sounds[0].load("assets/bassdrum.wav", spec);
     sounds[1].load("assets/ep.wav", spec);
@@ -58,15 +60,17 @@ int main()
     sounds[3].load("assets/snare-hat.wav", spec);
 
     SourceHandle<PCMSource> sources[4];
-    sources[0] = engine.playSound(&sounds[0], false, true);
-    sources[1] = engine.playSound(&sounds[1], false, true);
-    sources[2] = engine.playSound(&sounds[2], false, true);
-    sources[3] = engine.playSound(&sounds[3], false, true);
+    sources[0] = engine.playSound(&sounds[0], false, true, false, myBus);
+    sources[1] = engine.playSound(&sounds[1], false, true, false, myBus);
+    sources[2] = engine.playSound(&sounds[2], false, true, false, myBus);
+    sources[3] = engine.playSound(&sounds[3], false, true, false, myBus);
+
+    sources[0]->volume(.5f);
 
     Bus *masterBus;
     engine.getMasterBus(&masterBus);
 
-    masterBus->insertEffect(new DelayEffect(&engine, (int)((float)spec.freq / 8.f), .3f, .3f), 0);
+    masterBus->insertEffect(new DelayEffect(&engine, (int)((float)spec.freq * .15f), .2f, .6f), 0);
 
     bool isRunning = true;
     int channelSelect = 0;
@@ -122,20 +126,20 @@ int main()
 
                         case SDL_SCANCODE_P:
                         {
-                            std::cout << "Send pause command at " << masterBus->parentClock() << '\n';
+                            std::cout << "Send pause command at " << myBus->parentClock() << '\n';
                             if (paused)
                             {
-                                masterBus->paused(false, masterBus->parentClock());
-                                masterBus->paused(true, 0); // cancel pause TODO: this is an unclear way to clear timed pause
-                                masterBus->addFadePoint(masterBus->parentClock(), 0);
-                                masterBus->addFadePoint(masterBus->parentClock() + spec.freq, 1.f);
+                                myBus->paused(false, myBus->parentClock());
+                                myBus->paused(true, 0); // cancel pause TODO: this is an unclear way to clear timed pause
+                                myBus->addFadePoint(myBus->parentClock(), 0);
+                                myBus->addFadePoint(myBus->parentClock() + spec.freq, 1.f);
                             }
                             else
                             {
-                                masterBus->paused(true, masterBus->parentClock() + spec.freq);
-                                masterBus->paused(false, 0);
-                                masterBus->addFadePoint(masterBus->parentClock(), 1.f);
-                                masterBus->addFadePoint(masterBus->parentClock() + spec.freq, 0);
+                                myBus->paused(true, myBus->parentClock() + spec.freq);
+                                myBus->paused(false, 0);
+                                myBus->addFadePoint(myBus->parentClock(), 1.f);
+                                myBus->addFadePoint(myBus->parentClock() + spec.freq, 0);
                             }
 
                             paused = !paused;
@@ -143,19 +147,19 @@ int main()
 
                         case SDL_SCANCODE_Z:
                         {
-                            masterBus->panner()->left(masterBus->panner()->left() + .05f);
+                            myBus->panner()->left(myBus->panner()->left() + .05f);
                         } break;
                         case SDL_SCANCODE_X:
                         {
-                            masterBus->panner()->left(masterBus->panner()->left() - .05f);
+                            myBus->panner()->left(myBus->panner()->left() - .05f);
                         } break;
                         case SDL_SCANCODE_C:
                         {
-                            masterBus->panner()->right(masterBus->panner()->right() - .05f);
+                            myBus->panner()->right(myBus->panner()->right() - .05f);
                         } break;
                         case SDL_SCANCODE_V:
                         {
-                            masterBus->panner()->right(masterBus->panner()->right() + .05f);
+                            myBus->panner()->right(myBus->panner()->right() + .05f);
                         } break;
 
                         // Stop and release the sound source

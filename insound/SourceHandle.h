@@ -27,6 +27,7 @@ namespace insound {
         [[nodiscard]]
         bool isValid() const;
 
+        T *get() { return m_source; }
     private:
         T *m_source;
         Engine *m_engine;

@@ -5,20 +5,27 @@
 
 #include <vector>
 
+#include "SourceHandle.h"
+
 namespace insound {
+    struct Command;
+
     class Bus : public SoundSource {
     public:
-        explicit Bus(Engine *engine, Bus *parent);
+        explicit Bus(Engine *engine, Bus *parent, bool paused);
         ~Bus() override = default;
 
         void release(bool recursive);
 
-        // void setOutput(Bus *output);
+        void setOutput(SourceHandle<Bus> output);
 
     private: // Engine-accessible functions
         friend class Engine;
         void updateParentClock(uint32_t parentClock) override;
         void processRemovals();
+        void applyBusCommand(const Command &command);
+        void setOutput(Bus *output);
+
         /// Append a sound source to the bus.
         /// No checks for duplicates are made, caller should take care of this.
         /// Mix lock should be applied
@@ -35,6 +42,5 @@ namespace insound {
         std::vector<SoundSource *> m_sources;
         std::vector<float> m_buffer; ///< temp buffer to calculate mix
         Bus *m_parent;
-        PanEffect *m_panner;
     };
 }

@@ -60,7 +60,7 @@ namespace insound {
 
             m_deviceID = tempDeviceID;
             m_clock = 0;
-            m_masterBus = new Bus(m_engine, nullptr);
+            m_masterBus = new Bus(m_engine, nullptr, false);
             m_bufferSize = obtained.size;
 
             SDL_PauseAudioDevice(tempDeviceID, SDL_FALSE);
@@ -132,7 +132,16 @@ namespace insound {
 
             m_sources.emplace(newSource);
 
-            return SourceHandle<PCMSource>(newSource, m_engine);
+            return SourceHandle(newSource, m_engine);
+        }
+
+        SourceHandle<Bus> createBus(bool paused, Bus *output)
+        {
+            auto newBus = new Bus(m_engine, output ? output : m_masterBus, paused);
+
+            m_sources.emplace(newBus);
+
+            return SourceHandle(newBus, m_engine);
         }
 
         [[nodiscard]]
@@ -234,6 +243,11 @@ namespace insound {
                         command.data.pcmsource.source->applyPCMSourceCommand(command);
                     } break;
 
+                    case Command::Bus:
+                    {
+                        command.data.bus.bus->applyBusCommand(command);
+                    } break;
+
                     default:
                     {
 
@@ -304,9 +318,16 @@ namespace insound {
         return m->isOpen();
     }
 
-    SourceHandle<PCMSource> Engine::playSound(const SoundBuffer *buffer, bool paused, bool looping, bool oneshot, Bus *bus)
+    /// TODO: make this return bool, and retrieve value via outval
+    SourceHandle<PCMSource> Engine::playSound(const SoundBuffer *buffer, bool paused, bool looping, bool oneshot, SourceHandle<Bus> bus)
     {
-        return m->playSound(buffer, paused, looping, oneshot, bus);
+        return m->playSound(buffer, paused, looping, oneshot, bus.get());
+    }
+
+    /// TODO: make this return bool, and retrieve value via outval
+    SourceHandle<Bus> Engine::createBus(bool paused, Bus *output)
+    {
+        return m->createBus(paused, output);
     }
 
     uint32_t Engine::deviceID() const

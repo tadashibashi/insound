@@ -4,12 +4,14 @@
 
 #include "Engine.h"
 #include "Error.h"
+#include "Command.h"
 
 namespace insound {
-    Bus::Bus(Engine *engine, Bus *parent) : SoundSource(engine, parent ? parent->clock() : 0),
-        m_sources(), m_buffer(), m_parent(parent), m_panner()
+    Bus::Bus(Engine *engine, Bus *parent, bool paused) : SoundSource(engine, parent ? parent->clock() : 0, paused),
+        m_sources(), m_buffer(), m_parent()
     {
-        m_panner = (PanEffect *)insertEffect(new PanEffect(engine), 0);
+        if (parent)
+            setOutput(parent);
     }
 
     void Bus::updateParentClock(uint32_t parentClock)
@@ -61,6 +63,26 @@ namespace insound {
 
             return shouldDiscard;
         }), m_sources.end());
+    }
+
+    void Bus::applyBusCommand(const Command &command)
+    {
+        if (command.data.bus.type == BusCommandType::SetOutput)
+        {
+            const auto newParent = command.data.bus.data.setoutput.output;
+
+            if (m_parent)
+            {
+                m_parent->removeSource(this);
+            }
+
+            newParent->appendSource(this);
+            m_parent = newParent;
+        }
+        else
+        {
+            pushError(Error::InvalidArg, "Unknown bus command type");
+        }
     }
 
     int Bus::readImpl(uint8_t *pcmPtr, int length)
@@ -130,5 +152,25 @@ namespace insound {
                 }
             }
         }
+    }
+
+    void Bus::setOutput(SourceHandle<Bus> output)
+    {
+        if (!output.isValid())
+        {
+            return;
+        }
+
+        setOutput(output.get());
+    }
+
+    void Bus::setOutput(Bus *output)
+    {
+        if (output == m_parent) // don't need to update if same object
+        {
+            return;
+        }
+
+        engine()->pushCommand(Command::makeBusSetOutput(this, output));
     }
 }
