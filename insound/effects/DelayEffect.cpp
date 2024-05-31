@@ -13,33 +13,29 @@ insound::DelayEffect::DelayEffect(Engine *engine, uint32_t delayTime, float wet,
 
 void insound::DelayEffect::process(float *input, float *output, int count)
 {
-    const auto size = m_buffer.size();
-
+    const auto bufSize = m_buffer.size();
     const auto dry = 1.f - m_wet;
     const auto wet = m_wet;
-
-    // write to output (add from delay buffer delayHead)
-    for (int i = 0; i < count; i += 4)
-    {
-        output[i] = input[i] * dry + m_buffer[(m_delayHead + i) % size] * wet;
-        output[i + 1] = input[i + 1] * dry + m_buffer[(m_delayHead + i + 1) % size] * wet;
-        output[i + 2] = input[i + 2] * dry + m_buffer[(m_delayHead + i + 2) % size] * wet;
-        output[i + 3] = input[i + 3] * dry + m_buffer[(m_delayHead + i + 3) % size] * wet;
-    }
-
     const auto feedback = m_feedback;
 
-    // read from input and write to our delaybuffer
+    // write to output (add from delay buffer), read from input and fill buffer
     for (int i = 0; i < count; i += 4)
     {
-        m_buffer[(m_delayHead + i) % size] = input[i] * feedback;
-        m_buffer[(m_delayHead + i + 1) % size] = input[i+1] * feedback;
-        m_buffer[(m_delayHead + i + 2) % size] = input[i+2] * feedback;
-        m_buffer[(m_delayHead + i + 3) % size] = input[i+3] * feedback;
+        output[i] = input[i] * dry + m_buffer[(m_delayHead + i) % bufSize] * wet;
+        m_buffer[(m_delayHead + i) % bufSize] = input[i] * feedback;
+
+        output[i + 1] = input[i + 1] * dry + m_buffer[(m_delayHead + i + 1) % bufSize] * wet;
+        m_buffer[(m_delayHead + i + 1) % bufSize] = input[i+1] * feedback;
+
+        output[i + 2] = input[i + 2] * dry + m_buffer[(m_delayHead + i + 2) % bufSize] * wet;
+        m_buffer[(m_delayHead + i + 2) % bufSize] = input[i+2] * feedback;
+
+        output[i + 3] = input[i + 3] * dry + m_buffer[(m_delayHead + i + 3) % bufSize] * wet;
+        m_buffer[(m_delayHead + i + 3) % bufSize] = input[i+3] * feedback;
     }
 
     // update delay head
-    m_delayHead = (m_delayHead + count) % size;
+    m_delayHead = (m_delayHead + count) % bufSize;
 }
 
 void insound::DelayEffect::delayTime(uint32_t samples)
