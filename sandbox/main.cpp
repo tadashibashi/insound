@@ -10,6 +10,7 @@
 #include <iostream>
 
 #include "insound/AudioSpec.h"
+#include "insound/effects/DelayEffect.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
@@ -62,13 +63,10 @@ int main()
     sources[2] = engine.playSound(&sounds[2], false, true);
     sources[3] = engine.playSound(&sounds[3], false, true);
 
-    // for (auto source : sources)
-    // {
-    //     source->paused(false);
-    // }
-
     Bus *masterBus;
     engine.getMasterBus(&masterBus);
+
+    masterBus->insertEffect(new DelayEffect(&engine, (int)((float)spec.freq / 8.f), .3f, .3f), 0);
 
     bool isRunning = true;
     int channelSelect = 0;
