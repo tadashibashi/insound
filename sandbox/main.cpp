@@ -2,6 +2,7 @@
 #include <insound/Engine.h>
 #include <insound/SoundBuffer.h>
 #include <insound/PCMSource.h>
+#include <insound/SourceHandle.h>
 #include <insound/Bus.h>
 
 #include <SDL2/SDL.h>
@@ -25,7 +26,7 @@ using namespace insound;
 
 int main()
 {
-    if (SDL_Init(SDL_INIT_AUDIO | SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0)
+    if (SDL_Init(SDL_INIT_VIDEO) != 0)
     {
         printf("Failed to init SDL2 %s\n", SDL_GetError());
         return -1;
@@ -55,11 +56,11 @@ int main()
     sounds[2].load("assets/piano.wav", spec);
     sounds[3].load("assets/snare-hat.wav", spec);
 
-    PCMSource *sources[4]; // using PCMSource ptrs here is error prone, because engine will delete ones that end
-    sources[0] = engine.playSound(&sounds[0], false);
-    sources[1] = engine.playSound(&sounds[1], false);
-    sources[2] = engine.playSound(&sounds[2], false);
-    sources[3] = engine.playSound(&sounds[3], false);
+    SourceHandle<PCMSource> sources[4]; // using PCMSource ptrs here is error prone, because engine will delete ones that end
+    sources[0] = engine.playSound(&sounds[0], false, true);
+    sources[1] = engine.playSound(&sounds[1], false, true);
+    sources[2] = engine.playSound(&sounds[2], false, true);
+    sources[3] = engine.playSound(&sounds[3], false, true);
 
     // for (auto source : sources)
     // {
@@ -159,9 +160,25 @@ int main()
                             masterBus->panner()->right(masterBus->panner()->right() + .05f);
                         } break;
 
+                        // Stop and release the sound source
+                        case SDL_SCANCODE_S:
+                        {
+                            if (sources[channelSelect].isValid())
+                            {
+                                sources[channelSelect]->release();
+                            }
+                        } break;
+
+                        // Reset the sound sources
                         case SDL_SCANCODE_R:
                         {
-                            // TODO: restart track logic
+                            for (auto &source : sources)
+                            {
+                                if (source.isValid())
+                                {
+                                    source->position(0);
+                                }
+                            }
                         } break;
 
                         case SDL_SCANCODE_UP:

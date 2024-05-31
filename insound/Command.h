@@ -1,6 +1,8 @@
 #pragma once
 #include <cstdint>
 
+#include "PCMSource.h"
+
 namespace insound {
 
     struct SourceCommandType {
@@ -13,21 +15,28 @@ namespace insound {
         };
     };
 
+    struct PCMSourceCommandType {
+        enum Enum {
+            SetPosition
+        };
+    };
+
     struct Command {
         enum Type {
             EffectParamSet, ///< effect data
             SoundSource,    ///< source data
+            PCMSource,      ///< pcmsource data
         } type;
 
         union {
             struct {
-                class IEffect *effect;
+                class Effect *effect;
                 int   index;
                 float value;
             } effect;
 
             struct {
-                class ISoundSource *source;
+                class SoundSource *source;
                 SourceCommandType::Enum type;
                 union {
                     struct {
@@ -35,7 +44,7 @@ namespace insound {
                         uint32_t clock;
                     } pause;
                     struct {
-                        class IEffect *effect;
+                        class Effect *effect;
                         int position;
                     } effect;
                     struct {
@@ -48,9 +57,19 @@ namespace insound {
                     } removefadepoint;
                 } data;
             } source;
+
+            struct {
+                class PCMSource *source;
+                PCMSourceCommandType::Enum type;
+                union {
+                    struct {
+                        uint32_t position;
+                    } setposition;
+                } data;
+            } pcmsource;
         } data;
 
-        static Command makeEffectParamSet(class IEffect *effect, const int index, const float value)
+        static Command makeEffectParamSet(class Effect *effect, const int index, const float value)
         {
             Command c{};
             c.type = EffectParamSet;
@@ -61,7 +80,7 @@ namespace insound {
             return c;
         }
 
-        static Command makeSourcePause(class ISoundSource *source, const bool paused, const uint32_t clock)
+        static Command makeSourcePause(class SoundSource *source, const bool paused, const uint32_t clock)
         {
             Command c{};
             c.type = SoundSource;
@@ -72,7 +91,7 @@ namespace insound {
             return c;
         }
 
-        static Command makeSourceEffect(class ISoundSource *source, const bool addEffect, class IEffect *effect, const int position)
+        static Command makeSourceEffect(class SoundSource *source, const bool addEffect, class Effect *effect, const int position)
         {
             Command c{};
             c.type = SoundSource;
@@ -84,7 +103,7 @@ namespace insound {
             return c;
         }
 
-        static Command makeSourceAddFadePoint(class ISoundSource *source, const uint32_t clock, const float value)
+        static Command makeSourceAddFadePoint(class SoundSource *source, const uint32_t clock, const float value)
         {
             Command c{};
             c.type = SoundSource;
@@ -96,7 +115,7 @@ namespace insound {
             return c;
         }
 
-        static Command makeSourceRemoveFadePoint(class ISoundSource *source, const uint32_t begin, const uint32_t end)
+        static Command makeSourceRemoveFadePoint(class SoundSource *source, const uint32_t begin, const uint32_t end)
         {
             Command c{};
             c.type = SoundSource;
@@ -104,6 +123,17 @@ namespace insound {
             c.data.source.type = SourceCommandType::RemoveFadePoint;
             c.data.source.data.removefadepoint.begin = begin;
             c.data.source.data.removefadepoint.end = end;
+
+            return c;
+        }
+
+        static Command makePCMSourceSetPosition(class PCMSource *source, const uint32_t position)
+        {
+            Command c{};
+            c.type = Type::PCMSource;
+            c.data.pcmsource.type = PCMSourceCommandType::SetPosition;
+            c.data.pcmsource.source = source;
+            c.data.pcmsource.data.setposition.position = position;
 
             return c;
         }

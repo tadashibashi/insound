@@ -23,14 +23,14 @@ add_library(insound
     Pool.h
     Bus.cpp
     Bus.h
-    ISoundSource.h
+    SoundSource.h
     error.cpp
     error.h
-    IEffect.cpp
-    IEffect.h
+    Effect.cpp
+    Effect.h
     effects/PanEffect.cpp
     effects/PanEffect.h
-    ISoundSource.cpp
+    SoundSource.cpp
     mathf.cpp
     mathf.h
     Command.h
@@ -40,6 +40,11 @@ add_library(insound
     SampleFormat.h
     AudioSpec.cpp
     AudioSpec.h
+    private/SdlAudioGuard.cpp
+    private/SdlAudioGuard.h
+    SourceHandle.h
+    effects/DelayEffect.cpp
+    effects/DelayEffect.h
 )
 
 target_link_libraries(insound PRIVATE SDL2::SDL2-static)

@@ -5,9 +5,12 @@
 namespace insound {
     void VolumeEffect::process(float *input, float *output, int count)
     {
-        for (int i = 0; i < count; ++i)
+        for (int i = 0; i < count; i += 4)
         {
             output[i] = input[i] * m_volume;
+            output[i+1] = input[i+1] * m_volume;
+            output[i+2] = input[i+2] * m_volume;
+            output[i+3] = input[i+3] * m_volume;
         }
     }
 

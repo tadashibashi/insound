@@ -3,10 +3,10 @@
 namespace insound {
     class Engine;
 
-    class IEffect {
+    class Effect {
     public:
-        explicit IEffect(Engine *engine) : m_engine(engine) { }
-        virtual ~IEffect() = default;
+        explicit Effect(Engine *engine) : m_engine(engine) { }
+        virtual ~Effect() = default;
 
         virtual void process(float *input, float *output, int count) = 0;
 

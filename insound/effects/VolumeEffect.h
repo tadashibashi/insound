@@ -1,11 +1,11 @@
 #pragma once
-#include "insound/IEffect.h"
+#include <insound/Effect.h>
 
 namespace insound {
-    class VolumeEffect : public IEffect {
+    class VolumeEffect : public Effect {
     public:
         explicit VolumeEffect(Engine *engine)
-            : IEffect(engine), m_volume(1.f)
+            : Effect(engine), m_volume(1.f)
         {
         }
 

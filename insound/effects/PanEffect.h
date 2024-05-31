@@ -1,11 +1,11 @@
 #pragma once
-#include <insound/IEffect.h>
+#include <insound/Effect.h>
 
 namespace insound {
 
-    class PanEffect : public IEffect {
+    class PanEffect : public Effect {
     public:
-        explicit PanEffect(Engine *engine) : IEffect(engine), m_left(1.f), m_right(1.f) { }
+        explicit PanEffect(Engine *engine) : Effect(engine), m_left(1.f), m_right(1.f) { }
 
         void process(float *input, float *output, int count) override;
 
