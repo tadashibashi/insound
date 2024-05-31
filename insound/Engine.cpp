@@ -10,9 +10,11 @@
 
 #include <iostream>
 #include <mutex>
+#include <unordered_set>
 #include <vector>
 
-
+#include "SourceHandle.h"
+#include "private/SdlAudioGuard.h"
 
 static int getDefaultSampleRate();
 
@@ -21,7 +23,9 @@ namespace insound {
     public:
         explicit Impl(Engine *engine) : m_engine(engine), m_spec(), m_deviceID(), m_clock(), m_masterBus(),
                                         m_mixMutex(),
-                                        m_deferredCommands(), m_immediateCommands(), m_bufferSize(0)
+                                        m_deferredCommands(), m_immediateCommands(), m_bufferSize(0),
+                                        m_discardFlag(false), m_initGuard(),
+                                        m_sources()
         {
         }
 
@@ -44,13 +48,14 @@ namespace insound {
             const auto tempDeviceID = SDL_OpenAudioDevice(nullptr, false, &desired, &obtained, 0);
             if (tempDeviceID == 0)
             {
-                printf("Failed to open audio device: %s\n", SDL_GetError());
+                pushError(Error::RuntimeErr, std::string("Failed to open audio device: ") + SDL_GetError());
                 return false;
             }
 
             m_spec.channels = obtained.channels;
             m_spec.freq = obtained.freq;
-            m_spec.format = SampleFormat(SDL_AUDIO_BITSIZE(obtained.format), SDL_AUDIO_ISFLOAT(obtained.format),
+            m_spec.format = SampleFormat(
+                SDL_AUDIO_BITSIZE(obtained.format), SDL_AUDIO_ISFLOAT(obtained.format),
                 SDL_AUDIO_ISBIGENDIAN(obtained.format), SDL_AUDIO_ISSIGNED(obtained.format));
 
             m_deviceID = tempDeviceID;
@@ -66,16 +71,27 @@ namespace insound {
         {
             if (isOpen())
             {
-                SDL_CloseAudioDevice(m_deviceID);
-                m_deviceID = 0;
-                m_clock = 0;
-
                 if (m_masterBus)
                 {
+                    m_masterBus->release(true);
+                    processCommands(m_immediateCommands); // flush command buffers
+                    processCommands(m_deferredCommands);
+                    m_masterBus->processRemovals();
                     delete m_masterBus;
                     m_masterBus = nullptr;
                 }
 
+                SDL_CloseAudioDevice(m_deviceID);
+                m_deviceID = 0;
+                m_clock = 0;
+            }
+        }
+
+        void flagDiscard(SoundSource *source)
+        {
+            if (m_sources.erase(source))
+            {
+                m_discardFlag = true;
             }
         }
 
@@ -100,9 +116,9 @@ namespace insound {
             return m_deviceID != 0;
         }
 
-        PCMSource *playSound(const SoundBuffer *buffer, bool paused, Bus *bus)
+        SourceHandle<PCMSource> playSound(const SoundBuffer *buffer, bool paused, bool looping, bool oneshot, Bus *bus)
         {
-            auto newSource = new PCMSource(m_engine, buffer, bus ? bus->clock() : m_masterBus->clock(), paused);
+            auto newSource = new PCMSource(m_engine, buffer, bus ? bus->clock() : m_masterBus->clock(), paused, looping, oneshot);
 
             std::lock_guard lockGuard(m_mixMutex); // we don't want to append while processing is occuring
             if (bus != nullptr)
@@ -114,7 +130,16 @@ namespace insound {
                 m_masterBus->appendSource(newSource);
             }
 
-            return newSource;
+            m_sources.emplace(newSource);
+
+            return SourceHandle<PCMSource>(newSource, m_engine);
+        }
+
+        [[nodiscard]]
+        bool isSourceValid(SoundSource *source) const
+        {
+            const auto it = m_sources.find(source);
+            return it != m_sources.end();
         }
 
         /// non-zero positive number if open, zero if not
@@ -163,6 +188,12 @@ namespace insound {
         {
             std::lock_guard lockGuard(m_mixMutex);
             processCommands(m_deferredCommands);
+
+            if (m_discardFlag)
+            {
+                m_masterBus->processRemovals();
+                m_discardFlag = false;
+            }
         }
 
         void pushCommand(const Command &command)
@@ -196,6 +227,11 @@ namespace insound {
                     case Command::SoundSource:
                     {
                         command.data.source.source->applyCommand(command);
+                    } break;
+
+                    case Command::PCMSource:
+                    {
+                        command.data.pcmsource.source->applyPCMSourceCommand(command);
                     } break;
 
                     default:
@@ -239,6 +275,10 @@ namespace insound {
         std::vector<Command> m_deferredCommands;
         std::vector<Command> m_immediateCommands;
         uint32_t m_bufferSize;
+        bool m_discardFlag; ///< set to true when sound source discard should be made
+        detail::SdlAudioGuard m_initGuard;
+
+        std::unordered_set<SoundSource *> m_sources;
     };
 
     Engine::Engine() : m(new Impl(this))
@@ -264,9 +304,9 @@ namespace insound {
         return m->isOpen();
     }
 
-    PCMSource *Engine::playSound(const SoundBuffer *buffer, bool paused, Bus *bus)
+    SourceHandle<PCMSource> Engine::playSound(const SoundBuffer *buffer, bool paused, bool looping, bool oneshot, Bus *bus)
     {
-        return m->playSound(buffer, paused, bus);
+        return m->playSound(buffer, paused, looping, oneshot, bus);
     }
 
     uint32_t Engine::deviceID() const
@@ -302,6 +342,16 @@ namespace insound {
     void Engine::update()
     {
         m->update();
+    }
+
+    void Engine::flagDiscard(SoundSource *source)
+    {
+        m->flagDiscard(source);
+    }
+
+    bool Engine::isSourceValid(SoundSource *source)
+    {
+        return m->isSourceValid(source);
     }
 }
 
