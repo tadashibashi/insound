@@ -57,7 +57,7 @@ int main()
     sounds[2].load("assets/piano.wav", spec);
     sounds[3].load("assets/snare-hat.wav", spec);
 
-    SourceHandle<PCMSource> sources[4]; // using PCMSource ptrs here is error prone, because engine will delete ones that end
+    SourceHandle<PCMSource> sources[4];
     sources[0] = engine.playSound(&sounds[0], false, true);
     sources[1] = engine.playSound(&sounds[1], false, true);
     sources[2] = engine.playSound(&sounds[2], false, true);
