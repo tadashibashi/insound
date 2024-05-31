@@ -7,17 +7,17 @@ namespace insound {
     class PanEffect;
     struct Command;
     class Engine;
-    class IEffect;
+    class Effect;
 
     struct FadePoint {
         uint32_t clock;
         float value;
     };
 
-    class ISoundSource {
+    class SoundSource {
     public:
-        explicit ISoundSource(Engine *engine, uint32_t parentClock, bool paused = false);
-        virtual ~ISoundSource();
+        explicit SoundSource(Engine *engine, uint32_t parentClock, bool paused = false);
+        virtual ~SoundSource();
 
         /// Get the current pointer position
         /// @param pcmPtr      pointer to receive pointer to data
@@ -30,9 +30,9 @@ namespace insound {
         void paused(bool value, uint32_t clock = UINT32_MAX);
 
         /// Insert effect into effect chain, 0 is the first effect and effectCount - 1 is the last
-        IEffect *insertEffect(IEffect *effect, int position);
+        Effect *insertEffect(Effect *effect, int position);
 
-        void removeEffect(IEffect *effect);
+        void removeEffect(Effect *effect);
 
         [[nodiscard]]
         auto effectCount() const { return m_effects.size(); }
@@ -71,11 +71,16 @@ namespace insound {
         void removeFadePoints(uint32_t start, uint32_t end = UINT32_MAX);
 
         bool getFadeValue(float *outValue) const;
+
+        [[nodiscard]]
+        bool shouldDiscard() const { return m_shouldDiscard; }
+
+        virtual void release();
     private:
         virtual int readImpl(uint8_t *pcmPtr, int length) = 0;
         bool m_paused;
 
-        std::vector<IEffect * >m_effects;
+        std::vector<Effect * >m_effects;
         Engine *m_engine;
         uint32_t m_clock, m_parentClock;
         int m_pauseClock, m_unpauseClock;
@@ -87,5 +92,6 @@ namespace insound {
         // default effects included in each SoundSource
         PanEffect *m_panner;
         VolumeEffect *m_volume;
+        bool m_shouldDiscard;
     };
 }

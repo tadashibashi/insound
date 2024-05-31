@@ -2,8 +2,11 @@
 
 #include <SDL_audio.h>
 
+#include "Engine.h"
+#include "Error.h"
+
 namespace insound {
-    Bus::Bus(Engine *engine, Bus *parent) : ISoundSource(engine, parent ? parent->clock() : 0),
+    Bus::Bus(Engine *engine, Bus *parent) : SoundSource(engine, parent ? parent->clock() : 0),
         m_sources(), m_buffer(), m_parent(parent), m_panner()
     {
         m_panner = (PanEffect *)insertEffect(new PanEffect(engine), 0);
@@ -11,7 +14,7 @@ namespace insound {
 
     void Bus::updateParentClock(uint32_t parentClock)
     {
-        ISoundSource::updateParentClock(parentClock);
+        SoundSource::updateParentClock(parentClock);
 
         // Recursively update all sub-sources
         const auto curClock = clock();
@@ -19,6 +22,45 @@ namespace insound {
         {
             source->updateParentClock(curClock);
         }
+    }
+
+    void Bus::processRemovals()
+    {
+        // grab master bus ref
+        Bus *masterBus;
+        if (!engine()->getMasterBus(&masterBus))
+        {
+            return;
+        }
+
+        // erase-remove idiom on all sound sources with discard flagged true
+        m_sources.erase(std::remove_if(m_sources.begin(), m_sources.end(), [masterBus] (SoundSource *source) {
+            auto shouldDiscard = source->shouldDiscard();
+
+            if (auto bus = dynamic_cast<Bus *>(source))
+            {
+                bus->processRemovals(); // if graph is huge, this recursive call could be a problem...
+
+                if (shouldDiscard) // if this bus is flagged for discarding
+                {
+                    for (auto &subSource : bus->m_sources)
+                    {
+                        masterBus->appendSource(subSource);
+                        if (auto subBus = dynamic_cast<Bus *>(subSource)) // set each subBus's new parent
+                        {
+                            subBus->m_parent = masterBus;
+                        }
+                    }
+                }
+            }
+
+            if (shouldDiscard)
+            {
+                delete source;
+            }
+
+            return shouldDiscard;
+        }), m_sources.end());
     }
 
     int Bus::readImpl(uint8_t *pcmPtr, int length)
@@ -51,12 +93,12 @@ namespace insound {
         return (int)(m_buffer.size() * sizeof(float));
     }
 
-    void Bus::appendSource(ISoundSource *source)
+    void Bus::appendSource(SoundSource *source)
     {
         m_sources.emplace_back(source);
     }
 
-    bool Bus::removeSource(const ISoundSource *source)
+    bool Bus::removeSource(const SoundSource *source)
     {
         for (auto it = m_sources.begin(); it != m_sources.end(); ++it)
         {
@@ -70,18 +112,23 @@ namespace insound {
         return false;
     }
 
-    void Bus::update()
+    void Bus::release(bool recursive)
     {
-        // if (!m_sources.empty())
-        // {
-            // erase any sounds that are no longer playing
+        SoundSource::release();
 
-            // this probably could be more efficient if source is tied to an engine,
-            // and then calls a callback and sets flag when it is done, this flag is then checked to perform the remove-erase idiom
-            // m_sources.erase(std::remove_if(m_sources.begin(), m_sources.end(), [](const ISoundSource *source) {
-            //     return source->hasEnded();
-            // }), m_sources.end());
-        // }
+        if (recursive)
+        {
+            for (auto &source : m_sources)
+            {
+                if (auto bus = dynamic_cast<Bus *>(source))
+                {
+                    bus->release(true);
+                }
+                else
+                {
+                    source->release();
+                }
+            }
+        }
     }
-
 }

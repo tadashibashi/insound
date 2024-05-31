@@ -1,8 +1,8 @@
-#include "ISoundSource.h"
+#include "SoundSource.h"
 
 #include <iostream>
 
-#include "IEffect.h"
+#include "Effect.h"
 #include "Engine.h"
 #include "Command.h"
 
@@ -10,15 +10,16 @@
 #include "effects/VolumeEffect.h"
 
 namespace insound {
-    ISoundSource::ISoundSource(Engine *engine, uint32_t parentClock, bool paused) :
+    SoundSource::SoundSource(Engine *engine, uint32_t parentClock, bool paused) :
         m_paused(paused), m_effects(), m_engine(engine), m_clock(0), m_parentClock(parentClock),
-        m_pauseClock(-1), m_unpauseClock(-1), m_fadePoints(), m_fadeValue(1.f), m_panner(nullptr), m_volume(nullptr)
+        m_pauseClock(-1), m_unpauseClock(-1), m_fadePoints(), m_fadeValue(1.f), m_panner(nullptr), m_volume(nullptr),
+        m_shouldDiscard(false)
     {
         m_panner = (PanEffect *)insertEffect(new PanEffect(engine), 0);
         m_volume = (VolumeEffect *)insertEffect(new VolumeEffect(engine), 1);
     }
 
-    ISoundSource::~ISoundSource()
+    SoundSource::~SoundSource()
     {
         for (const auto &effect : m_effects)
         {
@@ -53,7 +54,7 @@ namespace insound {
         return res + 1 < points.size();
     }
 
-    int ISoundSource::read(const uint8_t **pcmPtr, int length)
+    int SoundSource::read(const uint8_t **pcmPtr, int length)
     {
         if (m_inBuffer.size() < length)
         {
@@ -174,23 +175,23 @@ namespace insound {
         return length;
     }
 
-    void ISoundSource::paused(const bool value, const uint32_t clock)
+    void SoundSource::paused(const bool value, const uint32_t clock)
     {
         m_engine->pushImmediateCommand(Command::makeSourcePause(this, value, clock == UINT32_MAX ? m_parentClock : clock));
     }
 
-    IEffect * ISoundSource::insertEffect(IEffect *effect, int position)
+    Effect * SoundSource::insertEffect(Effect *effect, int position)
     {
         m_engine->pushCommand(Command::makeSourceEffect(this, true, effect, position));
         return effect;
     }
 
-    void ISoundSource::removeEffect(IEffect *effect)
+    void SoundSource::removeEffect(Effect *effect)
     {
         m_engine->pushCommand(Command::makeSourceEffect(this, false, effect, -1)); // -1 is discarded in applyCommand
     }
 
-    void ISoundSource::applyCommand(const Command &command)
+    void SoundSource::applyCommand(const Command &command)
     {
         /// assumes that the command is a source command
         switch (command.data.source.type)
@@ -273,32 +274,38 @@ namespace insound {
         }
     }
 
-    float ISoundSource::volume() const
+    float SoundSource::volume() const
     {
         return m_volume->volume();
     }
 
-    void ISoundSource::volume(const float value)
+    void SoundSource::volume(const float value)
     {
         m_volume->volume(value);
     }
 
-    void ISoundSource::addFadePoint(const uint32_t clock, const float value)
+    void SoundSource::addFadePoint(const uint32_t clock, const float value)
     {
         // pushed immediately due to need for immediate sample clock accuracy
         m_engine->pushImmediateCommand(Command::makeSourceAddFadePoint(this, clock, value));
     }
 
-    void ISoundSource::removeFadePoints(const uint32_t start, const uint32_t end)
+    void SoundSource::removeFadePoints(const uint32_t start, const uint32_t end)
     {
         // pushed immeidately due to need for immediate sample clock accuracy
         m_engine->pushImmediateCommand(Command::makeSourceRemoveFadePoint(this, start, end));
     }
 
-    bool ISoundSource::getFadeValue(float *outValue) const
+    bool SoundSource::getFadeValue(float *outValue) const
     {
         if (outValue)
             *outValue = m_fadeValue;
         return true;
+    }
+
+    void SoundSource::release()
+    {
+        m_shouldDiscard = true;
+        m_engine->flagDiscard(this);
     }
 }
