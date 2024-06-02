@@ -134,8 +134,14 @@ namespace insound {
         return false;
     }
 
-    void Bus::release(bool recursive)
+    bool Bus::release(bool recursive)
     {
+        if (detail::popSystemError().code == Error::InvalidHandle)
+        {
+            pushError(Error::InvalidHandle);
+            return false;
+        }
+
         SoundSource::release();
 
         if (recursive)
@@ -152,16 +158,25 @@ namespace insound {
                 }
             }
         }
+
+        return true;
     }
 
-    void Bus::setOutput(SourceHandle<Bus> output)
+    bool Bus::setOutput(SourceRef<Bus> output)
     {
+        if (lastErrorIs(Error::InvalidHandle))
+        {
+            return false;
+        }
+
         if (!output.isValid())
         {
-            return;
+            pushError(Error::InvalidHandle, "output bus is invalid");
+            return false;
         }
 
         setOutput(output.get());
+        return true;
     }
 
     void Bus::setOutput(Bus *output)
