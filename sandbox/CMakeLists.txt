@@ -9,10 +9,6 @@ if (EMSCRIPTEN)
     set_target_properties(insound_sandbox PROPERTIES
         SUFFIX .html
     )
-
-    if ("${CMAKE_BUILD_TYPE}" MATCHES "Deb")
-        target_link_options(insound_sandbox PRIVATE --emrun) # logging for html run with emrun
-    endif()
 else()
     if (NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/assets)
         execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink

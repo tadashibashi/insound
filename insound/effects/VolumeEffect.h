@@ -4,10 +4,12 @@
 namespace insound {
     class VolumeEffect : public Effect {
     public:
-        explicit VolumeEffect(Engine *engine)
-            : Effect(engine), m_volume(1.f)
+        VolumeEffect()
+            : m_volume(1.f)
         {
         }
+
+        explicit VolumeEffect(float volume) : m_volume(volume) { }
 
         void process(float *input, float *output, int count) override;
 
@@ -16,7 +18,7 @@ namespace insound {
         void volume(float value);
 
     private:
-        void receiveParam(int index, float value) override;
+        void receiveFloat(int index, float value) override;
 
         struct Param {
             enum Enum {

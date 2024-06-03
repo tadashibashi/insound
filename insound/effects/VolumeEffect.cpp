@@ -5,16 +5,17 @@
 namespace insound {
     void VolumeEffect::process(float *input, float *output, int count)
     {
+        const auto volume = m_volume;
         for (int i = 0; i < count; i += 4)
         {
-            output[i] = input[i] * m_volume;
-            output[i+1] = input[i+1] * m_volume;
-            output[i+2] = input[i+2] * m_volume;
-            output[i+3] = input[i+3] * m_volume;
+            output[i] = input[i] * volume;
+            output[i+1] = input[i+1] * volume;
+            output[i+2] = input[i+2] * volume;
+            output[i+3] = input[i+3] * volume;
         }
     }
 
-    void VolumeEffect::receiveParam(int index, float value)
+    void VolumeEffect::receiveFloat(int index, float value)
     {
         switch(index)
         {
@@ -25,13 +26,13 @@ namespace insound {
 
             default:
             {
-                pushError(Error::InvalidArg, "Unknown parameter index");
+                pushError(Result::InvalidArg, "Unknown parameter index");
             } break;
         }
     }
 
     void VolumeEffect::volume(float value)
     {
-        sendParam(Param::Volume, value);
+        sendFloat(Param::Volume, value);
     }
 }

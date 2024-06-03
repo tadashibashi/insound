@@ -5,7 +5,8 @@ namespace insound {
 
     class PanEffect : public Effect {
     public:
-        explicit PanEffect(Engine *engine) : Effect(engine), m_left(1.f), m_right(1.f) { }
+        PanEffect() : m_left(1.f), m_right(1.f) { }
+        PanEffect(float left, float right) : m_left(left), m_right(right) { }
 
         void process(float *input, float *output, int count) override;
 
@@ -28,7 +29,7 @@ namespace insound {
             };
         };
 
-        void receiveParam(int index, float value) override;
+        void receiveFloat(int index, float value) override;
 
         float m_left, m_right;
     };

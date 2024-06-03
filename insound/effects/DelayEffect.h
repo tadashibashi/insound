@@ -8,25 +8,37 @@
 namespace insound {
     class DelayEffect: public Effect {
     public:
-        DelayEffect(Engine *engine, uint32_t delayTime, float wet, float feedback);
+        DelayEffect(uint32_t delayTime, float wet, float feedback);
         ~DelayEffect() override = default;
 
         void process(float *input, float *output, int count) override;
 
+        /// Set the delay time in sample frames, (use engine spec to find sample rate)
         void delayTime(uint32_t samples);
 
+        /// Get the current delay time in sample frames
         [[nodiscard]]
         uint32_t delayTime() const { return m_delayTime; }
 
+        /// Set the input feedback percentage, where 0 = 0% through 1.f = 100%
         void feedback(float value);
 
+        /// Get the input feedback percentage, where 0 = 0% through 1.f = 100%
         [[nodiscard]]
         float feedback() const { return m_feedback; }
 
-        void wet(float value);
+        /// Set the wet and dry signal percentages at once, where the value of the wet signal is equal to `value`,
+        /// and dry is `1.f - value`.
+        /// For example, 0 results in 0% wet signal (no effect applied with 100% dry
+        /// signal), and 1.f results in 100% of the wet signal and 0% of the dry.
+        void wetDry(float value);
 
+        /// Get the wet and dry signal percentages at once, where the value of the wet signal is equal to `value`,
+        /// and dry is `1.f - value`.
+        /// For example, 0 results in 0% wet signal (no effect applied with 100% dry
+        /// signal), and 1.f results in 100% of the wet signal and 0% of the dry.
         [[nodiscard]]
-        float wet() const { return m_wet; }
+        float wetDry() const { return m_wet; }
 
     protected:
         struct Param {
@@ -36,7 +48,8 @@ namespace insound {
                 Wet,
             };
         };
-        void receiveParam(int index, float value) override;
+        void receiveFloat(int index, float value) override;
+        void receiveInt(int index, int value) override;
 
     private:
         std::vector<float> m_buffer;

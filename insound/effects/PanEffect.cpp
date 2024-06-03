@@ -28,7 +28,7 @@ namespace insound {
         }
     }
 
-    void PanEffect::receiveParam(int index, float value)
+    void PanEffect::receiveFloat(int index, float value)
     {
         switch(index)
         {
@@ -44,18 +44,18 @@ namespace insound {
 
             default:
             {
-                pushError(Error::InvalidArg, "PanEffect received unknown parameter index");
+                pushError(Result::InvalidArg, "PanEffect received unknown parameter index");
             } break;
         }
     }
 
     void PanEffect::left(const float value)
     {
-        sendParam(Param::Left, mathf::clamp(value, 0, 1.f));
+        sendFloat(Param::Left, mathf::clamp(value, 0, 1.f));
     }
 
     void PanEffect::right(float value)
     {
-        sendParam(Param::Right, mathf::clamp(value, 0, 1.f));
+        sendFloat(Param::Right, mathf::clamp(value, 0, 1.f));
     }
 } // insound

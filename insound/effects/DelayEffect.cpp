@@ -4,7 +4,7 @@
 #include "insound/Error.h"
 
 
-insound::DelayEffect::DelayEffect(Engine *engine, uint32_t delayTime, float wet, float feedback): Effect(engine),
+insound::DelayEffect::DelayEffect(uint32_t delayTime, float wet, float feedback) :
     m_delayTime(delayTime), m_feedback(feedback), m_wet(wet), m_delayHead(0)
 {
     m_buffer.resize(delayTime * 2);
@@ -40,20 +40,41 @@ void insound::DelayEffect::process(float *input, float *output, int count)
 
 void insound::DelayEffect::delayTime(uint32_t samples)
 {
-    sendParam(Param::DelayTime, (float)samples);
+    sendInt(Param::DelayTime, (int)samples); // TODO: enforce a maximum?
 }
 
 void insound::DelayEffect::feedback(const float value)
 {
-    sendParam(Param::Feedback, value);
+    sendFloat(Param::Feedback, value);
 }
 
-void insound::DelayEffect::wet(float value)
+void insound::DelayEffect::wetDry(float value)
 {
-    sendParam(Param::Wet, value);
+    sendFloat(Param::Wet, value);
 }
 
-void insound::DelayEffect::receiveParam(int index, float value)
+void insound::DelayEffect::receiveFloat(int index, float value)
+{
+    switch(index)
+    {
+        case Param::Feedback:
+        {
+            m_feedback = value;
+        } break;
+
+        case Param::Wet:
+        {
+            m_wet = value;
+        } break;
+
+        default:
+        {
+            pushError(Result::InvalidArg, "Unknown parameter index passed to DelayEffect::receiveFloat");
+        } break;
+    }
+}
+
+void insound::DelayEffect::receiveInt(int index, int value)
 {
     switch(index)
     {
@@ -67,19 +88,10 @@ void insound::DelayEffect::receiveParam(int index, float value)
             }
         } break;
 
-        case Param::Feedback:
-        {
-            m_feedback = value;
-        } break;
-
-        case Param::Wet:
-        {
-            m_wet = value;
-        } break;
-
         default:
         {
-            pushError(Error::InvalidArg, "Unknown parameter index passed to DelayEffect");
+            pushError(Result::InvalidArg, "Unknown parameter index passed to DelayEffect::receiveInt");
         } break;
     }
+
 }
