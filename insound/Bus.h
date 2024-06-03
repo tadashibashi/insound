@@ -1,5 +1,5 @@
 #pragma once
-
+#include "SourceRefFwd.h"
 #include "SoundSource.h"
 #include "effects/PanEffect.h"
 

@@ -1,5 +1,5 @@
 #pragma once
-#include "Command.h"
+#include "SourceRefFwd.h"
 
 #include <cstdint>
 

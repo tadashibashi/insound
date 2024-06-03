@@ -1,5 +1,4 @@
 #pragma once
-
 #include "SoundSource.h"
 #include "Error.h"
 
@@ -18,7 +17,7 @@ namespace insound {
         {
             if (!isValid())
             {
-                detail::pushSystemError(Error::InvalidHandle);
+                detail::pushSystemError(Result::InvalidHandle);
             }
 
             return m_source.get();
@@ -28,7 +27,7 @@ namespace insound {
         {
             if (!isValid())
             {
-                detail::pushSystemError(Error::InvalidHandle);
+                detail::pushSystemError(Result::InvalidHandle);
             }
 
             return m_source.get();
@@ -47,6 +46,20 @@ namespace insound {
         const T *get() const
         {
             return m_source.get();
+        }
+
+        explicit operator bool()
+        {
+            return get();
+        }
+
+        template <typename U>
+        SourceRef<U> dynamicCast()
+        {
+            static_assert(std::is_base_of_v<SoundSource, U>, "type `U` must derive from SoundSource");
+
+            auto sp = std::dynamic_pointer_cast<U>(m_source);
+            return SourceRef<U>(sp, m_engine);
         }
     private:
         std::shared_ptr<T> m_source;
