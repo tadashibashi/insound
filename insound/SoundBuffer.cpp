@@ -3,6 +3,8 @@
 
 #include <SDL_audio.h>
 
+#include "Error.h"
+
 namespace insound {
     SoundBuffer::SoundBuffer() : m_byteLength(), m_buffer(), m_freq(0), m_spec()
     {
@@ -20,7 +22,7 @@ namespace insound {
         uint8_t *buffer;
         if (!SDL_LoadWAV(filepath.c_str(), &spec, &buffer, &length))
         {
-            printf("SDL_LoadWAV_RW failed: %s\n", SDL_GetError());
+            pushError(Result::SdlErr, SDL_GetError());
             return false;
         }
 
@@ -31,7 +33,7 @@ namespace insound {
 
         if (cvt.needed == SDL_FALSE || cvtResult < 0)
         {
-            printf("SDL_BuildAudioCVT failed: %s\n", SDL_GetError());
+            pushError(Result::SdlErr, SDL_GetError());
             return false;
         }
 
@@ -49,7 +51,7 @@ namespace insound {
 
         if (SDL_ConvertAudio(&cvt) != 0)
         {
-            printf("SDL_ConvertAudio failed: %s\n", SDL_GetError());
+            pushError(Result::SdlErr, SDL_GetError());
             SDL_free(cvt.buf);
             return false;
         }
