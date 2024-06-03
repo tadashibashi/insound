@@ -2,15 +2,16 @@
 #include "SourceRefFwd.h"
 
 #include <cstdint>
+#include <memory>
 
 namespace insound {
     struct AudioSpec;
     class Bus;
+    struct Command;
+    struct EngineCommand;
     class SoundBuffer;
+    class SoundSource;
     class PCMSource;
-
-    template <typename T>
-    class SourceHandle;
 
     class Engine {
     public:
@@ -29,37 +30,58 @@ namespace insound {
         /// @param looping whether to loop sound
         /// @param oneshot whether to release sound resources at end, (will not auto-release while looping is true)
         /// @param bus     bus this source should output to; left null the master bus will be used
-        SourceHandle<PCMSource> playSound(const SoundBuffer *buffer, bool paused, bool looping, bool oneshot, SourceHandle<Bus> bus);
+        /// @param outPcmSource pointer to receive pcm source, nullable if you don't need it e.g. a oneshot sound
+        bool playSound(const SoundBuffer *buffer, bool paused, bool looping, bool oneshot, SourceRef<Bus> &bus, SourceRef<PCMSource> *outPcmSource);
+        bool playSound(const SoundBuffer *buffer, bool paused, bool looping, bool oneshot, SourceRef<PCMSource> *outPcmSource);
 
         /// Create a new bus to use in the mixing graph
         /// @param paused whether bus should start off paused on initialization
         /// @param output output bus to feed this bus to, if nullptr, the master Bus will be used
-        SourceHandle<Bus> createBus(bool paused, Bus *output = nullptr);
+        bool createBus(bool paused, BusRef &output, BusRef *outBus);
+        bool createBus(bool paused, BusRef *outBus);
 
         [[nodiscard]]
-        uint32_t deviceID() const;
+        bool deviceID(uint32_t *outDeviceID) const;
 
         /// Get audio spec
         bool getSpec(AudioSpec *outSpec) const;
 
         /// Get the size of audio buffer in bytes
-        [[nodiscard]]
         bool getBufferSize(uint32_t *outSize) const;
 
-        bool getMasterBus(Bus **bus) const;
+        /// Get the master bus
+        bool getMasterBus(SourceRef<Bus> *outbus) const;
 
-        void pushCommand(const Command &command);
-        void pushImmediateCommand(const Command &command);
+        /// Push a command to be deferred until `update` is called
+        bool pushCommand(const Command &command);
 
-        void update();
+        /// Push a command that will immediately be processed the next audio buffer.
+        /// This is for commands that are sample clock-sensitive.
+        bool pushImmediateCommand(const Command &command);
 
-        void flagDiscard(SoundSource *source);
+        /// Pause the audio device
+        /// @returns whether function succeeded, check `popError()` for details
+        bool setPaused(bool value);
 
+        /// Get if the device is paused
+        bool getPaused(bool *outValue) const;
+
+        bool update();
+
+        /// Flag a SoundSource for removal from the mix graph, it becomes invalidated and will no longer function
+        /// @returns whether function succeeded; check `popError()` for details
+        bool flagDiscard(SoundSource *source);
+
+        /// Check if a SoundSource is currently valid
         [[nodiscard]]
-        bool isSourceValid(SoundSource *source);
+        bool isSourceValid(const std::shared_ptr<SoundSource> &source) const;
+        /// Check if a SoundSource is currently valid
+        [[nodiscard]]
+        bool isSourceValid(const SoundSource *source) const;
 
         struct Impl;
     private:
+        void applyCommand(const EngineCommand &command);
         Impl *m;
     };
 }
