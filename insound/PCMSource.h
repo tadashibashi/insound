@@ -1,5 +1,5 @@
 #pragma once
-#include "SoundSource.h"
+#include "Source.h"
 
 #include <cstdint>
 
@@ -7,7 +7,7 @@ namespace insound {
     class Bus;
     class SoundBuffer;
 
-    class PCMSource final : public SoundSource {
+    class PCMSource final : public Source {
     public:
         explicit PCMSource(Engine *engine, const SoundBuffer *buffer, uint32_t parentClock, bool paused = false,
             bool looping = false, bool oneShot = false);

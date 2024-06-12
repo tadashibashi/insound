@@ -1,3 +1,4 @@
+#include <iostream>
 #include <insound/AudioSpec.h>
 #include <insound/Bus.h>
 #include <insound/Engine.h>
@@ -10,10 +11,29 @@
 
 #include <SDL2/SDL.h>
 
+struct AppContext {
+    insound::Engine *audio;
+    SDL_Window *window;
+    SDL_Renderer *renderer;
+};
+
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
+#include <emscripten/html5.h>
 #include <functional>
+static const char *unloadCallback(int eventType, const void *reserved, void *userData)
+{
+    printf("Window closed\n");
 
+    auto context = (AppContext *)userData;
+    context->audio->close();
+
+    SDL_DestroyRenderer(context->renderer);
+    SDL_DestroyWindow(context->window);
+    SDL_Quit();
+    emscripten_force_exit(0);
+    return "";
+}
 std::function<void()> emMainLoopCallback;
 void emMainLoop()
 {
@@ -31,7 +51,9 @@ int main()
         return -1;
     }
 
-    auto window = SDL_CreateWindow("Mixer test", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+    AppContext app{};
+
+    const auto window = SDL_CreateWindow("Mixer test", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
         400, 400, 0);
     if (!window)
     {
@@ -39,7 +61,7 @@ int main()
         return -1;
     }
 
-    auto renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    const auto renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (!renderer)
     {
         printf("SDL renderer failed to create: %s\n", SDL_GetError());
@@ -48,28 +70,38 @@ int main()
     SDL_SetRenderDrawColor(renderer, 128, 128, 255, 255);
 
     Engine engine;
-    if (!engine.open())
+
+    int bufferFrameSize = 512;
+    if (!engine.open(0, bufferFrameSize))
     {
         printf("Failed to init sound engine\n");
         return -1;
     }
 
+    app.audio = &engine;
+    app.window = window;
+    app.renderer = renderer;
+
     AudioSpec spec;
     engine.getSpec(&spec);
 
-    BusRef myBus;
+    Handle<Bus> myBus;
     engine.createBus(false, &myBus);
 
-    SoundBuffer sounds[4];
-    sounds[0].load("assets/bassdrum.wav", spec);
-    sounds[1].load("assets/ep.wav", spec);
-    sounds[2].load("assets/piano.wav", spec);
-    sounds[3].load("assets/snare-hat.wav", spec);
+    const SoundBuffer sounds[4] = {
+        {"assets/bassdrum.wav", spec},
+        {"assets/ep.wav", spec},
+        {"assets/piano.wav", spec},
+        {"assets/snare-hat.wav", spec},
+    };
 
-    SoundBuffer marimba;
-    marimba.load("assets/marimba.wav", spec);
+    const SoundBuffer pizz("assets/vln_pizz.ogg", spec);
+    const SoundBuffer orch("assets/orch_scene.mp3", spec);
+    const SoundBuffer arp("assets/arp.flac", spec);
+    const SoundBuffer marimba("assets/marimba.wav", spec);
+    const SoundBuffer bach("assets/test.nsf", spec);
 
-    PCMSourceRef sources[4];
+    Handle<PCMSource> sources[4];
     engine.playSound(&sounds[0], false, true, false, myBus, &sources[0]);
     engine.playSound(&sounds[1], false, true, false, myBus, &sources[1]);
     engine.playSound(&sounds[2], false, true, false, myBus, &sources[2]);
@@ -77,7 +109,9 @@ int main()
 
     sources[0]->setVolume(.5f);
 
-    BusRef masterBus;
+    float masterBusFade = 1.f;
+
+    Handle<Bus> masterBus;
     engine.getMasterBus(&masterBus);
 
     bool isRunning = true;
@@ -107,11 +141,16 @@ int main()
                     {
                         case SDL_SCANCODE_Q:
                         {
-                                isRunning = false;
+                            isRunning = false;
 #ifdef __EMSCRIPTEN__
-                                emscripten_force_exit(0);
+                            engine.close();
+                            SDL_DestroyRenderer(renderer);
+                            SDL_DestroyWindow(window);
+                            SDL_Quit();
+                            emscripten_force_exit(0);
 #endif
                         } break;
+
                         case SDL_SCANCODE_1:
                         {
                             channelSelect = 0;
@@ -132,7 +171,7 @@ int main()
                             channelSelect = 3;
                         } break;
 
-                        case SDL_SCANCODE_F: // fade out / in pause
+                        case SDL_SCANCODE_F: // faded pause
                         {
                             uint32_t clock;
                             if (!myBus->getParentClock(&clock))
@@ -142,15 +181,13 @@ int main()
                             {
                                 myBus->setPaused(false, clock);
                                 myBus->setPaused(true, 0); // cancel pause TODO: this is an unclear way to clear timed pause
-                                myBus->addFadePoint(clock, 0);
-                                myBus->addFadePoint(clock + spec.freq, 1.f);
+                                myBus->fadeTo(1.f, spec.freq * .1);
                             }
                             else
                             {
-                                myBus->setPaused(true, clock + spec.freq);
+                                myBus->setPaused(true, clock + spec.freq * .1);
                                 myBus->setPaused(false, 0);
-                                myBus->addFadePoint(clock, 1.f);
-                                myBus->addFadePoint(clock + spec.freq, 0);
+                                myBus->fadeTo(0.f, spec.freq * .1);
                             }
 
                             paused = !paused;
@@ -164,7 +201,7 @@ int main()
 
                         case SDL_SCANCODE_O: { // play one shot
 
-                            PCMSourceRef marimbaSource;
+                            Handle<PCMSource> marimbaSource;
                             engine.playSound(&marimba, true, false, true, &marimbaSource);
 
                             if (marimbaSource.isValid())
@@ -173,6 +210,26 @@ int main()
                                 marimbaSource->setSpeed(2.f);
                                 marimbaSource->setPaused(false);
                             }
+                        } break;
+
+                        case SDL_SCANCODE_I:
+                        {
+                            engine.playSound(&pizz, false, false, true, nullptr);
+                        } break;
+
+                        case SDL_SCANCODE_J:
+                        {
+                            engine.playSound(&arp, false, false, true, nullptr);
+                        } break;
+
+                        case SDL_SCANCODE_K:
+                        {
+                            engine.playSound(&orch, false, false, true, nullptr);
+                        } break;
+
+                        case SDL_SCANCODE_B:
+                        {
+                            engine.playSound(&bach, false, false, true, nullptr);
                         } break;
 
                         case SDL_SCANCODE_Z: // Set myBus left pan =>
@@ -198,7 +255,7 @@ int main()
                         {
                             if (sources[channelSelect].isValid())
                             {
-                                sources[channelSelect]->release();
+                                engine.releaseSound(sources[channelSelect]);
                             }
                         } break;
 
@@ -209,6 +266,7 @@ int main()
                             {
                                 source->setPosition(0);
                             }
+                            printf("Restarted track\n");
                         } break;
 
                         case SDL_SCANCODE_UP:
@@ -221,6 +279,18 @@ int main()
                         {
                             auto source = sources[channelSelect];
                             source->setVolume(source->getVolume(nullptr) - .1f);
+                        } break;
+
+                        case SDL_SCANCODE_MINUS:
+                        {
+                            masterBusFade -= .1f;
+                            masterBus->fadeTo(masterBusFade, spec.freq * .5);
+                        } break;
+
+                        case SDL_SCANCODE_EQUALS:
+                        {
+                            masterBusFade += .1f;
+                            masterBus->fadeTo(masterBusFade, spec.freq * .5);
                         } break;
 
                         default:
@@ -240,7 +310,9 @@ int main()
         SDL_RenderPresent(renderer);
     }
 #ifdef __EMSCRIPTEN__
-    }; emscripten_set_main_loop(emMainLoop, -1, 1);
+    };
+    emscripten_set_beforeunload_callback(&app, unloadCallback);
+    emscripten_set_main_loop(emMainLoop, -1, 1);
 #endif
 
     engine.close();

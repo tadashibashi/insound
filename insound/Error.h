@@ -1,17 +1,19 @@
 #pragma once
 
-#include <string>
-
 namespace insound {
     struct Result {
-        enum Code {
-            Ok,            ///< No errors.
+        enum Code : int {
+            Ok = 0,        ///< No errors.
             SdlErr,        ///< SDL runtime error.
             RuntimeErr,    ///< Insound runtime error.
             LogicErr,      ///< Most likely a user logic error.
             InvalidArg,    ///< Invalid argument passed to a function.
             InvalidHandle, ///< Attempted to use invalid handle.
-            EngineNotInit,
+            EngineNotInit, ///< Engine was not initialized when depended on.
+            NotSupported,  ///< Feature is not supported.
+            FileOpenErr,   ///< Error when attempting to open a file
+            GmeErr,        ///< LibGME runtime error.
+            Count,
         };
 
         Result(Code code, const char *message);
@@ -22,7 +24,6 @@ namespace insound {
 
     void pushError(Result::Code code, const char *message = nullptr);
 
-    [[nodiscard]]
     Result popError();
 
     [[nodiscard]]

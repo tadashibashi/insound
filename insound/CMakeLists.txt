@@ -1,64 +1,178 @@
 project(insound)
-
-if (NOT TARGET SDL2::SDL2-static)
-    include(FetchContent)
-    FetchContent_Declare(SDL2
-        GIT_REPOSITORY https://github.com/tadashibashi/SDL.git
-        GIT_TAG        78b6ce7e0c524422ea5deb4041fada5b60ca2585
-    )
-    FetchContent_MakeAvailable(SDL2)
-
-    set(SDL_STATIC      ON  CACHE BOOL "" FORCE)
-    set(SDL_SHARED      OFF CACHE BOOL "" FORCE)
-    set(SDL_TEST        OFF CACHE BOOL "" FORCE)
-endif()
+include(FetchContent)
 
 add_library(insound
+    platform/getDefaultSampleRate.h
+    Pool.cpp
+    SourcePool.cpp
+    SourcePool.h)
+
+if (NOT TARGET SDL2::SDL2-static) # user can provide their own SDL2 submodule, but we may want to enforce a minimum version
+    FetchContent_Declare(Insound_SDL2
+        GIT_REPOSITORY https://github.com/tadashibashi/SDL.git
+        GIT_TAG        506002b71e0ccfd89b2d25091d684943be7ebbf5
+    )
+
+    set(SDL_STATIC             ON  CACHE BOOL "" FORCE)
+    set(SDL_SHARED             OFF CACHE BOOL "" FORCE)
+    set(SDL2_DISABLE_UNINSTALL ON  CACHE BOOL "" FORCE)
+    set(SDL_TEST               OFF CACHE BOOL "" FORCE)
+    set(SDL_PTHREADS           (NOT ${INSOUND_NO_PTHREAD}) CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(Insound_SDL2)
+endif()
+
+if (INSOUND_DECODE_VORBIS)
+    FetchContent_Declare(stb
+        GIT_REPOSITORY https://github.com/nothings/stb.git
+        GIT_TAG        013ac3beddff3dbffafd5177e7972067cd2b5083
+    )
+    FetchContent_MakeAvailable(stb)
+    FetchContent_GetProperties(stb)
+
+    target_include_directories(insound PRIVATE ${stb_SOURCE_DIR})
+    target_compile_definitions(insound PRIVATE -DINSOUND_DECODE_VORBIS=1)
+endif()
+
+if (INSOUND_DECODE_FLAC OR INSOUND_DECODE_MP3)
+    FetchContent_Declare(dr_libs
+        GIT_REPOSITORY https://github.com/mackron/dr_libs.git
+        GIT_TAG        da35f9d6c7374a95353fd1df1d394d44ab66cf01
+    )
+    FetchContent_MakeAvailable(dr_libs)
+    FetchContent_GetProperties(dr_libs)
+
+    target_include_directories(insound PRIVATE ${dr_libs_SOURCE_DIR})
+
+    if (INSOUND_DECODE_FLAC)
+        target_compile_definitions(insound PRIVATE -DINSOUND_DECODE_FLAC=1)
+    endif()
+
+    if (INSOUND_DECODE_MP3)
+        target_compile_definitions(insound PRIVATE -DINSOUND_DECODE_MP3=1)
+    endif()
+endif()
+
+if (INSOUND_DECODE_GME)
+    FetchContent_Declare(libgme
+        GIT_REPOSITORY https://github.com/libgme/game-music-emu.git
+        GIT_TAG        4964e543bc25ac3d7968fb5117aabd99d7ff2073
+    )
+
+    if (EMSCRIPTEN)
+        set(GME_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+    else()
+        set(GME_BUILD_SHARED ON CACHE BOOL "" FORCE)  # leave this ON to avoid forcing consumer app to be LGPL
+    endif()
+    set(GME_ENABLE_UBSAN      OFF CACHE BOOL "" FORCE)
+
+    set_property(GLOBAL PROPERTY CTEST_TARGETS_ADDED TRUE)
+
+    FetchContent_MakeAvailable(libgme)
+    target_link_libraries(insound PRIVATE gme)
+    target_compile_definitions(insound PRIVATE -DINSOUND_DECODE_GME=1)
+endif()
+
+target_sources(insound
+PUBLIC
     AudioSpec.h
-    Bus.cpp
     Bus.h
     Command.h
-    Effect.cpp
     Effect.h
-    effects/DelayEffect.cpp
     effects/DelayEffect.h
-    effects/PanEffect.cpp
     effects/PanEffect.h
-    effects/VolumeEffect.cpp
     effects/VolumeEffect.h
-    Engine.cpp
     Engine.h
-    error.cpp
-    error.h
-    mathf.cpp
+    Error.h
+    io/loadAudio.h
     mathf.h
-    PCMSource.cpp
     PCMSource.h
     Pool.h
-    private/SdlAudioGuard.cpp
-    private/SdlAudioGuard.h
-    SampleFormat.cpp
     SampleFormat.h
-    SoundBuffer.cpp
     SoundBuffer.h
-    SoundSource.cpp
-    SoundSource.h
+    Source.h
     SourceRef.h
     SourceRefFwd.h
+PRIVATE
+    Bus.cpp
+    Effect.cpp
+    effects/DelayEffect.cpp
+    effects/PanEffect.cpp
+    effects/VolumeEffect.cpp
+    Engine.cpp
+    Error.cpp
+    io/decodeFLAC.inl
+    io/decodeGME.inl
+    io/decodeMp3.inl
+    io/decodeVorbis.inl
+    io/decodeWAV.inl
+    io/openFile.cpp
+    io/openFile.h
+    io/loadAudio.cpp
+    mathf.cpp
+    PCMSource.cpp
+    platform/AudioDevice/AudioDevice.h
+    platform/AudioDevice/SdlAudioDevice.cpp
+    platform/AudioDevice/SdlAudioDevice.h
+    platform/AudioDevice/AudioDevice.cpp
+    platform/AudioDevice/EmAudioDevice.cpp
+    platform/AudioDevice/EmAudioDevice.h
+    platform/getDefaultSampleRate.cpp
+    platform/getDefaultSampleRate.h
+    SampleFormat.cpp
+    SoundBuffer.cpp
+    Source.cpp
+
+    private/SdlAudioGuard.cpp
+    private/SdlAudioGuard.h
 )
 
 target_link_libraries(insound PRIVATE SDL2::SDL2-static)
 target_include_directories(insound PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 if ("${CMAKE_BUILD_TYPE}" MATCHES "Deb")
+    set(INSOUND_DEBUG TRUE)
     target_compile_definitions(insound PRIVATE -DINSOUND_DEBUG=1)
 else()
+    set(INSOUND_DEBUG FALSE)
     target_compile_definitions(insound PRIVATE -DINSOUND_DEBUG=0)
 endif()
 
 if (EMSCRIPTEN)
-    target_link_options(insound PUBLIC
+    find_program(EMRUN emrun)
+
+    target_link_options(insound
+    PUBLIC
         -sALLOW_MEMORY_GROWTH=1
+        -sINITIAL_MEMORY=2GB
+        -sSTACK_SIZE=131072
+        -sASSERTIONS=2
+        -sWASM=1
     )
-else()
-    target_compile_definitions(insound PRIVATE -DINSOUND_THREADING=1)
+
+    if (EMRUN)
+        target_link_options(insound PUBLIC --emrun)
+    endif()
+
+    if (INSOUND_THREADING)
+            target_link_options(insound PUBLIC
+                -pthread
+                -sPTHREAD_POOL_SIZE=4
+                -sAUDIO_WORKLET=1
+                -sWASM_WORKERS=1
+            )
+            target_compile_options(insound PUBLIC -pthread)
+    endif()
+
+    if (INSOUND_DEBUG)
+        # TODO: -O0 results in a stack overflow with current bus mixing function in audio thread.
+        # emcc version
+        target_link_options(insound PUBLIC -O1 -g -gsource-map)
+        target_compile_options(insound PUBLIC -O1 -g -gsource-map)
+    else()
+        target_link_options(insound PUBLIC -O3)
+        target_compile_options(insound PUBLIC -O3)
+    endif()
+endif()
+
+if (NOT INSOUND_NO_PTHREAD)
+    target_compile_definitions(insound PRIVATE -DINSOUND_THREADING)
 endif()

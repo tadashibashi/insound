@@ -1,8 +1,9 @@
 #pragma once
 #include "SourceRefFwd.h"
 
+#include "SourcePool.h"
+
 #include <cstdint>
-#include <memory>
 
 namespace insound {
     struct AudioSpec;
@@ -10,7 +11,7 @@ namespace insound {
     struct Command;
     struct EngineCommand;
     class SoundBuffer;
-    class SoundSource;
+    class Source;
     class PCMSource;
 
     class Engine {
@@ -18,7 +19,7 @@ namespace insound {
         Engine();
         ~Engine();
 
-        bool open();
+        bool open(int samplerate, int bufferFrameSize);
         void close();
 
         [[nodiscard]]
@@ -31,14 +32,27 @@ namespace insound {
         /// @param oneshot whether to release sound resources at end, (will not auto-release while looping is true)
         /// @param bus     bus this source should output to; left null the master bus will be used
         /// @param outPcmSource pointer to receive pcm source, nullable if you don't need it e.g. a oneshot sound
-        bool playSound(const SoundBuffer *buffer, bool paused, bool looping, bool oneshot, SourceRef<Bus> &bus, SourceRef<PCMSource> *outPcmSource);
-        bool playSound(const SoundBuffer *buffer, bool paused, bool looping, bool oneshot, SourceRef<PCMSource> *outPcmSource);
+        bool playSound(const SoundBuffer *buffer, bool paused, bool looping, bool oneshot, Handle<Bus> bus, Handle<PCMSource> *outPcmSource);
+        bool playSound(const SoundBuffer *buffer, bool paused, bool looping, bool oneshot, Handle<PCMSource> *outPcmSource);
 
         /// Create a new bus to use in the mixing graph
         /// @param paused whether bus should start off paused on initialization
         /// @param output output bus to feed this bus to, if nullptr, the master Bus will be used
-        bool createBus(bool paused, BusRef &output, BusRef *outBus);
-        bool createBus(bool paused, BusRef *outBus);
+        /// @param outBus [out] pointer to retrieve created bus reference
+        bool createBus(bool paused, Handle<Bus> output, Handle<Bus> *outBus);
+        bool createBus(bool paused, Handle<Bus> *outBus);
+
+        template <typename T>
+        bool releaseSound(Handle<T> source)
+        {
+            return releaseSoundImpl((Handle<Source>)source);
+        }
+
+        /// Release a bus
+        /// @param bus bus handle to release
+        /// @param recursive whether to recursively release all bus's children, if `false` all children will be
+        ///                  reattached to the master bus instead. If `true` all children will be released / deleted.
+        bool releaseBus(Handle<Bus> bus, bool recursive);
 
         [[nodiscard]]
         bool deviceID(uint32_t *outDeviceID) const;
@@ -50,7 +64,7 @@ namespace insound {
         bool getBufferSize(uint32_t *outSize) const;
 
         /// Get the master bus
-        bool getMasterBus(SourceRef<Bus> *outbus) const;
+        bool getMasterBus(Handle<Bus> *outBus) const;
 
         /// Push a command to be deferred until `update` is called
         bool pushCommand(const Command &command);
@@ -68,20 +82,23 @@ namespace insound {
 
         bool update();
 
-        /// Flag a SoundSource for removal from the mix graph, it becomes invalidated and will no longer function
-        /// @returns whether function succeeded; check `popError()` for details
-        bool flagDiscard(SoundSource *source);
-
-        /// Check if a SoundSource is currently valid
-        [[nodiscard]]
-        bool isSourceValid(const std::shared_ptr<SoundSource> &source) const;
-        /// Check if a SoundSource is currently valid
-        [[nodiscard]]
-        bool isSourceValid(const SoundSource *source) const;
+        template <typename T>
+        bool tryFindHandle(T *ptr, Handle<T> *outHandle)
+        {
+            return getSourcePool().tryFind(ptr, outHandle);
+        }
 
         struct Impl;
     private:
-        void applyCommand(const EngineCommand &command);
+        friend class Bus;
+        bool releaseSoundImpl(Handle<Source> source);
+        void destroySource(Handle<Source> source);
+        [[nodiscard]]
+        const SourcePool &getSourcePool() const;
+        [[nodiscard]]
+        SourcePool &getSourcePool();
+
+        void applyCommand(EngineCommand &command);
         Impl *m;
     };
 }

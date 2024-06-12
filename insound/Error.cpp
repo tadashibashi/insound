@@ -10,27 +10,38 @@ namespace insound {
     static const Result NoErrors {Result::Ok, nullptr};
 
     static const char *s_codeNames[] = {
-        "No errors.",
+        "No errors",
         "SDL Error",
         "Runtime Error",
         "Logic Error",
         "Invalid Argument",
         "Invalid Handle",
+        "Engine uninitialized",
+        "Feature unsupported",
+        "File failed to open",
+        "LibGME Runtime Error"
     };
+    static_assert(Result::Count == sizeof(s_codeNames) / sizeof(char *));
 
     Result::Result(Code code, const char *message): code(code), message(message)
     { }
 
     void pushError(Result::Code code, const char *message)
     {
-#if INSOUND_DEBUG || INSOUND_LOG_ERRORS
+#if 0 //INSOUND_DEBUG || INSOUND_LOG_ERRORS
+        if (code >= Result::Count)
+            code = (Result::Code)(Result::Count - 1);
+        else if (code < 0)
+            code = (Result::Code)0;
+
         if (message)
         {
-            fprintf(stderr, "INSOUND ERROR: %s: %s\n", s_codeNames[code], s_errors.emplace(code, message).message);
+            //fprintf(stderr, "INSOUND ERROR: %s: %s\n", s_codeNames[code],
+                s_errors.emplace(code, message);
         }
         else
         {
-            fprintf(stderr, "INSOUND ERROR: %s\n", s_codeNames[code]);
+            //fprintf(stderr, "INSOUND ERROR: %s\n", s_codeNames[code]);
             s_errors.emplace(code, "");
         }
 #else
@@ -76,23 +87,30 @@ namespace insound {
 
     const Result &detail::peekSystemError()
     {
-        return s_errors.empty() ? NoErrors : s_sysErrors.top();
+        return s_sysErrors.empty() ? NoErrors : s_sysErrors.top();
     }
 
     void detail::pushSystemError(Result::Code code, const char *message)
     {
-#if INSOUND_DEBUG || INSOUND_LOG_ERRORS
+        if (code >= Result::Count)
+            code = (Result::Code)(Result::Count - 1);
+        else if (code < 0)
+            code = (Result::Code)0;
+#if 0 //INSOUND_DEBUG || INSOUND_LOG_ERRORS
+
+
         if (message)
         {
-            fprintf(stderr, "INSOUND ERROR: %s: %s\n", s_codeNames[code], s_errors.emplace(code, message).message);
+            //fprintf(stderr, "INSOUND ERROR: %s: %s\n", s_codeNames[code],
+                s_sysErrors.emplace(code, message);
         }
         else
         {
-            fprintf(stderr, "INSOUND ERROR: %s\n", s_codeNames[code]);
-            s_errors.emplace(code, "");
+            //fprintf(stderr, "INSOUND ERROR: %s\n", s_codeNames[code]);
+            s_sysErrors.emplace(code, "");
         }
 #else
-        s_errors.emplace(code, message ? message : "");
+        s_sysErrors.emplace(code, message ? message : "");
 #endif
     }
 

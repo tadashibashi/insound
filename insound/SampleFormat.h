@@ -9,23 +9,26 @@ namespace insound {
         SampleFormat();
         SampleFormat(uint8_t bits, bool isFloat, bool isBigEndian, bool isSigned);
 
-        /// @returns indicating format is floating point (on true), or integer data (on false)
+        /// @returns whether format is floating point (on true), or integer data (on false)
         [[nodiscard]]
         bool isFloat() const;
 
+        /// @returns whether format is big endian (on true), or little endian (on false)
         [[nodiscard]]
         bool isBigEndian() const;
 
+        /// @returns whether format is signed (on true), or unsigned (on false)
         [[nodiscard]]
         bool isSigned() const;
 
+        /// @returns how many bits per sample - divide by CHAR_BIT to get bytes
         [[nodiscard]]
         uint8_t bits() const;
 
+        /// @returns the raw flags
         [[nodiscard]]
         uint16_t flags() const { return m_flags; }
     private:
         uint16_t m_flags;
     };
 }
-

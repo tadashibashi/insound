@@ -6,8 +6,8 @@
 #include "SoundBuffer.h"
 
 namespace insound {
-    PCMSource::PCMSource(Engine *engine, const SoundBuffer *buffer, uint32_t parentClock, const bool paused,
-        const bool looping, const bool oneShot) : SoundSource(engine, parentClock, paused),
+    PCMSource::PCMSource(Engine *engine, const SoundBuffer *buffer, const uint32_t parentClock, const bool paused,
+        const bool looping, const bool oneShot) : Source(engine, parentClock, paused),
                                                   m_buffer(buffer), m_position(0), m_isLooping(looping),
                                                   m_isOneShot(oneShot), m_speed(1.f)
     {
@@ -15,8 +15,9 @@ namespace insound {
 
     bool PCMSource::setPosition(const float value)
     {
-        if (detail::popSystemError().code == Result::InvalidHandle)
+        if (detail::peekSystemError().code == Result::InvalidHandle)
         {
+            detail::popSystemError();
             pushError(Result::InvalidHandle);
             return false;
         }
@@ -27,8 +28,9 @@ namespace insound {
 
     bool PCMSource::getSpeed(float *outSpeed) const
     {
-        if (detail::popSystemError().code == Result::InvalidHandle)
+        if (detail::peekSystemError().code == Result::InvalidHandle)
         {
+            detail::popSystemError();
             pushError(Result::InvalidHandle);
             return false;
         }
@@ -43,8 +45,9 @@ namespace insound {
 
     bool PCMSource::setSpeed(float value)
     {
-        if (detail::popSystemError().code == Result::InvalidHandle)
+        if (detail::peekSystemError().code == Result::InvalidHandle)
         {
+            detail::popSystemError();
             pushError(Result::InvalidHandle);
             return false;
         }
@@ -159,7 +162,9 @@ namespace insound {
             m_position += (float)framesToRead * m_speed;
             if (m_isOneShot && m_position >= (float)frameSize)
             {
-                release();
+                Handle<PCMSource> handle;
+                if (engine()->tryFindHandle(this, &handle))
+                    engine()->releaseSound((Handle<Source>)handle);
             }
         }
 
@@ -173,8 +178,9 @@ namespace insound {
 
     bool PCMSource::getPosition(float *outPosition) const
     {
-        if (detail::popSystemError().code == Result::InvalidHandle)
+        if (detail::peekSystemError().code == Result::InvalidHandle)
         {
+            detail::popSystemError();
             pushError(Result::InvalidHandle);
             return false;
         }

@@ -6,9 +6,11 @@
 #include <cstdint>
 #include <vector>
 
+#include "SourcePool.h"
+
 namespace insound {
     // Forward declarations
-    struct SoundSourceCommand;
+    struct SourceCommand;
     class Engine;
     class Effect;
 
@@ -17,9 +19,13 @@ namespace insound {
         float value;
     };
 
-    class SoundSource {
+    /// Base class for a source that generates an audio signal.
+    /// Includes an effects chain, ability to pause/unpause, linear fade points, etc.
+    /// To release resources and remove from the mix graph, call `release()`
+    ///
+    class Source {
     public:
-        virtual ~SoundSource();
+        virtual ~Source();
 
         /// Get paused status of the sound source
         /// @param outPaused pionter to receive paused state
@@ -46,7 +52,7 @@ namespace insound {
 
             if (detail::popSystemError().code == Result::InvalidHandle)
             {
-                pushError(Result::InvalidHandle, "SoundSource");
+                pushError(Result::InvalidHandle, "Source");
                 return nullptr;
             }
 
@@ -131,9 +137,16 @@ namespace insound {
         bool setVolume(float value);
 
         /// Add a linear fade point. Two must exist for it to be applied.
-        /// @param clock parent clocks in samples
+        /// @param clock parent clock time (samples)
         /// @param value value to fade to
+        /// @returns whether function succeeded; check `popError` for details.
         bool addFadePoint(uint32_t clock, float value);
+
+        /// Fade from current value to a target value
+        /// @param value  value to fade to
+        /// @param length fade time in samples
+        /// @returns whether function succeeded; check `popError` for details.
+        bool fadeTo(float value, uint32_t length);
 
         /// Remove fade points between start (inclusive) and end (exclusive), in parent clock cycles
         /// @param start starting point at which to remove fadepoints (inclusive)
@@ -149,12 +162,12 @@ namespace insound {
         /// Swap out this sound source's internal output buffer
         bool swapBuffers(std::vector<uint8_t> *buffer);
 
-        /// Release SoundSource resources, invalidating further use
+        /// Release Source resources, invalidating further use
         /// @returns whether function succeeded; it will only fail if this object is already invalidated.
-        virtual bool release();
+
 
     protected:
-        explicit SoundSource(Engine *engine, uint32_t parentClock, bool paused = false);
+        explicit Source(Engine *engine, uint32_t parentClock, bool paused = false);
     private: // private + friend functionality
         friend class Engine;
         friend class Bus;
@@ -163,9 +176,11 @@ namespace insound {
         Effect *addEffectImpl(Effect *effect, int position);
 
         /// Called by Engine when processing commands
-        void applyCommand(const SoundSourceCommand &command);
-        /// Abstracted into a function for constructor where we immediately add default Pan & Volume to the SoundSource
+        void applyCommand(const SourceCommand &command);
+        /// Abstracted into a function for constructor where we immediately add default Pan & Volume to the Source
         void applyAddEffect(Effect *effect, int position);
+        void applyAddFadePoint(uint32_t clock, float value);
+        void applyRemoveFadePoint(uint32_t startClock, uint32_t endClock);
 
         /// Engine calls this in the mixer thread to update clock values (called recursively from master bus)
         virtual bool updateParentClock(uint32_t parentClock);
@@ -176,13 +191,16 @@ namespace insound {
         /// @returns the amount of bytes available or length arg, whichever is smaller
         int read(const uint8_t **pcmPtr, int length);
 
-        /// Implementation for getting PCM data from the SoundSource
+        /// Implementation for getting PCM data from the Source
         /// TODO: we only support 32-bit float stereo format, so we may not need to pass units in bytes
         /// @param output pointer to the buffer to fill
         /// @param length size of `output` buffer in bytes
         virtual int readImpl(uint8_t *output, int length) = 0;
 
     private: // member variables
+        /// Clean up logic before Source's pool memory is deallocated
+        virtual bool release();
+
         // Cached
         Engine *m_engine;         ///< Reference to the engine for synchronization with the audio thread
         PanEffect *m_panner;      ///< Default stereo pan effect, second to last in the effect chain
@@ -195,7 +213,7 @@ namespace insound {
 
         // State
         float m_fadeValue;                  ///< Current fade value, multiplied against output (separate from volume)
-        uint32_t m_clock, m_parentClock;    ///< Current time in samples since SoundSource and parent was added to the mix graph (check engine spec for sample rate)
+        uint32_t m_clock, m_parentClock;    ///< Current time in samples since Source and parent was added to the mix graph (check engine spec for sample rate)
         bool m_paused;                      ///< Current pause state, when true, no sound will be output
         int m_pauseClock, m_unpauseClock;   ///< Clock times in samples for timed pauses (check engine spec for sample rate)
         bool m_shouldDiscard;               ///< discard flag, signals the mix graph to remove this object

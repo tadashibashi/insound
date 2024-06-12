@@ -1,6 +1,8 @@
 #pragma once
 #include <cstdint>
 
+#include "SourcePool.h"
+
 namespace insound {
     // ======  Command types ==================================================
     struct EffectCommand {
@@ -42,14 +44,15 @@ namespace insound {
         /// Data union for the various commands set by `type`
         union {
             struct {
-                class SoundSource *source;
-            } releasesource;
+                Handle<Source> source;
+                bool recursive; ///< calls release function recursively if bus
+            } deallocsource;
         };
     };
 
-    struct SoundSourceCommand {
-        /// SoundSource to perform this command on
-        class SoundSource *source;
+    struct SourceCommand {
+        /// Source to perform this command on
+        class Source *source;
 
         /// Command subtype
         enum Type {
@@ -58,6 +61,7 @@ namespace insound {
            RemoveEffect,
            AddFadePoint,
            RemoveFadePoint,
+           AddFadeTo,
         } type;
 
         /// Data union for the various commands set by `type`
@@ -86,7 +90,7 @@ namespace insound {
 
     struct BusCommand {
         /// The bus to perform this command on
-        class Bus *bus;
+        Handle<class Bus >bus;
 
         /// Command subtype
         enum Type {
@@ -98,13 +102,13 @@ namespace insound {
         /// Data union for the various commands set by `type`
         union{
             struct {
-                class Bus *output;
+                Handle<Bus> output;
             } setoutput;
             struct {
-                class SoundSource *source;
+                Handle<Source> source;
             } appendsource;
             struct {
-                class SoundSource *source;
+                Handle<Source> source;
             } removesource;
         };
     };
@@ -136,7 +140,7 @@ namespace insound {
         enum Type {
             Effect,         ///< `effect` data
             Engine,         ///< `engine` data
-            SoundSource,    ///< `source` data
+            Source,         ///< `source` data
             PCMSource,      ///< `pcmsource` data
             Bus,            ///< `bus` data
         } type;
@@ -144,14 +148,14 @@ namespace insound {
         union {
             EffectCommand      effect;
             EngineCommand      engine;
-            SoundSourceCommand source;
+            SourceCommand source;
             PCMSourceCommand   pcmsource;
             BusCommand         bus;
         };
 
         // ====== Static helpers =============================================
 
-        static Command makeBusSetOutput(class Bus *bus, class Bus *output)
+        static Command makeBusSetOutput(Handle<class Bus> bus, Handle<class Bus> output)
         {
             Command c{};
             c.type = Type::Bus;
@@ -162,38 +166,40 @@ namespace insound {
             return c;
         }
 
-        static Command makeBusAppendSource(class Bus *bus, class SoundSource *source)
+        static Command makeBusAppendSource(Handle<class Bus> bus, Handle<class Source> handle)
         {
             Command c{};
             c.type = Type::Bus;
             c.bus.bus = bus;
             c.bus.type = BusCommand::AppendSource;
-            c.bus.appendsource.source = source;
+            c.bus.appendsource.source = handle;
 
             return c;
         }
 
-        static Command makeBusRemoveSource(class Bus *bus, class SoundSource *source)
+        static Command makeBusRemoveSource(Handle<class Bus> bus, Handle<class Source> handle)
         {
             Command c{};
             c.type = Type::Bus;
             c.bus.bus = bus;
             c.bus.type = BusCommand::RemoveSource;
-            c.bus.appendsource.source = source;
+            c.bus.appendsource.source = handle;
 
             return c;
         }
 
-        static Command makeEngineReleaseSource(class Engine *engine, class SoundSource *source)
+        static Command makeEngineDeallocateSource(class Engine *engine, Handle<class Source> source, bool recursive = false)
         {
             Command c{};
             c.type = Command::Engine,
             c.engine.engine = engine;
             c.engine.type = EngineCommand::ReleaseSource;
-            c.engine.releasesource.source = source;
+            c.engine.deallocsource.source = source;
+            c.engine.deallocsource.recursive = recursive;
 
             return c;
         }
+
         static Command makeEffectSetFloat(class Effect *effect, const int index, const float value)
         {
             Command c{};
@@ -225,22 +231,22 @@ namespace insound {
             return c;
         }
 
-        static Command makeSourcePause(class SoundSource *source, const bool paused, const uint32_t clock)
+        static Command makeSourcePause(class Source *source, const bool paused, const uint32_t clock)
         {
             Command c{};
-            c.type = SoundSource;
-            c.source.type = SoundSourceCommand::SetPause;
+            c.type = Source;
+            c.source.type = SourceCommand::SetPause;
             c.source.source = source;
             c.source.pause.value = paused;
             c.source.pause.clock = clock;
             return c;
         }
 
-        static Command makeSourceEffect(class SoundSource *source, const bool addEffect, class Effect *effect, const int position)
+        static Command makeSourceEffect(class Source *source, const bool addEffect, class Effect *effect, const int position)
         {
             Command c{};
-            c.type = SoundSource;
-            c.source.type = addEffect ? SoundSourceCommand::AddEffect : SoundSourceCommand::RemoveEffect;
+            c.type = Source;
+            c.source.type = addEffect ? SourceCommand::AddEffect : SourceCommand::RemoveEffect;
             c.source.source = source;
             c.source.effect.effect = effect;
             c.source.effect.position = position;
@@ -248,24 +254,36 @@ namespace insound {
             return c;
         }
 
-        static Command makeSourceAddFadePoint(class SoundSource *source, const uint32_t clock, const float value)
+        static Command makeSourceAddFadePoint(class Source *source, const uint32_t clock, const float value)
         {
             Command c{};
-            c.type = SoundSource;
+            c.type = Source;
             c.source.source = source;
-            c.source.type = SoundSourceCommand::AddFadePoint;
+            c.source.type = SourceCommand::AddFadePoint;
             c.source.addfadepoint.clock = clock;
             c.source.addfadepoint.value = value;
 
             return c;
         }
 
-        static Command makeSourceRemoveFadePoint(class SoundSource *source, const uint32_t begin, const uint32_t end)
+        static Command makeSourceAddFadeTo(class Source *source, const uint32_t clock, const float value)
         {
             Command c{};
-            c.type = SoundSource;
+            c.type = Source;
             c.source.source = source;
-            c.source.type = SoundSourceCommand::RemoveFadePoint;
+            c.source.type = SourceCommand::AddFadeTo;
+            c.source.addfadepoint.clock = clock;
+            c.source.addfadepoint.value = value;
+
+            return c;
+        }
+
+        static Command makeSourceRemoveFadePoint(class Source *source, const uint32_t begin, const uint32_t end)
+        {
+            Command c{};
+            c.type = Source;
+            c.source.source = source;
+            c.source.type = SourceCommand::RemoveFadePoint;
             c.source.removefadepoint.begin = begin;
             c.source.removefadepoint.end = end;
 

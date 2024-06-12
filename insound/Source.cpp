@@ -1,15 +1,15 @@
-#include "SoundSource.h"
+#include "Source.h"
 
 #include "Effect.h"
 #include "Engine.h"
-#include "Command.h"
 #include "Error.h"
+#include "Command.h"
 
 #include "effects/PanEffect.h"
 #include "effects/VolumeEffect.h"
 
 namespace insound {
-    SoundSource::SoundSource(Engine *engine, const uint32_t parentClock, const bool paused) :
+    Source::Source(Engine *engine, const uint32_t parentClock, const bool paused) :
         m_engine(engine),
         m_effects(),
         m_outBuffer(), m_inBuffer(),
@@ -32,7 +32,7 @@ namespace insound {
         }
     }
 
-    SoundSource::~SoundSource()
+    Source::~Source()
     {
         for (const auto &effect : m_effects)
         {
@@ -67,16 +67,16 @@ namespace insound {
         return res + 1 < points.size();
     }
 
-    int SoundSource::read(const uint8_t **pcmPtr, int length)
+    int Source::read(const uint8_t **pcmPtr, int length)
     {
         if (m_inBuffer.size() < length)
         {
-            m_inBuffer.resize(length);
+            m_inBuffer.resize(length, 0);
         }
 
         if (m_outBuffer.size() < length)
         {
-            m_outBuffer.resize(length);
+            m_outBuffer.resize(length, 0);
         }
 
         std::memset(m_outBuffer.data(), 0, m_outBuffer.size());
@@ -187,12 +187,25 @@ namespace insound {
         return length;
     }
 
-    bool SoundSource::getPaused(bool *outPaused) const
+    bool Source::release()
     {
         if (detail::peekSystemError().code == Result::InvalidHandle)
         {
             detail::popSystemError();
-            pushError(Result::InvalidHandle, "SoundSource::getPaused");
+            pushError(Result::InvalidHandle, "Source::release: invalid handle");
+            return false;
+        }
+
+        m_shouldDiscard = true;
+        return true;
+    }
+
+    bool Source::getPaused(bool *outPaused) const
+    {
+        if (detail::peekSystemError().code == Result::InvalidHandle)
+        {
+            detail::popSystemError();
+            pushError(Result::InvalidHandle, "Source::getPaused");
             return false;
         }
 
@@ -203,12 +216,12 @@ namespace insound {
         return true;
     }
 
-    bool SoundSource::setPaused(const bool value, const uint32_t clock)
+    bool Source::setPaused(const bool value, const uint32_t clock)
     {
         if (detail::peekSystemError().code == Result::InvalidHandle)
         {
             detail::popSystemError();
-            pushError(Result::InvalidHandle, "SoundSource::setPaused");
+            pushError(Result::InvalidHandle, "Source::setPaused");
             return false;
         }
 
@@ -216,19 +229,19 @@ namespace insound {
         return true;
     }
 
-    Effect *SoundSource::addEffectImpl(Effect *effect, int position)
+    Effect *Source::addEffectImpl(Effect *effect, int position)
     {
         // No check for validity needed since it was done in `addEffect`
         m_engine->pushCommand(Command::makeSourceEffect(this, true, effect, position));
         return effect;
     }
 
-    bool SoundSource::removeEffect(Effect *effect)
+    bool Source::removeEffect(Effect *effect)
     {
         if (detail::peekSystemError().code == Result::InvalidHandle)
         {
             detail::popSystemError();
-            pushError(Result::InvalidHandle, "SoundSource::removeEffect");
+            pushError(Result::InvalidHandle, "Source::removeEffect");
             return false;
         }
 
@@ -237,12 +250,12 @@ namespace insound {
         return true;
     }
 
-    bool SoundSource::getEffect(const int position, Effect **outEffect) const
+    bool Source::getEffect(const int position, Effect **outEffect) const
     {
         if (detail::peekSystemError().code == Result::InvalidHandle)
         {
             detail::popSystemError();
-            pushError(Result::InvalidHandle, "SoundSource::getEffect");
+            pushError(Result::InvalidHandle, "Source::getEffect");
             return false;
         }
 
@@ -252,12 +265,12 @@ namespace insound {
         return true;
     }
 
-    bool SoundSource::getEffectCount(int *outCount)
+    bool Source::getEffectCount(int *outCount)
     {
         if (detail::peekSystemError().code == Result::InvalidHandle)
         {
             detail::popSystemError();
-            pushError(Result::InvalidHandle, "SoundSource::getEffectCount");
+            pushError(Result::InvalidHandle, "Source::getEffectCount");
             return false;
         }
 
@@ -269,12 +282,12 @@ namespace insound {
         return true;
     }
 
-    bool SoundSource::getClock(uint32_t *outClock) const
+    bool Source::getClock(uint32_t *outClock) const
     {
         if (detail::peekSystemError().code == Result::InvalidHandle)
         {
             detail::popSystemError();
-            pushError(Result::InvalidHandle, "SoundSource::getClock");
+            pushError(Result::InvalidHandle, "Source::getClock");
             return false;
         }
 
@@ -286,12 +299,12 @@ namespace insound {
         return true;
     }
 
-    bool SoundSource::getParentClock(uint32_t *outClock) const
+    bool Source::getParentClock(uint32_t *outClock) const
     {
         if (detail::peekSystemError().code == Result::InvalidHandle)
         {
             detail::popSystemError();
-            pushError(Result::InvalidHandle, "SoundSource::getParentClock");
+            pushError(Result::InvalidHandle, "Source::getParentClock");
             return false;
         }
 
@@ -303,12 +316,12 @@ namespace insound {
         return true;
     }
 
-    bool SoundSource::updateParentClock(uint32_t parentClock)
+    bool Source::updateParentClock(uint32_t parentClock)
     {
         if (detail::peekSystemError().code == Result::InvalidHandle)
         {
             detail::popSystemError();
-            pushError(Result::InvalidHandle, "SoundSource::updateParentClock");
+            pushError(Result::InvalidHandle, "Source::updateParentClock");
             return false;
         }
 
@@ -316,19 +329,19 @@ namespace insound {
         return true;
     }
 
-    void SoundSource::applyCommand(const SoundSourceCommand &command)
+    void Source::applyCommand(const SourceCommand &command)
     {
         /// assumes that the command is a source command
         switch (command.type)
         {
-            case SoundSourceCommand::AddEffect:
+            case SourceCommand::AddEffect:
             {
                 applyAddEffect(
                     command.effect.effect,
                     command.effect.position);
             } break;
 
-            case SoundSourceCommand::RemoveEffect:
+            case SourceCommand::RemoveEffect:
             {
                 const auto effect = command.effect.effect;
                 for (auto it = m_effects.begin(); it != m_effects.end(); ++it)
@@ -341,57 +354,52 @@ namespace insound {
                 }
             } break;
 
-            case SoundSourceCommand::SetPause:
+            case SourceCommand::SetPause:
             {
                 if (command.pause.value)
                 {
-                    m_pauseClock = (int)command.pause.clock;
+
+                    if (command.pause.clock > 0 && command.pause.clock < m_parentClock)
+                        m_pauseClock = (int)m_parentClock; // command took too long to send, until the next clock buffer
+                    else
+                        m_pauseClock = (int)command.pause.clock;
                 }
                 else
                 {
-                    m_unpauseClock = (int)command.pause.clock;
+                    if (command.pause.clock > 0 && command.pause.clock < m_parentClock)
+                        m_unpauseClock = (int)m_parentClock; // command took too long to send, until the next clock buffer
+                    else
+                        m_unpauseClock = (int)command.pause.clock;
                 }
             } break;
 
-            case SoundSourceCommand::AddFadePoint:
+            case SourceCommand::AddFadePoint:
+            {
+                const auto clock = command.addfadepoint.clock;
+                const auto value = command.addfadepoint.value;
+                applyAddFadePoint(clock, value);
+            } break;
+
+            case SourceCommand::AddFadeTo:
             {
                 const auto clock = command.addfadepoint.clock;
                 const auto value = command.addfadepoint.value;
 
-                bool didInsert = false;
-                for (auto it = m_fadePoints.begin(); it != m_fadePoints.end(); ++it)
-                {
-                    if (clock == it->clock) // replace the value
-                    {
-                        it->value = value;
-                        didInsert = true;
-                        break;
-                    }
+                // Remove fade points between now and the fade value
+                removeFadePoints(m_parentClock, clock);
 
-                    if (clock < it->clock)
-                    {
-                        m_fadePoints.insert(it, FadePoint{.clock=clock, .value=value});
-                        didInsert = true;
-                        break;
-                    }
-                }
+                // Set current fade point
+                applyAddFadePoint(m_parentClock, m_fadeValue);
 
-                if (!didInsert)
-                {
-                    m_fadePoints.emplace_back(FadePoint{.clock=clock, .value=value});
-                }
+                // Set target fade point
+                applyAddFadePoint(clock, value);
             } break;
 
-            case SoundSourceCommand::RemoveFadePoint:
+            case SourceCommand::RemoveFadePoint:
             {
                 const auto start = command.removefadepoint.begin;
                 const auto end = command.removefadepoint.end;
-
-                // remove-erase idiom on all fadepoints that match criteria
-                m_fadePoints.erase(std::remove_if(m_fadePoints.begin(), m_fadePoints.end(), [start, end](const FadePoint &point) {
-                    return point.clock >=  start && point.clock < end;
-                }), m_fadePoints.end());
-
+                applyRemoveFadePoint(start, end);
             } break;
 
             default:
@@ -400,7 +408,41 @@ namespace insound {
         }
     }
 
-    void SoundSource::applyAddEffect(Effect *effect, int position)
+    void Source::applyAddFadePoint(const uint32_t clock, const float value)
+    {
+        bool didInsert = false;
+        for (auto it = m_fadePoints.begin(); it != m_fadePoints.end(); ++it)
+        {
+            if (clock == it->clock) // replace the value
+            {
+                it->value = value;
+                didInsert = true;
+                break;
+            }
+
+            if (clock < it->clock)
+            {
+                m_fadePoints.insert(it, FadePoint{.clock=clock, .value=value});
+                didInsert = true;
+                break;
+            }
+        }
+
+        if (!didInsert)
+        {
+            m_fadePoints.emplace_back(FadePoint{.clock=clock, .value=value});
+        }
+    }
+
+    void Source::applyRemoveFadePoint(const uint32_t startClock, const uint32_t endClock)
+    {
+        // remove-erase idiom on all fadepoints that match criteria
+        m_fadePoints.erase(std::remove_if(m_fadePoints.begin(), m_fadePoints.end(), [startClock, endClock](const FadePoint &point) {
+            return point.clock >= startClock && point.clock < endClock;
+        }), m_fadePoints.end());
+    }
+
+    void Source::applyAddEffect(Effect *effect, int position)
     {
         const auto it = m_effects.begin() + position;
 
@@ -409,11 +451,11 @@ namespace insound {
         m_effects.insert(it, effect);
     }
 
-    bool SoundSource::getVolume(float *outVolume) const
+    bool Source::getVolume(float *outVolume) const
     {
         if (detail::popSystemError().code == Result::InvalidHandle)
         {
-            pushError(Result::InvalidHandle, "SoundSource::getVolume");
+            pushError(Result::InvalidHandle, "Source::getVolume");
             return false;
         }
 
@@ -421,12 +463,12 @@ namespace insound {
         return true;
     }
 
-    bool SoundSource::setVolume(const float value)
+    bool Source::setVolume(const float value)
     {
         if (detail::peekSystemError().code == Result::InvalidHandle)
         {
             detail::popSystemError();
-            pushError(Result::InvalidHandle, "SoundSource::setVolume");
+            pushError(Result::InvalidHandle, "Source::setVolume");
             return false;
         }
 
@@ -434,40 +476,54 @@ namespace insound {
         return true;
     }
 
-    bool SoundSource::addFadePoint(const uint32_t clock, const float value)
+    bool Source::addFadePoint(const uint32_t clock, const float value)
     {
         if (detail::peekSystemError().code == Result::InvalidHandle)
         {
             detail::popSystemError();
-            pushError(Result::InvalidHandle, "SoundSource::addFadePoint");
+            pushError(Result::InvalidHandle, "Source::addFadePoint");
             return false;
         }
 
-        // pushed immediately due to need for immediate sample clock accuracy
+        // Push immediately for sample clock accuracy
         m_engine->pushImmediateCommand(Command::makeSourceAddFadePoint(this, clock, value));
         return true;
     }
 
-    bool SoundSource::removeFadePoints(const uint32_t start, const uint32_t end)
+    bool Source::fadeTo(const float value, const uint32_t length)
     {
         if (detail::peekSystemError().code == Result::InvalidHandle)
         {
             detail::popSystemError();
-            pushError(Result::InvalidHandle, "SoundSource::removeFadePoints");
+            pushError(Result::InvalidHandle, "Source::addFadePoint");
             return false;
         }
 
-        // pushed immeidately due to need for immediate sample clock accuracy
+        // Push immediately for sample clock accuracy
+        m_engine->pushImmediateCommand(Command::makeSourceAddFadeTo(this, m_parentClock + length, value));
+        return true;
+    }
+
+    bool Source::removeFadePoints(const uint32_t start, const uint32_t end)
+    {
+        if (detail::peekSystemError().code == Result::InvalidHandle)
+        {
+            detail::popSystemError();
+            pushError(Result::InvalidHandle, "Source::removeFadePoints");
+            return false;
+        }
+
+        // Push immediately for sample clock accuracy
         m_engine->pushImmediateCommand(Command::makeSourceRemoveFadePoint(this, start, end));
         return true;
     }
 
-    bool SoundSource::getFadeValue(float *outValue) const
+    bool Source::getFadeValue(float *outValue) const
     {
         if (detail::peekSystemError().code == Result::InvalidHandle)
         {
             detail::popSystemError();
-            pushError(Result::InvalidHandle, "SoundSource::getFadeValue");
+            pushError(Result::InvalidHandle, "Source::getFadeValue");
             return false;
         }
 
@@ -476,12 +532,12 @@ namespace insound {
         return true;
     }
 
-    bool SoundSource::shouldDiscard(bool *outShouldDiscard) const
+    bool Source::shouldDiscard(bool *outShouldDiscard) const
     {
         if (detail::peekSystemError().code == Result::InvalidHandle)
         {
             detail::popSystemError();
-            pushError(Result::InvalidHandle, "SoundSource::shouldDiscard");
+            pushError(Result::InvalidHandle, "Source::shouldDiscard");
             return false;
         }
 
@@ -494,30 +550,16 @@ namespace insound {
         return true;
     }
 
-    bool SoundSource::swapBuffers(std::vector<uint8_t> *buffer)
+    bool Source::swapBuffers(std::vector<uint8_t> *buffer)
     {
         if (detail::peekSystemError().code == Result::InvalidHandle)
         {
             detail::popSystemError();
-            pushError(Result::InvalidHandle, "SoundSource::swapBuffers");
+            pushError(Result::InvalidHandle, "Source::swapBuffers");
             return false;
         }
 
         m_outBuffer.swap(*buffer);
-        return true;
-    }
-
-    bool SoundSource::release()
-    {
-        if (detail::peekSystemError().code == Result::InvalidHandle)
-        {
-            detail::popSystemError();
-            pushError(Result::InvalidHandle, "SoundSource::release");
-            return false;
-        }
-
-
-        m_engine->flagDiscard(this);
         return true;
     }
 }

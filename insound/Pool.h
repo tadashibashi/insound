@@ -1,112 +1,95 @@
 #pragma once
-#include <climits>
-#include <functional>
-#include <utility>
-#include <vector>
-
-#include "Error.h"
+#include <cstddef>
 
 namespace insound {
-    struct PoolID {
-        uint32_t index;    ///< index in pool array
-        uint32_t id;       ///< inner id
-        uint32_t nextFree; ///< next free index
+
+/// Stores fixed blocks of memory.
+/// Number of slots expands when it reaches full capacity.
+/// Intended as an array for any single type of data.
+class Pool {
+public:
+    struct ID {
+        ID(const size_t index, const size_t id) : index(index), id(id) { }
+        ID(); // null id
+        size_t index, id;
+
+        explicit operator bool() const;
     };
 
-    template <typename T>
-    class Pool {
-        struct PoolObject {
-            PoolID id;
-            T entity;
-        };
-    public:
-
-        /// @param size    number of `T` to pool (implementation is fixed size)
-        /// @param factory create a default `T`
-        Pool(uint32_t size, std::function<T()> factory) :
-            m_pool(), m_nextFree(0), m_idCounter(0)
-        {
-            m_pool.reserve(size);
-            for (size_t i = 0; i < size; ++i)
-            {
-                m_pool.emplace_back(PoolObject{
-                    .id = {
-                        .index = i,
-                        .nextFree = (i == size - 1) ? UINT32_MAX : i + 1
-                    },
-                    .entity = factory(),
-                });
-            }
-        }
-
-        /// Checks if there are no free entities left to get
-        [[nodiscard]]
-        bool empty() const
-        {
-            return (m_nextFree == UINT32_MAX);
-        }
-
-        /// Draw out a fresh entity from the pool
-        /// @param outID     [out] pointer to receive PoolID
-        /// @param outEntity [out] pointer to receive T pointer
-        /// @returns whether get was successful
-        bool getOne(PoolID *outID, T **outEntity)
-        {
-            if (empty())
-            {
-                pushError(Error::RuntimeErr, "No more entities left in pool");
-                return false;
-            }
-
-            if (!outID || !outEntity)
-            {
-                pushError(Error::InvalidArg, "Either outID or outEntity are null, both must be present");
-                return false;
-            }
-
-            auto &poolObj = m_pool[m_nextFree];
-            poolObj.id.id == m_idCounter++;       // initialize inner id
-            m_nextFree = poolObj.id.nextFree;     // move free list head to next free
-
-            // done
-            *outID = poolObj.id;
-            *outEntity = &poolObj.entity;
-            return true;
-        }
-
-        bool isValid(const PoolID &id, T *entity)
-        {
-            const auto &poolObj = m_pool[id.index];
-            return (&poolObj.entity == entity) && poolObj.id.id == id.id;
-        }
-
-        /// Put an entity back into the pool
-        bool putBack(const PoolID &id, T *entity)
-        {
-            // Ensure this entity is valid and belongs to this pool
-            if (!isValid(id, entity))
-            {
-                pushError(Error::LogicErr, "entity does not belong to pool");
-                return false;
-            }
-
-            auto &poolObj = m_pool[id.index];
-
-            // Move this entity to the head of the free list
-            const auto tempNextFree = m_nextFree;
-            m_nextFree = id.index;
-
-            m_pool[id.index].id = PoolID {
-                .id = UINT32_MAX, // invalidate the inner id
-                .index = id.index,
-                .nextFree = tempNextFree,
-            };
-
-            return true;
-        }
-    private:
-        std::vector<PoolObject> m_pool;
-        uint32_t m_nextFree;
-        uint32_t m_idCounter;
+    struct Meta {
+        Meta(const ID id, const size_t nextFree) : id(id), nextFree(nextFree) { }
+        ID id;
+        size_t nextFree;
     };
+
+    /// @param initSize number of initial data slots
+    /// @param elemSize size of one slot in bytes
+    /// @param alignment byte alignment of memory
+    Pool(size_t initSize, size_t elemSize, size_t alignment = alignof(std::max_align_t));
+
+    Pool(const Pool &) = delete;
+    Pool &operator=(const Pool &) = delete;
+
+    Pool(Pool &&other) noexcept;
+    Pool &operator=(Pool &&other) noexcept;
+
+    ~Pool();
+
+    /// Get a slot of pool data. Pool may expand if it is full.
+    ID allocate();
+
+    /// Allocate data slots ahead of time to prevent dynamic resizes
+    void reserve(size_t size);
+
+    /// Returns memory ownership back to the pool.
+    /// @note user should run any cleanup logic on the memory before calling deallocate.
+    ///
+    /// @param id
+    void deallocate(const ID &id);
+
+    /// Check if an id returned from `allocate` is valid. Does not differentiate between ids from other pools,
+    /// so user must make sure that ID is from the correct pool.
+    [[nodiscard]]
+    bool isValid(const ID &id) const { return id.index < m_size && m_meta[id.index].id.id == id.id; }
+
+    /// Users of the pool should access memory via this function instead of caching pointers long-term
+    /// as memory resizing can cause pointers to become invalidated should the pool be dynamically resized.
+    /// Returns `nullptr` if id is invalid
+    void *get(const ID &id) { return isValid(id) ? m_memory + id.index * m_elemSize : nullptr; }
+
+    bool tryFind(void *ptr, ID *outID);
+
+    [[nodiscard]]
+    const void *get(const ID &id) const { return isValid(id) ? m_memory + id.index * m_elemSize : nullptr; }
+
+    [[nodiscard]]
+    size_t maxSize() const { return m_size; }
+
+    /// Size of one element in the pool
+    [[nodiscard]]
+    size_t elemSize() const { return m_elemSize; }
+
+    /// Alignment of element type
+    [[nodiscard]]
+    size_t alignment() const { return m_alignment; }
+
+    /// Deallocate all memory.
+    /// Does not run any cleanup logic, though - please make sure to clean up memory before calling clear.
+    void clear();
+
+private:
+    [[nodiscard]]
+    bool isFull() const;
+    void expand(size_t newSize);
+
+    char *m_memory;               ///< pointer to storage
+    Meta *m_meta;                 ///< contains information on a slot of memory
+    size_t m_size;                ///< current pool size
+
+    size_t m_nextFree;            ///< next free pool index
+    size_t m_elemSize;           ///< size of each memory block
+    size_t m_idCounter;           ///< next id to set on `allocate`
+    size_t m_alignment;           ///< memory alignment
+};
+
 }

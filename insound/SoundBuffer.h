@@ -15,6 +15,7 @@ namespace insound {
     class SoundBuffer {
     public:
         SoundBuffer();
+        SoundBuffer(const fs::path &filepath, const AudioSpec &targetSpec);
         ~SoundBuffer();
 
         /// Load sound and convert to target specification
@@ -32,7 +33,7 @@ namespace insound {
 
         /// Size of buffer in bytes
         [[nodiscard]]
-        auto size() const { return m_byteLength; }
+        auto size() const { return m_bufferSize; }
 
 
 
@@ -47,12 +48,8 @@ namespace insound {
         [[nodiscard]]
         const AudioSpec &spec() const { return m_spec; }
     private:
-        // buffer
-        uint32_t m_byteLength;
+        uint32_t m_bufferSize;
         uint8_t *m_buffer;
-
-        // buffer specs
-        int m_freq;
         AudioSpec m_spec;
     };
 

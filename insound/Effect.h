@@ -19,7 +19,7 @@ namespace insound {
         const Engine *engine() const { return m_engine; }
     private:
         friend class Engine;
-        friend class SoundSource;
+        friend class Source;
         void applyCommand(const EffectCommand &command);
 
         /// Override this if you need to process float parameter sets.
