@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "SourcePool.h"
+#include "Engine.h"
 
 namespace insound {
     // Forward declarations
@@ -25,7 +25,7 @@ namespace insound {
     ///
     class Source {
     public:
-        virtual ~Source();
+        virtual ~Source() = default;
 
         /// Get paused status of the sound source
         /// @param outPaused pionter to receive paused state
@@ -46,34 +46,38 @@ namespace insound {
         /// @param args     arguments to initialize the effect with
         /// @returns a pointer to the effect, or `nullptr` if the function failed; check `popError()` for details
         template <typename T, typename ...TArgs>
-        T *addEffect(int position, TArgs &&...args)
+        Handle<T> addEffect(int position, TArgs &&...args)
         {
             static_assert(std::is_base_of_v<Effect, T>, "`T` must derive from Effect");
 
+#ifdef INSOUND_THREADING
+            auto lockGuard = m_engine->device().mixLockGuard(); // TODO: try to turn this into a command insteadof relying on lockguard
+#endif
             if (detail::popSystemError().code == Result::InvalidHandle)
             {
-                pushError(Result::InvalidHandle, "Source");
-                return nullptr;
+                pushError(Result::InvalidHandle, "Source::addEffect");
+                return {};
             }
 
-            T *effect;
+            // Allocate a new effect
+            Handle<T> effect;
             try
             {
-                effect = new T(std::forward<TArgs>(args)...);
-                if (!effect)
+                effect = m_engine->getObjectPool().allocate<T>(std::forward<TArgs>(args)...);
+                if (!effect.isValid())
                 {
                     pushError(Result::RuntimeErr, "Out of memory");
-                    return nullptr;
+                    return {};
                 }
             }
             catch(...)
             {
                 // constructor threw
                 pushError(Result::RuntimeErr, "Effect constructor threw error");
-                return nullptr;
+                return {};
             }
 
-            addEffectImpl(effect, position);
+            addEffectImpl((Handle<Effect>)effect, position);
             return effect;
         }
 
@@ -83,7 +87,7 @@ namespace insound {
         ///
         /// @note Please take care not to remove the default pan and volume effect, as subsequent access to
         /// `panner()` and `volume()` would result in undefined behavior.
-        bool removeEffect(Effect *effect);
+        bool removeEffect(Handle<Effect> effect);
 
         /// Get an effect from the effect chain
         /// @param position index in the chain where 0 is the start, and `effectCount() - 1` is the last effect
@@ -91,20 +95,18 @@ namespace insound {
         ///                  Please make sure position is in range, otherwise access to the pointer will result in
         ///                  undefined behavior.
         /// @return whether function succeeded; check `popError` for details. `outEffect` will not be mutated on `false`.
-        bool getEffect(int position, Effect **outEffect) const;
+        bool getEffect(int position, Handle<Effect> *outEffect);
+        bool getEffect(int position, Handle<const Effect> *outEffect) const;
 
         /// Get the number of effects objects in the effect chain
         /// @param outCount pointer to receive the number of effects
         /// @returns whether function succeeded, check `popError` for details. `outCount` will not be mutated on `false`.
-        [[nodiscard]]
-        bool getEffectCount(int *outCount);
+        bool getEffectCount(int *outCount) const;
 
-        /// Reference to the engine object
-        [[nodiscard]]
-        Engine *engine() { return m_engine; }
-        /// Reference to the engine object
-        [[nodiscard]]
-        const Engine *engine() const { return m_engine; }
+        /// Retrieve the associated Engine object
+        bool getEngine(Engine **engine);
+        /// Retrieve the associated Engine object
+        bool getEngine(const Engine **engine) const;
 
         /// Get the current clock time in samples
         /// @param outClock pointer to receive the clock time
@@ -118,16 +120,13 @@ namespace insound {
         bool getParentClock(uint32_t *outClock) const;
 
         /// Get the default panner
-        [[nodiscard]]
-        PanEffect *panner() { return m_panner; }
-        /// Get the default panner
-        [[nodiscard]]
-        const PanEffect *panner() const { return m_panner; }
+        /// @param outPanner [out] pointer to receive the panner handle
+        bool getPanner(Handle<PanEffect> *outPanner);
+        bool getPanner(Handle<const PanEffect> *outPanner) const;
 
         /// Get the current volume
         /// @param outVolume pointer to receive volume value where 0 == 0% through 1.f == 100%
         /// @returns whether function succeeded; check `popError` for details. `outVolume` will not be mutated on `false`.
-        [[nodiscard]]
         bool getVolume(float *outVolume) const;
 
         /// Set the current volume
@@ -157,28 +156,29 @@ namespace insound {
 
         bool getFadeValue(float *outValue) const;
 
-        bool shouldDiscard(bool *outShouldDiscard) const;
-
         /// Swap out this sound source's internal output buffer
         bool swapBuffers(std::vector<uint8_t> *buffer);
 
-        /// Release Source resources, invalidating further use
-        /// @returns whether function succeeded; it will only fail if this object is already invalidated.
-
-
     protected:
-        explicit Source(Engine *engine, uint32_t parentClock, bool paused = false);
+        Source();
+        /// All child classes must implement an init function, and call it's parent's init
+        bool init(Engine *engine , uint32_t parentClock, bool paused);
+        /// Clean up logic before Source's pool memory is deallocated
+        virtual bool release();
     private: // private + friend functionality
         friend class Engine;
         friend class Bus;
+        friend class MultiPool; // for access to `init` and `release` lifetime functions
 
         /// Called in `addEffect` to push an add effect command to the Engine. Hides engine implementation.
-        Effect *addEffectImpl(Effect *effect, int position);
+        Handle<Effect> addEffectImpl(Handle<Effect> effect, int position);
+
+        bool shouldDiscard() const;
 
         /// Called by Engine when processing commands
         void applyCommand(const SourceCommand &command);
         /// Abstracted into a function for constructor where we immediately add default Pan & Volume to the Source
-        void applyAddEffect(Effect *effect, int position);
+        void applyAddEffect(const Handle<Effect> &effect, int position);
         void applyAddFadePoint(uint32_t clock, float value);
         void applyRemoveFadePoint(uint32_t startClock, uint32_t endClock);
 
@@ -197,17 +197,15 @@ namespace insound {
         /// @param length size of `output` buffer in bytes
         virtual int readImpl(uint8_t *output, int length) = 0;
 
+    protected:
+        // Cached for convenience
+        Engine *m_engine;                ///< Reference to the engine for synchronization with the audio thread
+        Handle<PanEffect> m_panner;      ///< Default stereo pan effect, second to last in the effect chain
+        Handle<VolumeEffect> m_volume;   ///< Default volume effect, last in the effect chain
+
     private: // member variables
-        /// Clean up logic before Source's pool memory is deallocated
-        virtual bool release();
-
-        // Cached
-        Engine *m_engine;         ///< Reference to the engine for synchronization with the audio thread
-        PanEffect *m_panner;      ///< Default stereo pan effect, second to last in the effect chain
-        VolumeEffect *m_volume;   ///< Default volume effect, last in the effect chain
-
         // Data
-        std::vector<Effect * >m_effects;              ///< Owned audio effects to apply to this source's output
+        std::vector<Handle<Effect>>m_effects;         ///< Owned audio effects to apply to this source's output
         std::vector<uint8_t> m_outBuffer, m_inBuffer; ///< Temporary buffers to store sound data
         std::vector<FadePoint> m_fadePoints;          ///< Fade points to apply
 

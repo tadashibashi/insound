@@ -9,36 +9,67 @@
 #include "effects/VolumeEffect.h"
 
 namespace insound {
-    Source::Source(Engine *engine, const uint32_t parentClock, const bool paused) :
-        m_engine(engine),
-        m_effects(),
+
+#define HANDLE_GUARD() do { if (detail::peekSystemError().code == Result::InvalidHandle) { \
+        detail::popSystemError(); \
+        pushError(Result::InvalidHandle, __FUNCTION__); \
+        return false; \
+    } } while(0)
+
+    Source::Source() :
+        m_engine(),
+        m_panner(),
+        m_volume(), m_effects(),
         m_outBuffer(), m_inBuffer(),
-        m_clock(0), m_parentClock(parentClock),
-        m_paused(paused), m_pauseClock(-1), m_unpauseClock(-1),
-        m_fadePoints(), m_fadeValue(1.f),
-        m_panner(new PanEffect()), m_volume(new VolumeEffect()),
+        m_fadePoints(), m_fadeValue(1.f), m_clock(0),
+        m_parentClock(0), m_paused(),
+        m_pauseClock(-1), m_unpauseClock(-1),
         m_shouldDiscard(false)
     {
+
+    }
+
+    bool Source::init(Engine *engine, const uint32_t parentClock, const bool paused)
+    {
+        m_engine = engine;
+        m_clock = 0;
+        m_parentClock = parentClock;
+        m_paused = paused;
+        m_pauseClock = -1;
+        m_unpauseClock = -1;
+        m_shouldDiscard = false;
+        m_fadeValue = 1.f;
+
+        m_panner = engine->getObjectPool().allocate<PanEffect>();
+        m_volume = engine->getObjectPool().allocate<VolumeEffect>();
+
         // Immediately add default effects (no need to go through deferred commands)
-        applyAddEffect(m_panner, 0);
-        applyAddEffect(m_volume, 1);
+        applyAddEffect(m_panner.cast<Effect>(), 0);
+        applyAddEffect(m_volume.cast<Effect>(), 1);
 
         // Initialize buffers
-        uint32_t bufferSize;
-        if (engine->getBufferSize(&bufferSize))
-        {
-            m_outBuffer.resize(bufferSize, 0);
-            m_inBuffer.resize(bufferSize, 0);
-        }
+        // m_outBuffer.resize(64 * 2 * sizeof(float), 0);
+        // m_inBuffer.resize(64 * 2 * sizeof(float), 0);
+
+        return true;
     }
 
-    Source::~Source()
+    bool Source::release()
     {
-        for (const auto &effect : m_effects)
+        HANDLE_GUARD();
+
+        // clean up logic here
+        for (auto &effect : m_effects)
         {
-            delete effect;
+            effect->release();
+            m_engine->getObjectPool().deallocate(effect);
         }
+        m_effects.clear();
+
+        m_shouldDiscard = true;
+        return true;
     }
+
 
     /// Find starting fade point index, if there is no fade, e.g. < 2 points available, or the last fadepoint clock time
     /// was surpassed, -1 is returned.
@@ -141,7 +172,7 @@ namespace insound {
         }
 
         const auto sampleCount = length / sizeof(float);
-        for (const auto &effect : m_effects)
+        for (auto &effect : m_effects)
         {
             // clear inBuffer to 0
             std::memset(m_inBuffer.data(), 0, m_inBuffer.size());
@@ -187,27 +218,9 @@ namespace insound {
         return length;
     }
 
-    bool Source::release()
-    {
-        if (detail::peekSystemError().code == Result::InvalidHandle)
-        {
-            detail::popSystemError();
-            pushError(Result::InvalidHandle, "Source::release: invalid handle");
-            return false;
-        }
-
-        m_shouldDiscard = true;
-        return true;
-    }
-
     bool Source::getPaused(bool *outPaused) const
     {
-        if (detail::peekSystemError().code == Result::InvalidHandle)
-        {
-            detail::popSystemError();
-            pushError(Result::InvalidHandle, "Source::getPaused");
-            return false;
-        }
+        HANDLE_GUARD();
 
         if (outPaused)
         {
@@ -218,61 +231,63 @@ namespace insound {
 
     bool Source::setPaused(const bool value, const uint32_t clock)
     {
-        if (detail::peekSystemError().code == Result::InvalidHandle)
-        {
-            detail::popSystemError();
-            pushError(Result::InvalidHandle, "Source::setPaused");
-            return false;
-        }
+        HANDLE_GUARD();
 
         m_engine->pushImmediateCommand(Command::makeSourcePause(this, value, clock == UINT32_MAX ? m_parentClock : clock));
         return true;
     }
 
-    Effect *Source::addEffectImpl(Effect *effect, int position)
+    Handle<Effect> Source::addEffectImpl(Handle<Effect> effect, int position)
     {
         // No check for validity needed since it was done in `addEffect`
         m_engine->pushCommand(Command::makeSourceEffect(this, true, effect, position));
         return effect;
     }
 
-    bool Source::removeEffect(Effect *effect)
+    bool Source::removeEffect(Handle<Effect> effect)
     {
-        if (detail::peekSystemError().code == Result::InvalidHandle)
-        {
-            detail::popSystemError();
-            pushError(Result::InvalidHandle, "Source::removeEffect");
-            return false;
-        }
+        HANDLE_GUARD();
 
         m_engine->pushCommand(Command::makeSourceEffect(this, false, effect, -1)); // -1 is discarded in applyCommand
 
         return true;
     }
 
-    bool Source::getEffect(const int position, Effect **outEffect) const
+    bool Source::getEffect(const int position, Handle<Effect> *outEffect)
     {
-        if (detail::peekSystemError().code == Result::InvalidHandle)
+        HANDLE_GUARD();
+
+        if (position >= m_effects.size() || position < 0)
         {
-            detail::popSystemError();
-            pushError(Result::InvalidHandle, "Source::getEffect");
+            pushError(Result::RangeErr, "Source::getEffect: `position` is out of range");
             return false;
         }
 
-        if (outEffect) // todo: add bounds checking?
+        if (outEffect)
             *outEffect = m_effects[position];
 
         return true;
     }
 
-    bool Source::getEffectCount(int *outCount)
+    bool Source::getEffect(int position, Handle<const Effect> *outEffect) const
     {
-        if (detail::peekSystemError().code == Result::InvalidHandle)
+        HANDLE_GUARD();
+
+        if (position >= m_effects.size() || position < 0)
         {
-            detail::popSystemError();
-            pushError(Result::InvalidHandle, "Source::getEffectCount");
+            pushError(Result::RangeErr, "Source::getEffect: `position` is out of range");
             return false;
         }
+
+        if (outEffect)
+            *outEffect = (Handle<const Effect>)m_effects[position];
+
+        return true;
+    }
+
+    bool Source::getEffectCount(int *outCount) const
+    {
+        HANDLE_GUARD();
 
         if (outCount)
         {
@@ -282,14 +297,27 @@ namespace insound {
         return true;
     }
 
+    bool Source::getEngine(Engine **engine)
+    {
+        HANDLE_GUARD();
+
+        if (engine)
+            *engine = m_engine;
+        return true;
+    }
+
+    bool Source::getEngine(const Engine **engine) const
+    {
+        HANDLE_GUARD();
+
+        if (engine)
+            *engine = m_engine;
+        return true;
+    }
+
     bool Source::getClock(uint32_t *outClock) const
     {
-        if (detail::peekSystemError().code == Result::InvalidHandle)
-        {
-            detail::popSystemError();
-            pushError(Result::InvalidHandle, "Source::getClock");
-            return false;
-        }
+        HANDLE_GUARD();
 
         if (outClock)
         {
@@ -301,12 +329,7 @@ namespace insound {
 
     bool Source::getParentClock(uint32_t *outClock) const
     {
-        if (detail::peekSystemError().code == Result::InvalidHandle)
-        {
-            detail::popSystemError();
-            pushError(Result::InvalidHandle, "Source::getParentClock");
-            return false;
-        }
+        HANDLE_GUARD();
 
         if (outClock)
         {
@@ -316,18 +339,96 @@ namespace insound {
         return true;
     }
 
-    bool Source::updateParentClock(uint32_t parentClock)
+    bool Source::getPanner(Handle<PanEffect> *outPanner)
     {
-        if (detail::peekSystemError().code == Result::InvalidHandle)
+        HANDLE_GUARD();
+
+        if (outPanner)
         {
-            detail::popSystemError();
-            pushError(Result::InvalidHandle, "Source::updateParentClock");
-            return false;
+            *outPanner = m_panner;
         }
 
-        m_parentClock = parentClock;
         return true;
     }
+
+    bool Source::getPanner(Handle<const PanEffect> *outPanner) const
+    {
+        HANDLE_GUARD();
+
+        if (outPanner)
+            *outPanner = (Handle<const PanEffect>)m_panner;
+        return true;
+    }
+
+    bool Source::getVolume(float *outVolume) const
+    {
+        HANDLE_GUARD();
+
+        if (outVolume)
+            *outVolume = m_volume->volume();
+        return true;
+    }
+
+    bool Source::setVolume(const float value)
+    {
+        HANDLE_GUARD();
+
+        m_volume->volume(value);
+        return true;
+    }
+
+    bool Source::addFadePoint(const uint32_t clock, const float value)
+    {
+        HANDLE_GUARD();
+
+        // Push immediately for sample clock accuracy
+        m_engine->pushImmediateCommand(Command::makeSourceAddFadePoint(this, clock, value));
+        return true;
+    }
+
+    bool Source::fadeTo(const float value, const uint32_t length)
+    {
+        HANDLE_GUARD();
+
+        // Push immediately for sample clock accuracy
+        m_engine->pushImmediateCommand(Command::makeSourceAddFadeTo(this, m_parentClock + length, value));
+        return true;
+    }
+
+    bool Source::removeFadePoints(const uint32_t start, const uint32_t end)
+    {
+        HANDLE_GUARD();
+
+        // Push immediately for sample clock accuracy
+        m_engine->pushImmediateCommand(Command::makeSourceRemoveFadePoint(this, start, end));
+        return true;
+    }
+
+    bool Source::getFadeValue(float *outValue) const
+    {
+        HANDLE_GUARD();
+
+        if (outValue)
+            *outValue = m_fadeValue;
+        return true;
+    }
+
+    bool Source::shouldDiscard() const
+    {
+        return m_shouldDiscard;
+    }
+
+    bool Source::swapBuffers(std::vector<uint8_t> *buffer)
+    {
+        HANDLE_GUARD();
+
+        m_outBuffer.swap(*buffer);
+        return true;
+    }
+
+
+    // ===== PRIVATE FUNCTIONS ================================================
+    // No need to add handle guard here, since checking for validity is the caller's responsibility
 
     void Source::applyCommand(const SourceCommand &command)
     {
@@ -442,124 +543,18 @@ namespace insound {
         }), m_fadePoints.end());
     }
 
-    void Source::applyAddEffect(Effect *effect, int position)
+    void Source::applyAddEffect(const Handle<Effect> &effect, int position)
     {
         const auto it = m_effects.begin() + position;
 
-        effect->m_engine = m_engine; // provide engine
+        effect->m_engine = m_engine; // provide engine to effect
 
         m_effects.insert(it, effect);
     }
 
-    bool Source::getVolume(float *outVolume) const
+    bool Source::updateParentClock(uint32_t parentClock)
     {
-        if (detail::popSystemError().code == Result::InvalidHandle)
-        {
-            pushError(Result::InvalidHandle, "Source::getVolume");
-            return false;
-        }
-
-        *outVolume = m_volume->volume();
-        return true;
-    }
-
-    bool Source::setVolume(const float value)
-    {
-        if (detail::peekSystemError().code == Result::InvalidHandle)
-        {
-            detail::popSystemError();
-            pushError(Result::InvalidHandle, "Source::setVolume");
-            return false;
-        }
-
-        m_volume->volume(value);
-        return true;
-    }
-
-    bool Source::addFadePoint(const uint32_t clock, const float value)
-    {
-        if (detail::peekSystemError().code == Result::InvalidHandle)
-        {
-            detail::popSystemError();
-            pushError(Result::InvalidHandle, "Source::addFadePoint");
-            return false;
-        }
-
-        // Push immediately for sample clock accuracy
-        m_engine->pushImmediateCommand(Command::makeSourceAddFadePoint(this, clock, value));
-        return true;
-    }
-
-    bool Source::fadeTo(const float value, const uint32_t length)
-    {
-        if (detail::peekSystemError().code == Result::InvalidHandle)
-        {
-            detail::popSystemError();
-            pushError(Result::InvalidHandle, "Source::addFadePoint");
-            return false;
-        }
-
-        // Push immediately for sample clock accuracy
-        m_engine->pushImmediateCommand(Command::makeSourceAddFadeTo(this, m_parentClock + length, value));
-        return true;
-    }
-
-    bool Source::removeFadePoints(const uint32_t start, const uint32_t end)
-    {
-        if (detail::peekSystemError().code == Result::InvalidHandle)
-        {
-            detail::popSystemError();
-            pushError(Result::InvalidHandle, "Source::removeFadePoints");
-            return false;
-        }
-
-        // Push immediately for sample clock accuracy
-        m_engine->pushImmediateCommand(Command::makeSourceRemoveFadePoint(this, start, end));
-        return true;
-    }
-
-    bool Source::getFadeValue(float *outValue) const
-    {
-        if (detail::peekSystemError().code == Result::InvalidHandle)
-        {
-            detail::popSystemError();
-            pushError(Result::InvalidHandle, "Source::getFadeValue");
-            return false;
-        }
-
-        if (outValue)
-            *outValue = m_fadeValue;
-        return true;
-    }
-
-    bool Source::shouldDiscard(bool *outShouldDiscard) const
-    {
-        if (detail::peekSystemError().code == Result::InvalidHandle)
-        {
-            detail::popSystemError();
-            pushError(Result::InvalidHandle, "Source::shouldDiscard");
-            return false;
-        }
-
-
-        if (outShouldDiscard)
-        {
-            *outShouldDiscard = m_shouldDiscard;
-        }
-
-        return true;
-    }
-
-    bool Source::swapBuffers(std::vector<uint8_t> *buffer)
-    {
-        if (detail::peekSystemError().code == Result::InvalidHandle)
-        {
-            detail::popSystemError();
-            pushError(Result::InvalidHandle, "Source::swapBuffers");
-            return false;
-        }
-
-        m_outBuffer.swap(*buffer);
+        m_parentClock = parentClock;
         return true;
     }
 }

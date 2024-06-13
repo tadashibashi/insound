@@ -12,6 +12,7 @@ namespace insound {
     static const char *s_codeNames[] = {
         "No errors",
         "SDL Error",
+        "Out of range",
         "Runtime Error",
         "Logic Error",
         "Invalid Argument",
@@ -28,7 +29,7 @@ namespace insound {
 
     void pushError(Result::Code code, const char *message)
     {
-#if 0 //INSOUND_DEBUG || INSOUND_LOG_ERRORS
+#if INSOUND_DEBUG || INSOUND_LOG_ERRORS
         if (code >= Result::Count)
             code = (Result::Code)(Result::Count - 1);
         else if (code < 0)
@@ -36,12 +37,12 @@ namespace insound {
 
         if (message)
         {
-            //fprintf(stderr, "INSOUND ERROR: %s: %s\n", s_codeNames[code],
-                s_errors.emplace(code, message);
+            fprintf(stderr, "INSOUND ERROR: %s: %s\n", s_codeNames[code],
+                s_errors.emplace(code, message).message);
         }
         else
         {
-            //fprintf(stderr, "INSOUND ERROR: %s\n", s_codeNames[code]);
+            fprintf(stderr, "INSOUND ERROR: %s\n", s_codeNames[code]);
             s_errors.emplace(code, "");
         }
 #else

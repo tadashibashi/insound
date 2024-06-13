@@ -55,7 +55,7 @@ namespace insound {
 
         if (outBufferSize)
         {
-            *outBufferSize = frameCount * config.channels * sizeof(float);
+            *outBufferSize = (uint32_t)frameCount * (uint32_t)config.channels * (uint32_t)sizeof(float);
         }
 
         return true;

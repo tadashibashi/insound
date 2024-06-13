@@ -1,5 +1,6 @@
 #include "Engine.h"
 
+#include "AudioDevice.h"
 #include "AudioSpec.h"
 #include "Bus.h"
 #include "Command.h"
@@ -8,11 +9,7 @@
 #include "PCMSource.h"
 
 #include <mutex>
-#include <unordered_map>
 #include <vector>
-
-#include <insound/platform/AudioDevice/AudioDevice.h>
-
 
 namespace insound {
     struct Engine::Impl {
@@ -96,7 +93,7 @@ namespace insound {
         }
 
         /// Pass null bus with default constructor `{}`
-        bool playSound(const SoundBuffer *buffer, bool paused, bool looping, bool oneshot, Handle<Bus> bus, Handle<PCMSource> *outPcmSource)
+        bool playSound(const SoundBuffer *buffer, bool paused, bool looping, bool oneshot, const Handle<Bus> &bus, Handle<PCMSource> *outPcmSource)
         {
             auto lockGuard = m_device->mixLockGuard();
 
@@ -124,7 +121,7 @@ namespace insound {
                 return false;
             }
 
-            auto newSource = m_sources.allocate<PCMSource>(m_engine, buffer, clock, paused, looping, oneshot);
+            auto newSource = m_objectPool.allocate<PCMSource>(m_engine, buffer, clock, paused, looping, oneshot);
 
             if (bus)
             {
@@ -138,7 +135,6 @@ namespace insound {
             if (outPcmSource)
                 *outPcmSource = newSource;
 
-            m_aliveSources.emplace(newSource.id().id, newSource);
             return true;
         }
 
@@ -158,11 +154,13 @@ namespace insound {
             }
 
             auto outputBus =  isMaster ? Handle<Bus>{} : output.isValid() ? output : m_masterBus;
-            auto newBusHandle = m_sources.allocate<Bus>(
+            const auto newBusHandle = m_objectPool.allocate<Bus>(
                 m_engine,
                 outputBus,
                 paused);
-            Bus::setOutput(newBusHandle, outputBus);
+
+            if (outputBus)
+                Bus::connect(outputBus, (Handle<Source>)newBusHandle);
 
             if (isMaster)
                 newBusHandle->m_isMaster = true;
@@ -172,11 +170,10 @@ namespace insound {
                 *outBus = newBusHandle;
             }
 
-            m_aliveSources.emplace(newBusHandle.id().id, newBusHandle);
             return true;
         }
 
-        bool release(Handle<Source> source, bool recursive)
+        bool release(const Handle<Source> &source, bool recursive)
         {
             if (!isOpen())
             {
@@ -191,7 +188,6 @@ namespace insound {
             }
 
             m_discardFlag = true;
-            m_aliveSources.erase(source.id().id);
             return m_engine->pushCommand(Command::makeEngineDeallocateSource(m_engine, source, recursive));
         }
 
@@ -336,7 +332,7 @@ namespace insound {
         }
 
 
-        void processCommand(EngineCommand &command)
+        void processCommand(const EngineCommand &command)
         {
             // This is called from the mix thread, so we don't need to lock
 
@@ -368,14 +364,20 @@ namespace insound {
         }
 
         [[nodiscard]]
-        const SourcePool &getSourcePools() const
+        const MultiPool &getObjectPool() const
         {
-            return m_sources;
+            return m_objectPool;
         }
 
-        SourcePool &getSourcePools()
+        [[nodiscard]]
+        MultiPool &getObjectPool()
         {
-            return m_sources;
+            return m_objectPool;
+        }
+
+        AudioDevice &getAudioDevice()
+        {
+            return *m_device;
         }
     private:
         static void processCommands(const Engine::Impl *engine, std::vector<Command> &commands)
@@ -447,9 +449,7 @@ namespace insound {
         std::vector<Command> m_immediateCommands;
 
         bool m_discardFlag; ///< set to true when sound source discard should be made
-        SourcePool m_sources; ///< manages multiple pools of different source types
-
-        std::unordered_map<size_t, Handle<Source>> m_aliveSources;
+        MultiPool m_objectPool; ///< manages multiple pools of different source types (also effects)
     };
 
     Engine::Engine() : m(new Impl(this))
@@ -485,7 +485,7 @@ namespace insound {
         return m->playSound(buffer, paused, looping, oneshot, {}, outPcmSource);
     }
 
-    bool Engine::createBus(bool paused, Handle<Bus> output, Handle<Bus> *outBus)
+    bool Engine::createBus(bool paused, const Handle<Bus> &output, Handle<Bus> *outBus)
     {
         return m->createBus(paused, output, outBus, false);
     }
@@ -495,17 +495,17 @@ namespace insound {
         return m->createBus(paused, {}, outBus, false);
     }
 
-    bool Engine::releaseSoundImpl(Handle<Source> source) // TODO: move this to engine impl
+    bool Engine::releaseSoundImpl(Handle<Source> source)
     {
         return m->release(source, false);
     }
 
-    bool Engine::releaseBus(Handle<Bus> bus, bool recursive) // TODO: move this to engine impl
+    bool Engine::releaseBus(const Handle<Bus> &bus, bool recursive)
     {
         return m->release((Handle<Source>)bus, recursive);
     }
 
-    bool Engine::deviceID(uint32_t *outDeviceID) const
+    bool Engine::getDeviceID(uint32_t *outDeviceID) const
     {
         return m->deviceID(outDeviceID);
     }
@@ -550,20 +550,24 @@ namespace insound {
         return m->update();
     }
 
-
-    void Engine::destroySource(Handle<Source> source)
+    void Engine::destroySource(const Handle<Source> &source)
     {
-        m->getSourcePools().deallocate(source);
+        m->getObjectPool().deallocate(source);
     }
 
-    const SourcePool &Engine::getSourcePool() const
+    const MultiPool &Engine::getObjectPool() const
     {
-        return m->getSourcePools();
+        return m->getObjectPool();
     }
 
-    SourcePool &Engine::getSourcePool()
+    MultiPool &Engine::getObjectPool()
     {
-        return m->getSourcePools();
+        return m->getObjectPool();
+    }
+
+    AudioDevice &Engine::device()
+    {
+        return m->getAudioDevice();
     }
 
     void Engine::applyCommand(EngineCommand &command)

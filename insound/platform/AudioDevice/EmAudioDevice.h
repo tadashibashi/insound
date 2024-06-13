@@ -1,6 +1,6 @@
 #pragma once
 #ifdef __EMSCRIPTEN__
-#include "AudioDevice.h"
+#include <insound/AudioDevice.h>
 
 namespace insound {
 

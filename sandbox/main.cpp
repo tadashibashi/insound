@@ -88,24 +88,24 @@ int main()
     Handle<Bus> myBus;
     engine.createBus(false, &myBus);
 
-    const SoundBuffer sounds[4] = {
-        {"assets/bassdrum.wav", spec},
-        {"assets/ep.wav", spec},
-        {"assets/piano.wav", spec},
-        {"assets/snare-hat.wav", spec},
-    };
+     const SoundBuffer sounds[4] = {
+         {"assets/bassdrum.wav", spec},
+         {"assets/ep.wav", spec},
+         {"assets/piano.wav", spec},
+         {"assets/snare-hat.wav", spec},
+     };
 
-    const SoundBuffer pizz("assets/vln_pizz.ogg", spec);
-    const SoundBuffer orch("assets/orch_scene.mp3", spec);
-    const SoundBuffer arp("assets/arp.flac", spec);
-    const SoundBuffer marimba("assets/marimba.wav", spec);
-    const SoundBuffer bach("assets/test.nsf", spec);
+     const SoundBuffer pizz("assets/vln_pizz.ogg", spec);
+     const SoundBuffer orch("assets/orch_scene.mp3", spec);
+     const SoundBuffer arp("assets/arp.flac", spec);
+     const SoundBuffer marimba("assets/marimba.wav", spec);
+     const SoundBuffer bach("assets/test.nsf", spec);
 
     Handle<PCMSource> sources[4];
-    engine.playSound(&sounds[0], false, true, false, myBus, &sources[0]);
-    engine.playSound(&sounds[1], false, true, false, myBus, &sources[1]);
-    engine.playSound(&sounds[2], false, true, false, myBus, &sources[2]);
-    engine.playSound(&sounds[3], false, true, false, myBus, &sources[3]);
+     engine.playSound(&sounds[0], false, true, false, myBus, &sources[0]);
+     engine.playSound(&sounds[1], false, true, false, myBus, &sources[1]);
+     engine.playSound(&sounds[2], false, true, false, myBus, &sources[2]);
+     engine.playSound(&sounds[3], false, true, false, myBus, &sources[3]);
 
     sources[0]->setVolume(.5f);
 
@@ -234,21 +234,29 @@ int main()
 
                         case SDL_SCANCODE_Z: // Set myBus left pan =>
                         {
-                            myBus->panner()->left(myBus->panner()->left() + .05f);
+                            Handle<PanEffect> panner;
+                            myBus->getPanner(&panner);
+                            panner->left(panner->left() + .05f);
                         } break;
 
                         case SDL_SCANCODE_X: // Set myBus left pan <=
                         {
-                            myBus->panner()->left(myBus->panner()->left() - .05f);
+                            Handle<PanEffect> panner;
+                            myBus->getPanner(&panner);
+                            panner->left(panner->left() - .05f);
                         } break;
 
                         case SDL_SCANCODE_C: // Set myBus right pan <=
                         {
-                            myBus->panner()->right(myBus->panner()->right() - .05f);
+                            Handle<PanEffect> panner;
+                            myBus->getPanner(&panner);
+                            panner->right(panner->right() - .05f);
                         } break;
                         case SDL_SCANCODE_V: // Set myBus right pan =>
                         {
-                            myBus->panner()->right(myBus->panner()->right() + .05f);
+                            Handle<PanEffect> panner;
+                            myBus->getPanner(&panner);
+                            panner->right(panner->right() + .05f);
                         } break;
 
                         case SDL_SCANCODE_S: // Stop and release the sound source
@@ -272,13 +280,19 @@ int main()
                         case SDL_SCANCODE_UP:
                         {
                             auto source = sources[channelSelect];
-                            source->setVolume(source->getVolume(nullptr) + .1f);
+
+                            float curVolume;
+                            source->getVolume(&curVolume);
+                            source->setVolume(curVolume + .1f);
                         } break;
 
                         case SDL_SCANCODE_DOWN:
                         {
                             auto source = sources[channelSelect];
-                            source->setVolume(source->getVolume(nullptr) - .1f);
+
+                            float curVolume;
+                            source->getVolume(&curVolume);
+                            source->setVolume(curVolume - .1f);
                         } break;
 
                         case SDL_SCANCODE_MINUS:

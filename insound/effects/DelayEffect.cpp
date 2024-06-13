@@ -4,11 +4,9 @@
 #include "insound/Error.h"
 
 
-insound::DelayEffect::DelayEffect(uint32_t delayTime, float wet, float feedback) :
-    m_delayTime(delayTime), m_feedback(feedback), m_wet(wet), m_delayHead(0)
+insound::DelayEffect::DelayEffect() :
+    m_delayTime(48000), m_feedback(), m_wet(.5f), m_delayHead(0)
 {
-    m_buffer.resize(delayTime * 2);
-    std::memset(m_buffer.data(), 0, m_buffer.size() * sizeof(float));
 }
 
 void insound::DelayEffect::process(float *input, float *output, int count)

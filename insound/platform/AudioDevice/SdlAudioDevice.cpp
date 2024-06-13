@@ -26,7 +26,6 @@ namespace insound {
         std::recursive_mutex mixMutex{};
         std::thread mixThread{};
         std::chrono::microseconds threadDelayTarget{};
-        bool bufferReadyToQueue{};
 #endif
 
         std::vector<uint8_t> buffer{};
@@ -55,21 +54,15 @@ namespace insound {
             if (isRunning())
             {
                 auto lockGuard = std::lock_guard(m_mixMutex);
-                if (!m->bufferReadyToQueue)
+
+                while ((int)SDL_GetQueuedAudioSize(m->id) - m->bufferSize <= 0)
                 {
                     m->callback(m->userData, &m->buffer);
-                    m->bufferReadyToQueue = true;
-                }
-
-                if ((int)SDL_GetQueuedAudioSize(m->id) - m->bufferSize * 2 <= 0)
-                {
-                    if (SDL_QueueAudio(m->id, m->buffer.data(), m->bufferSize) != 0)
+                    if (SDL_QueueAudio(m->id, m->buffer.data(),(uint32_t)m->buffer.size()) != 0)
                     {
                         pushError(Result::SdlErr, SDL_GetError());
                         break;
                     }
-
-                    m->bufferReadyToQueue = false;
                 }
             }
 
@@ -123,8 +116,8 @@ namespace insound {
             SDL_AUDIO_ISBIGENDIAN(obtained.format), SDL_AUDIO_ISSIGNED(obtained.format)
         );
 
-        m->bufferSize = sampleFrameBufferSize * (int)sizeof(float) * 2;
-        m->buffer.resize(m->bufferSize, 0);
+        m->bufferSize = sampleFrameBufferSize * (int)sizeof(float) * 2; // target buffer size
+        m->buffer.resize(128 * 2 * sizeof(float), 0);                   // size of our local buffer (matches web audio)
 
         m->id = deviceID;
         m->callback = audioCallback;
@@ -132,8 +125,6 @@ namespace insound {
 
 #ifdef INSOUND_THREADING
         m->threadDelayTarget = std::chrono::microseconds((int)((float)sampleFrameBufferSize / (float)obtained.freq * 500000.f) );
-        m->bufferReadyToQueue = false;
-
         m->mixThread = std::thread([this]() {
             mixCallback();
         });

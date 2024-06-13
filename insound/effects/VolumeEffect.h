@@ -9,6 +9,16 @@ namespace insound {
         {
         }
 
+        bool init(float volume = 1.f)
+        {
+            if (!Effect::init())
+                return false;
+
+            m_volume = volume;
+
+            return true;
+        }
+
         explicit VolumeEffect(float volume) : m_volume(volume) { }
 
         void process(float *input, float *output, int count) override;

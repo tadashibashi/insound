@@ -6,9 +6,9 @@
 #include "SourceRef.h"
 
 namespace insound {
-    Bus::Bus(Engine *engine, Handle<Bus> parent, const bool paused) :
-        Source(engine, engine && parent && parent.isValid() ? parent->m_clock : 0, paused),
-        m_sources(), m_buffer(), m_parent(parent), m_isMaster()
+    Bus::Bus() :
+        Source(),
+        m_sources(), m_buffer(), m_parent(), m_isMaster()
     {
     }
 
@@ -36,78 +36,74 @@ namespace insound {
 
     void Bus::processRemovals()
     {
-        // Only child classes are checked for validity, the Engine caller ensures that the master bus, which begins the
-        // recursive call is valid
-
-        Handle<Bus> masterBus;
-        if (!engine()->getMasterBus(&masterBus))
-        {
-            return;
-        }
-
-        auto soundEngine = this->engine();
+        auto engine = m_engine;
 
         // Erase-remove idiom on all sound sources with discard flagged true
-        m_sources.erase(std::remove_if(m_sources.begin(), m_sources.end(), [&masterBus, soundEngine] (Handle<Source> &handle) {
+        m_sources.erase(std::remove_if(m_sources.begin(), m_sources.end(), [engine] (Handle<Source> &handle) {
             if (!handle.isValid())
                 return true;
-            auto source = handle.get();
-
-            bool shouldDiscard;
-            if (!source->shouldDiscard(&shouldDiscard))
-                return true; // error, probably due to bad handle, should remove this source
+            const auto source = handle.get();
 
             if (const auto bus = dynamic_cast<Bus *>(source))
-            {
                 bus->processRemovals(); // if graph is huge, this recursive call could be a problem...
 
-                // if (shouldDiscard) // if this bus is flagged for discarding
-                // {
-                //     for (auto &subSourceHandle : bus->m_sources)
-                //     {
-                //         masterBus->applyAppendSource(subSourceHandle);
-                //         if (const auto subBus = dynamic_cast<Bus *>(subSourceHandle.get())) // set each subBus's new parent
-                //         {
-                //             subBus->m_parent = masterBus;
-                //         }
-                //     }
-                // }
+            if (source->shouldDiscard())
+            {
+                engine->destroySource(handle);
+                return true;
             }
 
-            if (shouldDiscard)
-                soundEngine->destroySource(handle);
-            return shouldDiscard;
+            return false;
         }), m_sources.end());
     }
 
-    void Bus::applyCommand(BusCommand &command)
+    void Bus::applyCommand(const BusCommand &command)
     {
         // No validation check necessary here, Engine does it in its processCommands function
 
         switch(command.type)
         {
-            case BusCommand::SetOutput:
-            {
-                auto newParent = command.setoutput.output;
-
-                if (m_parent)
-                {
-                    m_parent->applyRemoveSource((Handle<Source>)command.bus);
-                }
-
-                newParent->applyAppendSource((Handle<Source>)command.bus);
-                m_parent = newParent;
-
-            } break;
-
             case BusCommand::AppendSource:
             {
-                applyAppendSource(command.appendsource.source);
+                auto source = command.appendsource.source;
+
+                // If source is a bus, remove itself from its parent first
+                if (auto subBus = source.getAs<Bus>())
+                {
+                    Handle<Bus> parent;
+                    if (subBus->getOutputBus(&parent) && parent.isValid())
+                    {
+                        parent->applyRemoveSource(source);
+                    }
+
+                    subBus->m_parent = command.bus;
+                }
+
+                applyAppendSource(source);
             } break;
 
             case BusCommand::RemoveSource:
             {
-                applyRemoveSource(command.removesource.source);
+                auto source = command.removesource.source;
+
+                // Remove source from this bus
+                applyRemoveSource(source);
+
+                // // Re-attach source to master bus
+                // if (!m_isMaster)
+                // {
+                //     if (auto subBus = source.getAs<Bus>())
+                //     {
+                //         Handle<Bus> masterBus;
+                //         if (m_engine->getMasterBus(&masterBus))
+                //         {
+                //             masterBus->applyAppendSource(source);
+                //             subBus->m_parent = masterBus;
+                //         }
+                //     }
+                // }
+
+
             } break;
 
             default:
@@ -213,13 +209,13 @@ namespace insound {
         return (int)(m_buffer.size() * sizeof(float));
     }
 
-    bool Bus::applyAppendSource(Handle<Source> handle)
+    bool Bus::applyAppendSource(const Handle<Source> &handle)
     {
         m_sources.emplace_back(handle);
         return true;
     }
 
-    bool Bus::applyRemoveSource(Handle<Source> source)
+    bool Bus::applyRemoveSource(const Handle<Source> &source)
     {
         for (auto it = m_sources.begin(); it != m_sources.end(); ++it)
         {
@@ -304,37 +300,21 @@ namespace insound {
             if (!handle.isValid())
                 continue;
 
-            if (dynamic_cast<Bus *>(handle.get()))
-            {
-                Bus::setOutput((Handle<Bus>)handle, masterBus);
-            }
-            else
-            {
-                Bus::appendSource(masterBus, handle);
-            }
+            Bus::connect(masterBus, handle);
         }
 
         return Source::release();
     }
 
-    bool Bus::setOutput(Handle<Bus> bus, Handle<Bus> output)
+    bool Bus::init(Engine *engine, const Handle<Bus> &parent, bool paused)
     {
-        if (!bus.isValid())
-        {
-            pushError(Result::InvalidHandle, "Bus::setOutput: `bus` is invalid");
+        if (!Source::init(engine, engine && parent && parent.isValid() ? parent->m_clock : 0, paused))
             return false;
-        }
-
-        if (!output.isValid())
-        {
-            pushError(Result::InvalidHandle, "Bus::setOutput: `output` bus is invalid");
-            return false;
-        }
-
-        return bus->engine()->pushCommand(Command::makeBusSetOutput(bus, output));
+        m_parent = parent;
+        return true;
     }
 
-    bool Bus::appendSource(Handle<Bus> bus, Handle<Source> source)
+    bool Bus::connect(const Handle<Bus> &bus, const Handle<Source> &source)
     {
         if (!bus.isValid())
         {
@@ -348,10 +328,10 @@ namespace insound {
             return false;
         }
 
-        return bus->engine()->pushCommand(Command::makeBusAppendSource(bus, source));
+        return bus->m_engine->pushCommand(Command::makeBusAppendSource(bus, source));
     }
 
-    bool Bus::removeSource(Handle<Bus> bus, Handle<Source> source)
+    bool Bus::disconnect(const Handle<Bus> &bus, const Handle<Source> &source)
     {
         if (!bus.isValid())
         {
@@ -365,6 +345,19 @@ namespace insound {
             return false;
         }
 
-        return bus->engine()->pushCommand(Command::makeBusRemoveSource(bus, source));
+        return bus->m_engine->pushCommand(Command::makeBusRemoveSource(bus, source));
+    }
+
+    bool Bus::getOutputBus(Handle<Bus> *outBus)
+    {
+        if (detail::popSystemError().code == Result::InvalidHandle)
+        {
+            pushError(Result::InvalidHandle);
+            return false;
+        }
+
+        if (outBus)
+            *outBus = m_parent;
+        return true;
     }
 }

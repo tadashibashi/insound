@@ -9,19 +9,24 @@ namespace insound {
 
     class PCMSource final : public Source {
     public:
-        explicit PCMSource(Engine *engine, const SoundBuffer *buffer, uint32_t parentClock, bool paused = false,
+        PCMSource();
+
+        bool init(Engine *engine, const SoundBuffer *buffer, uint32_t parentClock, bool paused = false,
             bool looping = false, bool oneShot = false);
 
-        [[nodiscard]]
-        bool hasEnded() const;
+        bool getEnded(bool *outEnded) const;
 
         bool getPosition(float *outPosition) const;
-
         bool setPosition(float value);
 
         bool getSpeed(float *outSpeed) const;
-
         bool setSpeed(float value);
+
+        bool getLooping(bool *outLooping) const;
+        bool setLooping(bool value);
+
+        bool getOneshot(bool *outOneshot) const;
+        bool setOneshot(bool value);
 
     private:
         friend class Engine;

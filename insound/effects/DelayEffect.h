@@ -8,8 +8,23 @@
 namespace insound {
     class DelayEffect: public Effect {
     public:
-        DelayEffect(uint32_t delayTime, float wet, float feedback);
+        DelayEffect();
         ~DelayEffect() override = default;
+
+        bool init(uint32_t delayTime, float wet, float feedback)
+        {
+            if (!Effect::init())
+                return false;
+
+            m_delayTime = delayTime;
+            m_wet = wet;
+            m_feedback = feedback;
+
+            m_buffer.resize(delayTime * 2);
+            std::memset(m_buffer.data(), 0, m_buffer.size() * sizeof(float));
+
+            return true;
+        }
 
         void process(float *input, float *output, int count) override;
 

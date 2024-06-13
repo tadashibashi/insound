@@ -1,7 +1,7 @@
 #pragma once
 #include <cstdint>
 
-#include "SourcePool.h"
+#include "MultiPool.h"
 
 namespace insound {
     // ======  Command types ==================================================
@@ -72,7 +72,7 @@ namespace insound {
             } pause;
 
             struct {
-                class Effect *effect;
+                Handle<class Effect> effect;
                 int position;
             } effect;
 
@@ -94,16 +94,12 @@ namespace insound {
 
         /// Command subtype
         enum Type {
-            SetOutput,
             AppendSource,
             RemoveSource,
         } type;
 
         /// Data union for the various commands set by `type`
         union{
-            struct {
-                Handle<Bus> output;
-            } setoutput;
             struct {
                 Handle<Source> source;
             } appendsource;
@@ -121,6 +117,8 @@ namespace insound {
         enum Type {
             SetPosition,
             SetSpeed,
+            SetLooping,
+            SetOneShot,
         } type;
 
         /// Data union for the various commands set by `type`
@@ -132,6 +130,14 @@ namespace insound {
             struct {
                 float speed;
             } setspeed;
+
+            struct {
+                bool looping;
+            } setlooping;
+
+            struct {
+                bool oneshot;
+            } setoneshot;
         };
     };
 
@@ -154,17 +160,6 @@ namespace insound {
         };
 
         // ====== Static helpers =============================================
-
-        static Command makeBusSetOutput(Handle<class Bus> bus, Handle<class Bus> output)
-        {
-            Command c{};
-            c.type = Type::Bus;
-            c.bus.bus = bus;
-            c.bus.type = BusCommand::SetOutput;
-            c.bus.setoutput.output = output;
-
-            return c;
-        }
 
         static Command makeBusAppendSource(Handle<class Bus> bus, Handle<class Source> handle)
         {
@@ -242,7 +237,7 @@ namespace insound {
             return c;
         }
 
-        static Command makeSourceEffect(class Source *source, const bool addEffect, class Effect *effect, const int position)
+        static Command makeSourceEffect(class Source *source, const bool addEffect, Handle<class Effect> effect, const int position)
         {
             Command c{};
             c.type = Source;
@@ -308,6 +303,28 @@ namespace insound {
             c.pcmsource.type = PCMSourceCommand::SetSpeed;
             c.pcmsource.source = source;
             c.pcmsource.setspeed.speed = speed;
+
+            return c;
+        }
+
+        static Command makePCMSourceSetLooping(class PCMSource *source, const bool looping)
+        {
+            Command c{};
+            c.type = PCMSource;
+            c.pcmsource.type = PCMSourceCommand::SetSpeed;
+            c.pcmsource.source = source;
+            c.pcmsource.setlooping.looping = looping;
+
+            return c;
+        }
+
+        static Command makePCMSourceSetOneShot(class PCMSource *source, const bool oneshot)
+        {
+            Command c{};
+            c.type = PCMSource;
+            c.pcmsource.type = PCMSourceCommand::SetSpeed;
+            c.pcmsource.source = source;
+            c.pcmsource.setoneshot.oneshot = oneshot;
 
             return c;
         }

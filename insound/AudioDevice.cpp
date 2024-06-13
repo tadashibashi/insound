@@ -12,19 +12,22 @@ insound::AudioDevice *insound::AudioDevice::create()
 #endif
 }
 #else
-#include "SdlAudioDevice.h"
+#include "platform/AudioDevice/SdlAudioDevice.h"
 insound::AudioDevice *insound::AudioDevice::create()
 {
     return new SdlAudioDevice();
 }
 #endif
+
 void insound::AudioDevice::destroy(insound::AudioDevice *device)
 {
     device->close();
     delete device;
 }
 
+#ifdef INSOUND_THREADING
 std::lock_guard<std::recursive_mutex> insound::AudioDevice::mixLockGuard()
 {
     return std::lock_guard(m_mixMutex);
 }
+#endif

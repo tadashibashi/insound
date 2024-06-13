@@ -4,8 +4,9 @@ include(FetchContent)
 add_library(insound
     platform/getDefaultSampleRate.h
     Pool.cpp
-    SourcePool.cpp
-    SourcePool.h)
+    MultiPool.cpp
+    MultiPool.h
+    Handle.h)
 
 if (NOT TARGET SDL2::SDL2-static) # user can provide their own SDL2 submodule, but we may want to enforce a minimum version
     FetchContent_Declare(Insound_SDL2
@@ -93,6 +94,8 @@ PUBLIC
     SourceRef.h
     SourceRefFwd.h
 PRIVATE
+    AudioDevice.h
+    AudioDevice.cpp
     Bus.cpp
     Effect.cpp
     effects/DelayEffect.cpp
@@ -110,10 +113,8 @@ PRIVATE
     io/loadAudio.cpp
     mathf.cpp
     PCMSource.cpp
-    platform/AudioDevice/AudioDevice.h
     platform/AudioDevice/SdlAudioDevice.cpp
     platform/AudioDevice/SdlAudioDevice.h
-    platform/AudioDevice/AudioDevice.cpp
     platform/AudioDevice/EmAudioDevice.cpp
     platform/AudioDevice/EmAudioDevice.h
     platform/getDefaultSampleRate.cpp
@@ -152,7 +153,7 @@ if (EMSCRIPTEN)
         target_link_options(insound PUBLIC --emrun)
     endif()
 
-    if (INSOUND_THREADING)
+    if (NOT INSOUND_NO_PTHREAD)
             target_link_options(insound PUBLIC
                 -pthread
                 -sPTHREAD_POOL_SIZE=4

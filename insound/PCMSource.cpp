@@ -6,34 +6,41 @@
 #include "SoundBuffer.h"
 
 namespace insound {
-    PCMSource::PCMSource(Engine *engine, const SoundBuffer *buffer, const uint32_t parentClock, const bool paused,
-        const bool looping, const bool oneShot) : Source(engine, parentClock, paused),
-                                                  m_buffer(buffer), m_position(0), m_isLooping(looping),
-                                                  m_isOneShot(oneShot), m_speed(1.f)
+#define HANDLE_GUARD() do { if (detail::peekSystemError().code == Result::InvalidHandle) { \
+        detail::popSystemError(); \
+        pushError(Result::InvalidHandle, __FUNCTION__); \
+        return false; \
+    } } while(0)
+
+    PCMSource::PCMSource() : Source(),
+        m_buffer(), m_position(0), m_isLooping(),
+        m_isOneShot(), m_speed(1.f)
     {
+    }
+
+    bool PCMSource::init(Engine *engine, const SoundBuffer *buffer, uint32_t parentClock, bool paused,
+        bool looping, bool oneShot)
+    {
+        if (!Source::init(engine, parentClock, paused))
+            return false;
+        m_buffer = buffer;
+        m_isLooping = looping;
+        m_position = 0;
+        m_speed = 1.f;
+        m_isOneShot = oneShot;
+        return true;
     }
 
     bool PCMSource::setPosition(const float value)
     {
-        if (detail::peekSystemError().code == Result::InvalidHandle)
-        {
-            detail::popSystemError();
-            pushError(Result::InvalidHandle);
-            return false;
-        }
+        HANDLE_GUARD();
 
-        engine()->pushImmediateCommand(Command::makePCMSourceSetPosition(this, value));
-        return true;
+        return m_engine->pushImmediateCommand(Command::makePCMSourceSetPosition(this, value));
     }
 
     bool PCMSource::getSpeed(float *outSpeed) const
     {
-        if (detail::peekSystemError().code == Result::InvalidHandle)
-        {
-            detail::popSystemError();
-            pushError(Result::InvalidHandle);
-            return false;
-        }
+        HANDLE_GUARD();
 
         if (outSpeed)
         {
@@ -45,15 +52,41 @@ namespace insound {
 
     bool PCMSource::setSpeed(float value)
     {
-        if (detail::peekSystemError().code == Result::InvalidHandle)
-        {
-            detail::popSystemError();
-            pushError(Result::InvalidHandle);
-            return false;
-        }
+        HANDLE_GUARD();
 
-        engine()->pushCommand(Command::makePCMSourceSetSpeed(this, value));
+        return m_engine->pushCommand(Command::makePCMSourceSetSpeed(this, value));
+    }
+
+    bool PCMSource::getLooping(bool *outLooping) const
+    {
+        HANDLE_GUARD();
+
+        if (outLooping)
+            *outLooping = m_isLooping;
         return true;
+    }
+
+    bool PCMSource::setLooping(bool value)
+    {
+        HANDLE_GUARD();
+
+        return m_engine->pushCommand(Command::makePCMSourceSetLooping(this, value));
+    }
+
+    bool PCMSource::getOneshot(bool *outOneshot) const
+    {
+        HANDLE_GUARD();
+
+        if (outOneshot)
+            *outOneshot = m_isOneShot;
+        return true;
+    }
+
+    bool PCMSource::setOneshot(bool value)
+    {
+        HANDLE_GUARD();
+
+        return m_engine->pushCommand(Command::makePCMSourceSetOneShot(this, value));
     }
 
     void PCMSource::applyCommand(const PCMSourceCommand & command)
@@ -70,6 +103,16 @@ namespace insound {
                 m_speed = command.setspeed.speed;
             } break;
 
+            case PCMSourceCommand::SetLooping:
+            {
+                m_isLooping = command.setlooping.looping;
+            } break;
+
+            case PCMSourceCommand::SetOneShot:
+            {
+                m_isOneShot = command.setoneshot.oneshot;
+            } break;
+
             default:
             {
                 pushError(Result::InvalidArg, "Unknown pcm source command type");
@@ -79,13 +122,14 @@ namespace insound {
 
     int PCMSource::readImpl(uint8_t *output, int length)
     {
+        const auto buffer = (float *)m_buffer->data();
+        if (!buffer)
+            return 0;
         const auto sampleSize = m_buffer->size() / sizeof(float);
         const auto frameSize = sampleSize / 2;
         const auto sampleLength = length / sizeof(float);
         const auto frameLength = sampleLength / 2;
         const int framesToRead = m_isLooping ? (int)frameLength : std::min<int>((int)frameLength, (int)frameSize - (int)std::ceil(m_position));
-
-        const auto buffer = (float *)m_buffer->data();
 
         // clear the write buffer
         std::memset(output, 0, length);
@@ -163,27 +207,26 @@ namespace insound {
             if (m_isOneShot && m_position >= (float)frameSize)
             {
                 Handle<PCMSource> handle;
-                if (engine()->tryFindHandle(this, &handle))
-                    engine()->releaseSound((Handle<Source>)handle);
+                if (m_engine->tryFindHandle(this, &handle))
+                    m_engine->releaseSound((Handle<Source>)handle);
             }
         }
 
         return (int)framesToRead * (int)sizeof(float) * 2;
     }
 
-    bool PCMSource::hasEnded() const
+    bool PCMSource::getEnded(bool *outEnded) const
     {
-        return m_position >= (float)m_buffer->size() / (sizeof(float) * 2.f);
+        HANDLE_GUARD();
+
+        if (outEnded)
+            *outEnded = m_position >= (float)m_buffer->size() / (sizeof(float) * 2.f);
+        return true;
     }
 
     bool PCMSource::getPosition(float *outPosition) const
     {
-        if (detail::peekSystemError().code == Result::InvalidHandle)
-        {
-            detail::popSystemError();
-            pushError(Result::InvalidHandle);
-            return false;
-        }
+        HANDLE_GUARD();
 
         if (outPosition)
             *outPosition = m_position;

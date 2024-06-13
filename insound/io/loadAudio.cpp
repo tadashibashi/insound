@@ -67,7 +67,7 @@ bool insound::loadAudio(const std::filesystem::path &path, const AudioSpec &targ
     }
 
     // convert audio
-    if (!convertAudio(buffer, spec, targetSpec, bufferSize, &bufferSize, &buffer))
+    if (!convertAudio(buffer, bufferSize, spec, targetSpec, &buffer, &bufferSize))
     {
         free(buffer);
         return false;
@@ -90,8 +90,8 @@ bool insound::loadAudio(const std::filesystem::path &path, const AudioSpec &targ
     return true;
 }
 
-bool insound::convertAudio(uint8_t *data, const AudioSpec &dataSpec, const AudioSpec &targetSpec,
-    const uint32_t length, uint32_t *outLength, uint8_t **outBuffer)
+bool insound::convertAudio(uint8_t *audioData, const uint32_t length, const AudioSpec &dataSpec,
+                           const AudioSpec &targetSpec, uint8_t **outBuffer, uint32_t *outLength)
 {
     SDL_AudioCVT cvt;
     auto cvtResult = SDL_BuildAudioCVT(&cvt,
@@ -109,15 +109,15 @@ bool insound::convertAudio(uint8_t *data, const AudioSpec &dataSpec, const Audio
         if (outLength)
             *outLength = length;
         if (outBuffer)
-            *outBuffer = data;
+            *outBuffer = audioData;
         else
-            free(data);
+            free(audioData);
         return true;
     }
 
     // Convert audio
     cvt.len = (int)length;
-    cvt.buf = (uint8_t *)realloc(data, cvt.len * cvt.len_mult);
+    cvt.buf = (uint8_t *)realloc(audioData, cvt.len * cvt.len_mult);
     cvtResult = SDL_ConvertAudio(&cvt);
 
     if (outLength)

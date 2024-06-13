@@ -1,9 +1,9 @@
 #pragma once
-#include "AudioDevice.h"
+#include <insound/AudioDevice.h>
 
 namespace insound {
 
-    class SdlAudioDevice : public AudioDevice {
+    class SdlAudioDevice final : public AudioDevice {
     public:
         SdlAudioDevice();
         ~SdlAudioDevice() override;
@@ -27,7 +27,6 @@ namespace insound {
 
         [[nodiscard]]
         int bufferSize() const override;
-
     private:
 #ifdef INSOUND_THREADING
         void mixCallback();

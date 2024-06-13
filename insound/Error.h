@@ -5,6 +5,7 @@ namespace insound {
         enum Code : int {
             Ok = 0,        ///< No errors.
             SdlErr,        ///< SDL runtime error.
+            RangeErr,
             RuntimeErr,    ///< Insound runtime error.
             LogicErr,      ///< Most likely a user logic error.
             InvalidArg,    ///< Invalid argument passed to a function.

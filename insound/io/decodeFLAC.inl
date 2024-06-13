@@ -1,3 +1,4 @@
+/// This file should be included only once
 #pragma once
 #include "../AudioSpec.h"
 #include "../Error.h"
@@ -56,7 +57,7 @@ namespace insound {
 
         if (outBufferSize)
         {
-            *outBufferSize = frameCount * channels * sizeof(float);
+            *outBufferSize = (uint32_t)frameCount * (uint32_t)channels * (uint32_t)sizeof(float);
         }
 
         return true;

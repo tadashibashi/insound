@@ -2,6 +2,7 @@
 #include "SampleFormat.h"
 
 namespace insound {
+    /// Description for buffer or stream of audio data
     struct AudioSpec {
         AudioSpec(): freq(), channels(), format() { }
 

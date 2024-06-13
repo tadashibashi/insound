@@ -1,11 +1,14 @@
 #pragma once
 #include "SourceRefFwd.h"
 
-#include "SourcePool.h"
+#include "MultiPool.h"
 
 #include <cstdint>
 
+#include "AudioDevice.h"
+
 namespace insound {
+    class BufferPool;
     struct AudioSpec;
     class Bus;
     struct Command;
@@ -39,7 +42,7 @@ namespace insound {
         /// @param paused whether bus should start off paused on initialization
         /// @param output output bus to feed this bus to, if nullptr, the master Bus will be used
         /// @param outBus [out] pointer to retrieve created bus reference
-        bool createBus(bool paused, Handle<Bus> output, Handle<Bus> *outBus);
+        bool createBus(bool paused, const Handle<Bus> &output, Handle<Bus> *outBus);
         bool createBus(bool paused, Handle<Bus> *outBus);
 
         template <typename T>
@@ -52,10 +55,11 @@ namespace insound {
         /// @param bus bus handle to release
         /// @param recursive whether to recursively release all bus's children, if `false` all children will be
         ///                  reattached to the master bus instead. If `true` all children will be released / deleted.
-        bool releaseBus(Handle<Bus> bus, bool recursive);
+        bool releaseBus(const Handle<Bus> &bus, bool recursive);
 
+        /// Retrieve the engine's device ID. If zero, the audio device is uninitialized.
         [[nodiscard]]
-        bool deviceID(uint32_t *outDeviceID) const;
+        bool getDeviceID(uint32_t *outDeviceID) const;
 
         /// Get audio spec
         bool getSpec(AudioSpec *outSpec) const;
@@ -85,18 +89,31 @@ namespace insound {
         template <typename T>
         bool tryFindHandle(T *ptr, Handle<T> *outHandle)
         {
-            return getSourcePool().tryFind(ptr, outHandle);
+            return getObjectPool().tryFind(ptr, outHandle);
         }
 
         struct Impl;
     private:
         friend class Bus;
+        friend class Source;
+
+        template <typename T, typename...TArgs>
+        Handle<T> createObject(TArgs &&...args)
+        {
+#ifdef INSOUND_THREADING
+            auto lockGuard = device().mixLockGuard();
+#endif
+            return getObjectPool().allocate<T>(std::forward<TArgs>(args)...);
+        }
+
         bool releaseSoundImpl(Handle<Source> source);
-        void destroySource(Handle<Source> source);
+        void destroySource(const Handle<Source> &source);
         [[nodiscard]]
-        const SourcePool &getSourcePool() const;
+        const MultiPool &getObjectPool() const;
         [[nodiscard]]
-        SourcePool &getSourcePool();
+        MultiPool &getObjectPool();
+
+        AudioDevice &device();
 
         void applyCommand(EngineCommand &command);
         Impl *m;

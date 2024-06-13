@@ -17,9 +17,15 @@ namespace insound {
         Engine *engine() { return m_engine; }
         [[nodiscard]]
         const Engine *engine() const { return m_engine; }
+
+        /// `init` must be implemented by child classes, and children must call direct parent's init
+        /// It isn't virtual so no override is necessary.
+        bool init() { return true; }
+        virtual void release() { }
     private:
         friend class Engine;
         friend class Source;
+        friend class MultiPool; // for access to `init` and `release` lifetime functions
         void applyCommand(const EffectCommand &command);
 
         /// Override this if you need to process float parameter sets.
