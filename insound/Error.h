@@ -6,6 +6,7 @@ namespace insound {
             Ok = 0,        ///< No errors.
             SdlErr,        ///< SDL runtime error.
             StdExcept,     ///< std::exception thrown
+            OutOfMemory,   ///< Ran out of system resources
             RangeErr,
             RuntimeErr,    ///< Insound runtime error.
             LogicErr,      ///< Most likely a user logic error.
@@ -14,6 +15,7 @@ namespace insound {
             EngineNotInit, ///< Engine was not initialized when depended on.
             NotSupported,  ///< Feature is not supported.
             FileOpenErr,   ///< Error when attempting to open a file
+            UnexpectedData,///< Unexpected data in buffer, may be due to a malformed file or a bug in the file parsing logic.
             EndOfBuffer,   ///< Buffer attempted to read past end of buffer
             GmeErr,        ///< LibGME runtime error.
             UnknownErr,    ///< Most likely something unexpected was thrown that was not an std::exception
