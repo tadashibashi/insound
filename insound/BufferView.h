@@ -57,7 +57,7 @@ namespace insound {
         template <typename T>
         uint32_t read(T &outVal)
         {
-            return readImpl(&outVal, sizeof(T));
+            return readRaw(&outVal, sizeof(T));
         }
 
         template <typename T>
@@ -139,9 +139,9 @@ namespace insound {
         {
             m_pos = offset;
         }
-    protected:
-        uint32_t readImpl(void *buffer, size_t size);
 
+        uint32_t readRaw(void *buffer, size_t size);
+    protected:
         uint8_t *m_buf;
         size_t m_pos;
         size_t m_size;

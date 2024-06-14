@@ -56,8 +56,8 @@ namespace insound {
         }
 
         outString = std::string(m_buf + m_pos, m_buf + m_pos + length);
-        m_pos += length + 1; // +1 to move one past null terminator
-        return length + 1u;
+        m_pos += length;
+        return length;
     }
 
     uint32_t BufferView::read(char *outBuffer, const size_t maxSize)
@@ -116,7 +116,7 @@ namespace insound {
         return m_buf[index];
     }
 
-    uint32_t BufferView::readImpl(void *buffer, const size_t size)
+    uint32_t BufferView::readRaw(void *buffer, const size_t size)
     {
         if (size == 0) return 0; // edge case
 
