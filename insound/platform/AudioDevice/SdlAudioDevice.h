@@ -28,11 +28,6 @@ namespace insound {
         [[nodiscard]]
         int bufferSize() const override;
     private:
-#ifdef INSOUND_THREADING
-        void mixCallback();
-#else
-        static void audioCallback(void *userdata, uint8_t *stream, int length);
-#endif
         struct Impl;
         Impl *m;
     };

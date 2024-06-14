@@ -12,6 +12,7 @@ namespace insound {
     static const char *s_codeNames[] = {
         "No errors",
         "SDL Error",
+        "Standard exception was thrown",
         "Out of range",
         "Runtime Error",
         "Logic Error",
@@ -20,7 +21,9 @@ namespace insound {
         "Engine uninitialized",
         "Feature unsupported",
         "File failed to open",
-        "LibGME Runtime Error"
+        "Attempted to read past end of buffer",
+        "LibGME Runtime Error",
+        "Unknown error",
     };
     static_assert(Result::Count == sizeof(s_codeNames) / sizeof(char *));
 

@@ -12,6 +12,11 @@
 #include <vector>
 
 namespace insound {
+#define ENGINE_INIT_GUARD() do { if (!isOpen()) { \
+        pushError(Result::EngineNotInit, __FUNCTION__); \
+        return false; \
+    } } while(0)
+
     struct Engine::Impl {
     public:
         explicit Impl(Engine *engine) : m_engine(engine), m_clock(), m_masterBus(),
@@ -74,11 +79,7 @@ namespace insound {
         [[nodiscard]]
         bool getBufferSize(uint32_t *outSize) const
         {
-            if (!isOpen())
-            {
-                pushError(Result::EngineNotInit);
-                return false;
-            }
+            ENGINE_INIT_GUARD();
 
             if (outSize)
                 *outSize = m_device->bufferSize();
@@ -96,12 +97,7 @@ namespace insound {
         bool playSound(const SoundBuffer *buffer, bool paused, bool looping, bool oneshot, const Handle<Bus> &bus, Handle<PCMSource> *outPcmSource)
         {
             auto lockGuard = m_device->mixLockGuard();
-
-            if (!isOpen())
-            {
-                pushError(Result::EngineNotInit);
-                return false;
-            }
+            ENGINE_INIT_GUARD();
 
             if (bus && !bus.isValid()) // if output bus was passed, and it's invalid => error
             {
@@ -141,11 +137,7 @@ namespace insound {
         bool createBus(bool paused, const Handle<Bus> &output, Handle<Bus> *outBus, bool isMaster)
         {
             auto lockGuard = m_device->mixLockGuard();
-            if (!isOpen())
-            {
-                pushError(Result::EngineNotInit);
-                return false;
-            }
+            ENGINE_INIT_GUARD();
 
             if (output && !output.isValid()) // if output was passed, and it's invalid => error
             {
@@ -153,16 +145,20 @@ namespace insound {
                 return false;
             }
 
-            auto outputBus =  isMaster ? Handle<Bus>{} : output.isValid() ? output : m_masterBus;
+            // Determine the output bus
+            auto outputBus =  isMaster ? Handle<Bus>{} :  // if creating the master bus => no output
+                output.isValid() ? output : m_masterBus;  // otherwise use provided output or master if null
+
             const auto newBusHandle = m_objectPool.allocate<Bus>(
                 m_engine,
                 outputBus,
                 paused);
 
+            // Connect bus to output
             if (outputBus)
                 Bus::connect(outputBus, (Handle<Source>)newBusHandle);
 
-            if (isMaster)
+            if (isMaster) // flag master
                 newBusHandle->m_isMaster = true;
 
             if (outBus)
@@ -175,11 +171,7 @@ namespace insound {
 
         bool release(const Handle<Source> &source, bool recursive)
         {
-            if (!isOpen())
-            {
-                pushError(Result::EngineNotInit);
-                return false;
-            }
+            ENGINE_INIT_GUARD();
 
             if (!source.isValid())
             {
@@ -196,11 +188,7 @@ namespace insound {
         bool deviceID(uint32_t *outDeviceID) const
         {
             auto lockGuard = m_device->mixLockGuard();
-            if (!isOpen())
-            {
-                pushError(Result::EngineNotInit);
-                return false;
-            }
+            ENGINE_INIT_GUARD();
 
             if (outDeviceID)
                 *outDeviceID = m_device->id();
@@ -213,11 +201,7 @@ namespace insound {
         bool getSpec(AudioSpec *outSpec) const
         {
             auto lockGuard = m_device->mixLockGuard();
-            if (!isOpen())
-            {
-                pushError(Result::EngineNotInit);
-                return false;
-            }
+            ENGINE_INIT_GUARD();
 
             if (outSpec)
             {
@@ -230,11 +214,7 @@ namespace insound {
         bool getMasterBus(Handle<Bus> *outBus) const
         {
             auto lockGuard = m_device->mixLockGuard();
-            if (!isOpen())
-            {
-                pushError(Result::EngineNotInit);
-                return false;
-            }
+            ENGINE_INIT_GUARD();
 
             if (outBus)
             {
@@ -246,11 +226,8 @@ namespace insound {
 
         bool getPaused(bool *outValue) const
         {
-            if (!isOpen())
-            {
-                pushError(Result::EngineNotInit);
-                return false;
-            }
+            auto lockGuard = m_device->mixLockGuard();
+            ENGINE_INIT_GUARD();
 
             if (outValue)
             {
@@ -262,11 +239,8 @@ namespace insound {
 
         bool setPaused(const bool value)
         {
-            if (!isOpen())
-            {
-                pushError(Result::EngineNotInit);
-                return false;
-            }
+            auto lockGuard = m_device->mixLockGuard();
+            ENGINE_INIT_GUARD();
 
             if (value)
                 m_device->suspend();
@@ -276,14 +250,10 @@ namespace insound {
         }
 
         bool update()
-        {;
-            if (!isOpen())
-            {
-                pushError(Result::EngineNotInit);
-                return false;
-            }
-
+        {
             auto lockGuard = m_device->mixLockGuard();
+            ENGINE_INIT_GUARD();
+
             processCommands(this, m_deferredCommands);
 
             if (m_discardFlag)
@@ -307,11 +277,7 @@ namespace insound {
         bool pushCommand(const Command &command)
         {
             auto lockGuard = m_device->mixLockGuard();
-            if (!isOpen())
-            {
-                pushError(Result::EngineNotInit);
-                return false;
-            }
+            ENGINE_INIT_GUARD();
 
             m_deferredCommands.emplace_back(command);
             return true;
@@ -320,21 +286,16 @@ namespace insound {
         bool pushImmediateCommand(const Command &command)
         {
             auto lockGuard = m_device->mixLockGuard();
-            if (!isOpen())
-            {
-                pushError(Result::EngineNotInit);
-                return false;
-            }
+            ENGINE_INIT_GUARD();
 
             m_immediateCommands.emplace_back(command);
 
             return true;
         }
 
-
         void processCommand(const EngineCommand &command)
         {
-            // This is called from the mix thread, so we don't need to lock
+            // This is called from the mix thread, so we shouldn't lock
 
             switch(command.type)
             {

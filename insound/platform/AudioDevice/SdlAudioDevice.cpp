@@ -9,85 +9,14 @@
 
 #include <vector>
 
-#ifdef INSOUND_THREADING
+#ifdef INSOUND_THREADING // Implementation using pthreads
 #include <thread>
-#endif
+struct insound::SdlAudioDevice::Impl {
+    explicit Impl(SdlAudioDevice *device) : mixMutex(device->m_mixMutex) { }
 
-
-namespace insound {
-    struct SdlAudioDevice::Impl {
-        void (*callback)(void *userdata, std::vector<uint8_t> *stream){};
-        void *userData{};
-
-        SDL_AudioDeviceID id{};
-        AudioSpec spec{};
-
-#ifdef INSOUND_THREADING
-        std::recursive_mutex mixMutex{};
-        std::thread mixThread{};
-        std::chrono::microseconds threadDelayTarget{};
-#endif
-
-        std::vector<uint8_t> buffer{};
-        int bufferSize{};
-        detail::SdlAudioGuard m_initGuard{};
-    };
-
-    SdlAudioDevice::SdlAudioDevice() : m(new Impl)
-    {
-    }
-
-    SdlAudioDevice::~SdlAudioDevice()
-    {
-        delete m;
-    }
-
-#ifdef INSOUND_THREADING
-    void SdlAudioDevice::mixCallback()
-    {
-        while (true)
-        {
-            const auto startTime = std::chrono::high_resolution_clock::now();
-            if (m->id == 0)
-                break;
-
-            if (isRunning())
-            {
-                auto lockGuard = std::lock_guard(m_mixMutex);
-
-                while ((int)SDL_GetQueuedAudioSize(m->id) - m->bufferSize <= 0)
-                {
-                    m->callback(m->userData, &m->buffer);
-                    if (SDL_QueueAudio(m->id, m->buffer.data(),(uint32_t)m->buffer.size()) != 0)
-                    {
-                        pushError(Result::SdlErr, SDL_GetError());
-                        break;
-                    }
-                }
-            }
-
-            const auto endTime = std::chrono::high_resolution_clock::now();
-            std::this_thread::sleep_until(m->threadDelayTarget - (endTime - startTime) + endTime);
-        }
-    }
-#else
-    void SdlAudioDevice::audioCallback(void *userdata, uint8_t *stream, int length)
-    {
-        auto device = (SdlAudioDevice *)(userdata);
-
-        if (device->m->buffer.size() != length)
-        {
-            device->m->buffer.resize(length, 0);
-        }
-
-        device->m->callback(device->m->userData, &device->m->buffer);
-
-        std::memcpy(stream, device->m->buffer.data(), length);
-    }
-#endif
-
-    bool SdlAudioDevice::open(int frequency, int sampleFrameBufferSize,
-        void(*audioCallback)(void *userdata, std::vector<uint8_t> *stream), void *userdata)
+    bool open(int frequency, int sampleFrameBufferSize,
+              void(*audioCallback)(void *userdata, std::vector<uint8_t> *stream),
+              void *userdata)
     {
         SDL_AudioSpec desired, obtained;
 
@@ -96,10 +25,6 @@ namespace insound {
         desired.format = AUDIO_F32;
         desired.freq = frequency > 0 ? frequency : getDefaultSampleRate();
         desired.samples = sampleFrameBufferSize;
-#ifndef INSOUND_THREADING
-        desired.callback = SdlAudioDevice::audioCallback;
-        desired.userdata = this;
-#endif
 
         const auto deviceID = SDL_OpenAudioDevice(nullptr, false, &desired, &obtained, 0);
         if (deviceID == 0)
@@ -109,49 +34,201 @@ namespace insound {
         }
 
         close();
-        m->spec.channels = obtained.channels;
-        m->spec.freq = obtained.freq;
-        m->spec.format = SampleFormat(
+        spec.channels = obtained.channels;
+        spec.freq = obtained.freq;
+        spec.format = SampleFormat(
             SDL_AUDIO_BITSIZE(obtained.format), SDL_AUDIO_ISFLOAT(obtained.format),
             SDL_AUDIO_ISBIGENDIAN(obtained.format), SDL_AUDIO_ISSIGNED(obtained.format)
         );
 
-        m->bufferSize = sampleFrameBufferSize * (int)sizeof(float) * 2; // target buffer size
-        m->buffer.resize(128 * 2 * sizeof(float), 0);                   // size of our local buffer (matches web audio)
+        bufferSize = sampleFrameBufferSize * (int)sizeof(float) * 2; // target buffer size
+        buffer.resize(128 * 2 * sizeof(float), 0);                   // size of our local buffer (matches web audio)
 
-        m->id = deviceID;
-        m->callback = audioCallback;
-        m->userData = userdata;
+        id = deviceID;
+        callback = audioCallback;
+        userData = userdata;
 
-#ifdef INSOUND_THREADING
-        m->threadDelayTarget = std::chrono::microseconds((int)((float)sampleFrameBufferSize / (float)obtained.freq * 500000.f) );
-        m->mixThread = std::thread([this]() {
-            mixCallback();
-        });
-#endif
+        threadDelayTarget = std::chrono::microseconds((int)((float)sampleFrameBufferSize / (float)obtained.freq * 500000.f) );
+        mixThread = SDL_CreateThread(mixCallback, "Audio Mix", this);
 
         return true;
     }
 
-    void SdlAudioDevice::close()
+    /// Code run in the mix thread. It feeds the SDL audio queue with data it retrieves from the mixed data from the user callback.
+    static int mixCallback(void *userptr)
     {
-        if (m->id != 0)
+        SDL_SetThreadPriority(SDL_THREAD_PRIORITY_TIME_CRITICAL);
+        auto dev = (SdlAudioDevice::Impl *)userptr;
+        while (true)
         {
-#ifdef INSOUND_THREADING
-            const auto deviceID = m->id;
+            const auto startTime = std::chrono::high_resolution_clock::now();
+            if (dev->id == 0)
+                break;
+
+            if (auto status = SDL_GetAudioDeviceStatus(dev->id); status == SDL_AUDIO_PLAYING)
             {
-                std::lock_guard lockGuard(m->mixMutex);
-                m->id = 0; // flag mix thread to close
+                auto lockGuard = std::lock_guard(dev->mixMutex);
+
+                while ((int)SDL_GetQueuedAudioSize(dev->id) - dev->bufferSize <= 0)
+                {
+                    dev->callback(dev->userData, &dev->buffer);
+                    if (SDL_QueueAudio(dev->id, dev->buffer.data(),(uint32_t)dev->buffer.size()) != 0)
+                    {
+                        pushError(Result::SdlErr, SDL_GetError());
+                        break;
+                    }
+                }
             }
 
-            m->mixThread.join();
+            const auto endTime = std::chrono::high_resolution_clock::now();
+            std::this_thread::sleep_until(dev->threadDelayTarget - (endTime - startTime) + endTime);
+        }
+
+        return 0;
+    }
+
+    /// Close the sdl audio device. Safe to call if already closed.
+    void close()
+    {
+        if (id != 0)
+        {
+            const auto deviceID = id;
+            {
+                std::lock_guard lockGuard(mixMutex);
+                id = 0; // flag mix thread to close
+            }
+
+            SDL_WaitThread(mixThread, nullptr);
+            mixThread = nullptr;
 
             SDL_CloseAudioDevice(deviceID);
-#else
+        }
+    }
+
+    void (*callback)(void *userdata, std::vector<uint8_t> *stream){};
+    void *userData{};
+
+    SDL_AudioDeviceID id{};
+    AudioSpec spec{};
+
+    // Mix thread info
+    std::recursive_mutex &mixMutex;
+    SDL_Thread *mixThread{};
+    std::chrono::microseconds threadDelayTarget{};
+
+    std::condition_variable bufferReady{};
+
+    // Buffer
+    std::vector<uint8_t> buffer{};
+    int bufferSize{}; // more like the target sdl buffer size
+
+    detail::SdlAudioGuard m_initGuard{};
+};
+
+#else  // Non-pthread implementation fallback
+
+struct insound::SdlAudioDevice::Impl {
+    Impl(SdlAudioDevice *device) { }
+
+    void (*callback)(void *userdata, std::vector<uint8_t> *stream){};
+    void *userData{};
+
+    SDL_AudioDeviceID id{};
+    AudioSpec spec{};
+
+    /// Open the SDL audio device, setting up the audio callback
+    bool open(int frequency, int sampleFrameBufferSize,
+              void(*audioCallback)(void *userdata, std::vector<uint8_t> *stream),
+              void *userdata)
+    {
+        // Setup configurations
+        SDL_AudioSpec desired, obtained;
+        SDL_memset(&desired, 0, sizeof(desired));
+        desired.channels = 2;
+        desired.format = AUDIO_F32;
+        desired.freq = frequency > 0 ? frequency : getDefaultSampleRate();
+        desired.samples = sampleFrameBufferSize;
+        desired.callback = audioCallback;
+        desired.userdata = this;
+
+        // Open the device
+        const auto deviceID = SDL_OpenAudioDevice(nullptr, false, &desired, &obtained, 0);
+        if (deviceID == 0)
+        {
+            pushError(Result::SdlErr, SDL_GetError());
+            return false;
+        }
+
+        // Clean up any pre-existing device in this class
+        close();
+
+        // Commit changes
+        spec.channels = obtained.channels;
+        spec.freq = obtained.freq;
+        spec.format = SampleFormat(
+            SDL_AUDIO_BITSIZE(obtained.format), SDL_AUDIO_ISFLOAT(obtained.format),
+            SDL_AUDIO_ISBIGENDIAN(obtained.format), SDL_AUDIO_ISSIGNED(obtained.format)
+        );
+
+        bufferSize = sampleFrameBufferSize * (int)sizeof(float) * 2; // target buffer size
+        buffer.resize(bufferSize, 0);                   // TODO: this can potentially result in all buffers being quite large
+
+        id = deviceID;
+        callback = audioCallback;
+        userData = userdata;
+
+        return true;
+    }
+
+    /// SDL audio callback
+    void audioCallback(void *userdata, uint8_t *stream, int length)
+    {
+        auto device = (SdlAudioDevice::Impl *)(userdata);
+        if (device->buffer.size() != length)
+        {
+            device->buffer.resize(length, 0);
+        }
+
+        device->callback(device->userData, &device->buffer);
+
+        std::memcpy(stream, device->buffer.data(), length);
+    }
+
+    /// Close the sdl audio device
+    void close()
+    {
+        if (id != 0)
+        {
             SDL_CloseAudioDevice(m->id);
             m->id = 0;
-#endif
         }
+    }
+
+    std::vector<uint8_t> buffer{};
+    int bufferSize{};
+    detail::SdlAudioGuard m_initGuard{};
+};
+#endif
+
+namespace insound {
+    SdlAudioDevice::SdlAudioDevice() : m(new Impl(this))
+    {
+    }
+
+    SdlAudioDevice::~SdlAudioDevice()
+    {
+        delete m;
+    }
+
+    bool SdlAudioDevice::open(int frequency, int sampleFrameBufferSize,
+        void(*audioCallback)(void *userdata, std::vector<uint8_t> *stream), void *userdata)
+    {
+        return m->open(frequency, sampleFrameBufferSize, audioCallback, userdata);
+    }
+
+    void SdlAudioDevice::close()
+    {
+        m->close();
     }
 
     void SdlAudioDevice::suspend()

@@ -5,6 +5,7 @@ namespace insound {
         enum Code : int {
             Ok = 0,        ///< No errors.
             SdlErr,        ///< SDL runtime error.
+            StdExcept,     ///< std::exception thrown
             RangeErr,
             RuntimeErr,    ///< Insound runtime error.
             LogicErr,      ///< Most likely a user logic error.
@@ -13,7 +14,9 @@ namespace insound {
             EngineNotInit, ///< Engine was not initialized when depended on.
             NotSupported,  ///< Feature is not supported.
             FileOpenErr,   ///< Error when attempting to open a file
+            EndOfBuffer,   ///< Buffer attempted to read past end of buffer
             GmeErr,        ///< LibGME runtime error.
+            UnknownErr,    ///< Most likely something unexpected was thrown that was not an std::exception
             Count,
         };
 

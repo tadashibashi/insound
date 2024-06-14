@@ -50,9 +50,9 @@ namespace insound {
         {
             static_assert(std::is_base_of_v<Effect, T>, "`T` must derive from Effect");
 
-#ifdef INSOUND_THREADING
-            auto lockGuard = m_engine->device().mixLockGuard(); // TODO: try to turn this into a command insteadof relying on lockguard
-#endif
+            // todo: turn this into a command to send to the engine
+            auto lockGuard = m_engine->device().mixLockGuard();
+
             if (detail::popSystemError().code == Result::InvalidHandle)
             {
                 pushError(Result::InvalidHandle, "Source::addEffect");

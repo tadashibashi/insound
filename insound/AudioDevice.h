@@ -29,11 +29,11 @@ namespace insound {
             void (*audioCallback)(void *userdata, std::vector<uint8_t> *buffer), ///< buffer to fill, may be swapped with internal buffer as long as it maintains its size
             void *userdata) = 0;
 
-        /// Close the audio device, should block
+        /// Close the audio device, should block. Safe to call if already closed.
         virtual void close() = 0;
-        /// Suspend the audio device, no output
+        /// Suspend the audio device, effectively pausing it.
         virtual void suspend() = 0;
-        /// Resume the audio device
+        /// Resume the audio device, unpausing it, if suspended.
         virtual void resume() = 0;
 
         /// Whether device is running (not suspended)
@@ -48,20 +48,17 @@ namespace insound {
         [[nodiscard]]
         virtual uint32_t id() const = 0;
 
-#ifdef INSOUND_THREADING
-        /// Mix thread lock guard
-        [[nodiscard]]
-        std::lock_guard<std::recursive_mutex> mixLockGuard();
-#endif
         /// Audio spec of the output device
         [[nodiscard]]
         virtual const AudioSpec &spec() const = 0;
+
+        std::lock_guard<std::recursive_mutex> mixLockGuard() const { return std::lock_guard(m_mixMutex); }
 
         /// Target buffer size of output device (may pass smaller size to audio callback)
         [[nodiscard]]
         virtual int bufferSize() const = 0;
     protected:
-        std::recursive_mutex m_mixMutex{};
+        mutable std::recursive_mutex m_mixMutex;
         virtual ~AudioDevice() = default;
     };
 }

@@ -5,6 +5,7 @@
 #include <map>
 #include <typeindex>
 #include <unordered_map>
+#include <mutex>
 
 namespace insound {
     /// Pool that manages storage of any number of types of concrete objects.
@@ -24,6 +25,8 @@ namespace insound {
     ///
     /// For subclasses, make sure init and release calls its parent init and release if this is important.
     /// Whether they are virtual or not is up to you.
+    ///
+    /// Pool contains its own mutex, so that it is safe to use with multiple threads.
     class MultiPool {
     public:
         MultiPool() : m_aliveCount(0) {}
@@ -47,26 +50,33 @@ namespace insound {
         {
             static_assert(!std::is_abstract_v<T>, "Cannot allocate an abstract class");
 
-            auto &pool = getPool<T>();
-            const auto lastSize = pool.maxSize();
-            const auto elemSize = pool.elemSize();
-
-            // Allocate new entity
-            auto id = pool.allocate();
-
-            // If pool expanded, place new objects
-            if (const auto curSize = pool.maxSize(); lastSize < curSize)
+            Pool *pool;
+            Pool::ID id;
+            uint32_t elemSize;
             {
-                for (size_t i = lastSize; i < curSize; ++i)
+                std::lock_guard lockGuard(m_mutex);
+
+                pool = &getPool<T>();
+                const auto lastSize = pool->maxSize();
+                elemSize = pool->elemSize();
+
+                // Allocate new entity
+                id = pool->allocate();
+
+                // If pool expanded, place new objects
+                if (const auto curSize = pool->maxSize(); lastSize < curSize)
                 {
-                    new (pool.data() + i * elemSize) T();
+                    for (size_t i = lastSize; i < curSize; ++i)
+                    {
+                        new (pool->data() + i * elemSize) T();
+                    }
                 }
             }
 
             // Init the newly retrieved entity
-            ((T *)(pool.data() + id.index * elemSize))->init(std::forward<TArgs>(args)...); // `T` poolable must implement `init`
+            ((T *)(pool->data() + id.index * elemSize))->init(std::forward<TArgs>(args)...); // `T` poolable must implement `init`
 
-            return Handle<T>(id, &pool);
+            return Handle<T>(id, pool);
         }
 
         /// Deallocate a handle that was retrieved via `MultiPool::allocate`
@@ -75,13 +85,13 @@ namespace insound {
         template <typename T>
         void deallocate(const Handle<T> &handle)
         {
-            // Only need to clean up handle if it's valid
             if (handle.isValid())
             {
-                // `T::release` cleans up the object without destructing it
                 handle->release();
-                handle.m_pool->deallocate(handle.m_id);
             }
+
+            std::lock_guard lockGuard(m_mutex);
+            handle.m_pool->deallocate(handle.m_id);
         }
 
         /// Try to find a handle from a raw pointer. Type `T` should be concrete, targeting
@@ -94,6 +104,7 @@ namespace insound {
         {
             static_assert(!std::is_abstract_v<T>, "Cannot find an abstract pool object");
 
+            std::lock_guard lockGuard(m_mutex);
             if (pointer == nullptr) return false;
 
             auto &pool = getPool<T>();
@@ -113,6 +124,8 @@ namespace insound {
         void reserve(const size_t size)
         {
             static_assert(!std::is_abstract_v<T>, "Cannot reserve space for an abstract class");
+
+            std::lock_guard lockGuard(m_mutex);
             getPool<T>(size).second.reserve(size);
         }
     private:
@@ -147,6 +160,7 @@ namespace insound {
         mutable std::vector<Pool *> m_poolPtrs;
         mutable std::map<std::type_index, Pool> m_pools;
         mutable size_t m_aliveCount;
+        mutable std::mutex m_mutex;
     };
 }
 

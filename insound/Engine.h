@@ -100,9 +100,6 @@ namespace insound {
         template <typename T, typename...TArgs>
         Handle<T> createObject(TArgs &&...args)
         {
-#ifdef INSOUND_THREADING
-            auto lockGuard = device().mixLockGuard();
-#endif
             return getObjectPool().allocate<T>(std::forward<TArgs>(args)...);
         }
 

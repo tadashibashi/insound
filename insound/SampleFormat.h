@@ -2,7 +2,7 @@
 #include <cstdint>
 
 namespace insound {
-    /// Audio format, implementation of SDL audio format used as intermediary object for cross-compatibility
+    /// Description of sample data type (e.g. int16, float32, etc.). It is an implementation of SDL audio format and used as intermediary object for cross-compatibility
     class SampleFormat {
     public:
         /// Zero-ed null sample format object

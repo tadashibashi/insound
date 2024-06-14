@@ -24,10 +24,3 @@ void insound::AudioDevice::destroy(insound::AudioDevice *device)
     device->close();
     delete device;
 }
-
-#ifdef INSOUND_THREADING
-std::lock_guard<std::recursive_mutex> insound::AudioDevice::mixLockGuard()
-{
-    return std::lock_guard(m_mixMutex);
-}
-#endif

@@ -2,12 +2,12 @@
 #include "SampleFormat.h"
 
 namespace insound {
-    /// Description for buffer or stream of audio data
+    /// Description for data in a buffer or stream of audio
     struct AudioSpec {
         AudioSpec(): freq(), channels(), format() { }
 
-        int freq;             ///< number of frames per second
+        int freq;             ///< number of sample frames per second
         int channels;         ///< number of interleaved channels per frame
-        SampleFormat format;  ///< sample format info
+        SampleFormat format;  ///< sample type info  (matches SDL2's audio format flags)
     };
 }

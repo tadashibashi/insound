@@ -6,7 +6,9 @@ add_library(insound
     Pool.cpp
     MultiPool.cpp
     MultiPool.h
-    Handle.h)
+    Handle.h
+    BufferView.h
+    BufferView.cpp)
 
 if (NOT TARGET SDL2::SDL2-static) # user can provide their own SDL2 submodule, but we may want to enforce a minimum version
     FetchContent_Declare(Insound_SDL2
@@ -85,7 +87,7 @@ PUBLIC
     Engine.h
     Error.h
     io/loadAudio.h
-    mathf.h
+    util.h
     PCMSource.h
     Pool.h
     SampleFormat.h
@@ -111,7 +113,7 @@ PRIVATE
     io/openFile.cpp
     io/openFile.h
     io/loadAudio.cpp
-    mathf.cpp
+    util.cpp
     PCMSource.cpp
     platform/AudioDevice/SdlAudioDevice.cpp
     platform/AudioDevice/SdlAudioDevice.h
