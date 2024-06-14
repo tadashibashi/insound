@@ -32,10 +32,14 @@ bool insound::loadAudio(const std::filesystem::path &path, const AudioSpec &targ
 
     if (ext == ".WAV")
     {
-        if (!decodeWAV(path, &spec, &buffer, &bufferSize))
+        if (decodeWAV_v2(path, &spec, &buffer, &bufferSize, nullptr) != WAVResult::Ok)
         {
             return false;
         }
+        // if (!decodeWAV(path, &spec, &buffer, &bufferSize))
+        // {
+        //     return false;
+        // }
     }
     else if (ext == ".OGG")
     {
