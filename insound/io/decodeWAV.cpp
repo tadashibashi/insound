@@ -1,27 +1,11 @@
-#pragma once
-#include "../AudioSpec.h"
-#include "../BufferView.h"
-#include "../Error.h"
+#include "decodeWAV.h"
+#include <insound/AudioSpec.h>
+#include <insound/BufferView.h>
+#include <insound/Error.h>
 
 #include <SDL2/SDL_audio.h>
 
-#include <cstdint>
-#include <filesystem>
-
 namespace insound {
-    struct Cue {
-        std::string name;     ///< string
-        uint32_t    position; ///< position in samples, check sample rate retrieved from spec for conversion to seconds, etc.
-    };
-
-    struct WAVResult {
-        enum Enum {
-            Ok,
-            FileOpenErr,
-            InvalidFile,
-            RuntimeErr,
-        };
-    };
 
 #define WAVREAD_CHECK(bytesRead, expectedCount) do { if ((bytesRead) != (expectedCount)) \
     return WAVResult::InvalidFile; } while(0)
@@ -78,10 +62,6 @@ namespace insound {
 
         return WAVResult::Ok;
     }
-
-    struct int24_t {
-        int32_t data : 24;
-    };
 
     static WAVResult::Enum parseDataChunk(BufferView &buf, uint32_t chunkSize, const FormatData &fmt, uint8_t **outWavData, uint32_t *outDataSize)
     {
@@ -143,17 +123,11 @@ namespace insound {
     /// Load a WAV file into PCM data
     /// Slower, since it streams WAV from disk instead of loading it all at once, but saves on RAM.
     /// It may be good to run this in another thread.
-    static WAVResult::Enum decodeWAV_v2(const std::filesystem::path &path,
+    WAVResult::Enum decodeWAV_v2(const uint8_t *memory, const uint32_t size,
         AudioSpec *outSpec, uint8_t **outBuffer, uint32_t *outBufferSize, std::vector<Cue> *outCues)
     {
-        std::string data;
-        if (!openFile(path, &data))
-        {
-            return WAVResult::FileOpenErr;
-        }
-
         // Read the header for format info
-        BufferView buf(data, endian::little);
+        BufferView buf(memory, size, endian::little);
 
         std::string header;
         header.reserve(4);
@@ -251,12 +225,13 @@ namespace insound {
     }
 
     // TODO: add ability to parse cue chunk into marker data, convert sample positions if necessary
-    static bool decodeWAV(const std::filesystem::path &path, AudioSpec *outSpec, uint8_t **outBuffer, uint32_t *outBufferSize)
+    bool decodeWAV(const uint8_t *memory, uint32_t size, AudioSpec *outSpec, uint8_t **outBuffer, uint32_t *outBufferSize)
     {
         SDL_AudioSpec sdlspec;
         uint32_t length;
         uint8_t *buffer;
-        if (!SDL_LoadWAV(path.c_str(), &sdlspec, &buffer, &length))
+
+        if (!SDL_LoadWAV_RW(SDL_RWFromConstMem(memory, (int)size), SDL_TRUE, &sdlspec, &buffer, &length))
         {
             pushError(Result::SdlErr, SDL_GetError());
             return false;

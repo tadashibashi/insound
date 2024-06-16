@@ -1,8 +1,9 @@
 #include "AudioDevice.h"
 
 #ifdef __EMSCRIPTEN__
-#include "EmAudioDevice.h"
-#include "SdlAudioDevice.h"
+#include "platform/AudioDevice/EmAudioDevice.h"
+#include "platform/AudioDevice/SdlAudioDevice.h"
+
 insound::AudioDevice *insound::AudioDevice::create()
 {
 #ifdef INSOUND_THREADING // Use AudioWorklet backend

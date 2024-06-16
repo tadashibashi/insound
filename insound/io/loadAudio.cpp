@@ -1,29 +1,37 @@
 #include "loadAudio.h"
 
-#include "../AudioSpec.h"
-#include "../Error.h"
-#include "decodeFLAC.inl"
-#include "decodeGME.inl"
-#include "decodeMp3.inl"
-#include "decodeVorbis.inl"
-#include "decodeWAV.inl"
+#include "decodeFLAC.h"
+#include "decodeGME.h"
+#include "decodeMp3.h"
+#include "decodeVorbis.h"
+#include "decodeWAV.h"
 
-#include <fstream>
-#include <iostream>
+#include <insound/AudioSpec.h>
+#include <insound/Error.h>
+#include <insound/io/openFile.h>
 
 bool insound::loadAudio(const std::filesystem::path &path, const AudioSpec &targetSpec, uint8_t **outBuffer, uint32_t *outLength)
 {
+    // Detect audio file type by extension
     if (!path.has_extension())
     {
-        pushError(Result::InvalidArg, R"(`path` must contain a recognizable extension e.g. ".wav", ".ogg")");
+        pushError(Result::InvalidArg,
+                  R"(`path` must contain a recognizable extension e.g. ".wav", ".ogg")");
         return false;
     }
 
-    // Make extension uppercase
-    auto ext = path.extension().string();
+    // Uppercase extension
+    auto ext = path.extension().native();
     for (char &c : ext)
     {
         c = (char)std::toupper(c);
+    }
+
+    // Load file data
+    std::string fileData;
+    if (!openFile(path, &fileData))
+    {
+        return false;
     }
 
     AudioSpec spec;
@@ -32,67 +40,51 @@ bool insound::loadAudio(const std::filesystem::path &path, const AudioSpec &targ
 
     if (ext == ".WAV")
     {
-        if (decodeWAV_v2(path, &spec, &buffer, &bufferSize, nullptr) != WAVResult::Ok)
-        {
+        if (decodeWAV_v2((uint8_t *)fileData.data(), fileData.size(), &spec, &buffer, &bufferSize, nullptr) != WAVResult::Ok)
             return false;
-        }
-        // if (!decodeWAV(path, &spec, &buffer, &bufferSize))
-        // {
-        //     return false;
-        // }
     }
     else if (ext == ".OGG")
     {
-        if (!decodeVorbis(path, &spec, &buffer, &bufferSize))
-        {
+        if (!decodeVorbis((uint8_t *)fileData.data(), fileData.size(), &spec, &buffer, &bufferSize))
             return false;
-        }
     }
     else if (ext == ".FLAC")
     {
-        if (!decodeFLAC(path, &spec, &buffer, &bufferSize))
-        {
+        if (!decodeFLAC((uint8_t *)fileData.data(), fileData.size(), &spec, &buffer, &bufferSize))
             return false;
-        }
     }
     else if (ext == ".MP3")
     {
-        if (!decodeMp3(path, &spec, &buffer, &bufferSize))
-        {
+        if (!decodeMp3((uint8_t *)fileData.data(), fileData.size(), &spec, &buffer, &bufferSize))
             return false;
-        }
     }
     else
     {
-        if (!decodeGME(path, targetSpec.freq, 0, -1, &spec, &buffer, &bufferSize))
-        {
+        if (!decodeGME((uint8_t *)fileData.data(), fileData.size(), targetSpec.freq, 0, -1, &spec, &buffer, &bufferSize))
             return false;
-        }
     }
 
-    // convert audio
+    // Convert audio format to the target format.
+    // This is because insound's audio engine depends on the loaded sound buffer formats being the same as its engine's.
     if (!convertAudio(buffer, bufferSize, spec, targetSpec, &buffer, &bufferSize))
     {
         free(buffer);
         return false;
     }
 
+    // Done, return the out values
     if (outBuffer)
-    {
         *outBuffer = buffer;
-    }
-    else
-    {
+    else // if outBuffer is discarded, free the buffer
         free(buffer);
-    }
 
     if (outLength)
-    {
         *outLength = bufferSize;
-    }
 
     return true;
 }
+
+#include <SDL2/SDL_audio.h>
 
 bool insound::convertAudio(uint8_t *audioData, const uint32_t length, const AudioSpec &dataSpec,
                            const AudioSpec &targetSpec, uint8_t **outBuffer, uint32_t *outLength)

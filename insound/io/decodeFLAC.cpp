@@ -1,33 +1,20 @@
-/// This file should be included only once
-#pragma once
-#include "../AudioSpec.h"
-#include "../Error.h"
+#include "decodeFLAC.h"
 
-#include <cstdint>
-#include <filesystem>
+#include <insound/Error.h>
 
 #ifdef INSOUND_DECODE_FLAC
-#include "openFile.h"
 
 #define DR_FLAC_IMPLEMENTATION
 #include <dr_flac.h>
 
-#include <string>
-
 namespace insound {
-    inline bool decodeFLAC(const std::filesystem::path &path, AudioSpec *outSpec, uint8_t **outData,
+    bool decodeFLAC(const uint8_t *memory, uint32_t size, AudioSpec *outSpec, uint8_t **outData,
         uint32_t *outBufferSize)
     {
-        std::string fileData;
-        if (!openFile(path, &fileData))
-        {
-            return false;
-        }
-
         unsigned channels, samplerate;
         drflac_uint64 frameCount;
         auto pcmData = drflac_open_memory_and_read_pcm_frames_f32(
-            fileData.data(), fileData.size(), &channels,
+            memory, size, &channels,
             &samplerate, &frameCount, nullptr);
 
         if (!pcmData)
@@ -65,7 +52,7 @@ namespace insound {
 }
 #else
 namespace insound {
-    inline bool decodeFLAC(const std::filesystem::path &path, AudioSpec *outSpec, uint8_t **outData,
+    bool decodeFLAC(const uint8_t *memory, uint32_t size, AudioSpec *outSpec, uint8_t **outData,
         uint32_t *outBufferSize)
     {
         pushError(Result::NotSupported, "FLAC decoding is not supported, make sure to compile with "

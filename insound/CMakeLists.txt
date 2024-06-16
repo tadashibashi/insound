@@ -1,14 +1,7 @@
 project(insound)
 include(FetchContent)
 
-add_library(insound
-    platform/getDefaultSampleRate.h
-    Pool.cpp
-    MultiPool.cpp
-    MultiPool.h
-    Handle.h
-    BufferView.h
-    BufferView.cpp)
+add_library(insound)
 
 if (NOT TARGET SDL2::SDL2-static) # user can provide their own SDL2 submodule, but we may want to enforce a minimum version
     FetchContent_Declare(Insound_SDL2
@@ -79,6 +72,7 @@ target_sources(insound
 PUBLIC
     AudioSpec.h
     Bus.h
+    BufferView.h
     Command.h
     Effect.h
     effects/DelayEffect.h
@@ -86,8 +80,14 @@ PUBLIC
     effects/VolumeEffect.h
     Engine.h
     Error.h
+    Handle.h
     io/loadAudio.h
-    util.h
+    io/decodeWAV.h
+    io/decodeVorbis.h
+    io/decodeMp3.h
+    io/decodeFLAC.h
+    io/decodeGME.h
+    MultiPool.h
     PCMSource.h
     Pool.h
     SampleFormat.h
@@ -95,6 +95,7 @@ PUBLIC
     Source.h
     SourceRef.h
     SourceRefFwd.h
+    util.h
 PRIVATE
     AudioDevice.h
     AudioDevice.cpp
@@ -105,11 +106,11 @@ PRIVATE
     effects/VolumeEffect.cpp
     Engine.cpp
     Error.cpp
-    io/decodeFLAC.inl
-    io/decodeGME.inl
-    io/decodeMp3.inl
-    io/decodeVorbis.inl
-    io/decodeWAV.inl
+    io/decodeFLAC.cpp
+    io/decodeGME.cpp
+    io/decodeMp3.cpp
+    io/decodeVorbis.cpp
+    io/decodeWAV.cpp
     io/openFile.cpp
     io/openFile.h
     io/loadAudio.cpp
@@ -125,12 +126,23 @@ PRIVATE
     SoundBuffer.cpp
     Source.cpp
 
+    Pool.cpp
+    MultiPool.cpp
+
+
+
+    BufferView.cpp
+    external/ctpl_stl.h
+    AudioLoader.cpp
+    AudioLoader.h
+
     private/SdlAudioGuard.cpp
     private/SdlAudioGuard.h
 )
 
 target_link_libraries(insound PRIVATE SDL2::SDL2-static)
-target_include_directories(insound PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
+target_include_directories(insound PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../)
+
 if ("${CMAKE_BUILD_TYPE}" MATCHES "Deb")
     set(INSOUND_DEBUG TRUE)
     target_compile_definitions(insound PRIVATE -DINSOUND_DEBUG=1)
@@ -149,6 +161,7 @@ if (EMSCRIPTEN)
         -sSTACK_SIZE=131072
         -sASSERTIONS=2
         -sWASM=1
+        -sFETCH
     )
 
     if (EMRUN)

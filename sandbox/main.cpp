@@ -1,4 +1,5 @@
 #include <iostream>
+#include <insound/AudioLoader.h>
 #include <insound/AudioSpec.h>
 #include <insound/Bus.h>
 #include <insound/Engine.h>
@@ -8,6 +9,7 @@
 
 #include <insound/effects/DelayEffect.h>
 #include <insound/effects/PanEffect.h>
+#include <insound/io/openFile.h>
 
 #include <SDL2/SDL.h>
 
@@ -51,6 +53,21 @@ int main()
         return -1;
     }
 
+    auto t = std::thread([]() {
+        std::string testData;
+        if (openFile("https://httpbin.org/get", &testData))
+        {
+            std::cout << "Retrieved data: " << testData << '\n';
+        }
+        else
+        {
+            std::cout << "Failed to retrieve data: " << popError().message << '\n';
+        }
+    });
+
+
+
+
     AppContext app{};
 
     const auto window = SDL_CreateWindow("Mixer test", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
@@ -88,26 +105,25 @@ int main()
     Handle<Bus> myBus;
     engine.createBus(false, &myBus);
 
-     const SoundBuffer sounds[4] = {
-         {"assets/bassdrum.wav", spec},
-         {"assets/ep.wav", spec},
-         {"assets/piano.wav", spec},
-         {"assets/snare-hat.wav", spec},
-     };
+    AudioLoader buffers(&engine);
 
-     const SoundBuffer pizz("assets/vln_pizz.ogg", spec);
-     const SoundBuffer orch("assets/orch_scene.mp3", spec);
-     const SoundBuffer arp("assets/arp.flac", spec);
-     const SoundBuffer marimba("assets/marimba.wav", spec);
-     const SoundBuffer bach("assets/test.nsf", spec);
+    const SoundBuffer *sounds[4] = {
+        buffers.loadAsync("assets/bassdrum.wav"),
+        buffers.loadAsync("assets/ep.wav"),
+        buffers.loadAsync("assets/piano.wav"),
+        buffers.loadAsync("assets/snare-hat.wav"),
+    };
+
+     // const SoundBuffer pizz("assets/vln_pizz.ogg", spec);
+     // const SoundBuffer orch("assets/orch_scene.mp3", spec);
+     // const SoundBuffer arp("assets/arp.flac", spec);
+     // const SoundBuffer marimba("assets/marimba.wav", spec);
+     // const SoundBuffer bach("assets/test.nsf", spec);
 
     Handle<PCMSource> sources[4];
-     engine.playSound(&sounds[0], false, true, false, myBus, &sources[0]);
-     engine.playSound(&sounds[1], false, true, false, myBus, &sources[1]);
-     engine.playSound(&sounds[2], false, true, false, myBus, &sources[2]);
-     engine.playSound(&sounds[3], false, true, false, myBus, &sources[3]);
+    bool sourcesWereLoaded = false;
 
-    sources[0]->setVolume(.5f);
+    //sources[0]->setVolume(.5f);
 
     float masterBusFade = 1.f;
 
@@ -199,38 +215,38 @@ int main()
                             paused = !paused;
                         } break;
 
-                        case SDL_SCANCODE_O: { // play one shot
-
-                            Handle<PCMSource> marimbaSource;
-                            engine.playSound(&marimba, true, false, true, &marimbaSource);
-
-                            if (marimbaSource.isValid())
-                            {
-                                marimbaSource->addEffect<DelayEffect>(0, spec.freq * .25f, .20f, .4f);
-                                marimbaSource->setSpeed(2.f);
-                                marimbaSource->setPaused(false);
-                            }
-                        } break;
-
-                        case SDL_SCANCODE_I:
-                        {
-                            engine.playSound(&pizz, false, false, true, nullptr);
-                        } break;
-
-                        case SDL_SCANCODE_J:
-                        {
-                            engine.playSound(&arp, false, false, true, nullptr);
-                        } break;
-
-                        case SDL_SCANCODE_K:
-                        {
-                            engine.playSound(&orch, false, false, true, nullptr);
-                        } break;
-
-                        case SDL_SCANCODE_B:
-                        {
-                            engine.playSound(&bach, false, false, true, nullptr);
-                        } break;
+                        // case SDL_SCANCODE_O: { // play one shot
+                        //
+                        //     Handle<PCMSource> marimbaSource;
+                        //     engine.playSound(&marimba, true, false, true, &marimbaSource);
+                        //
+                        //     if (marimbaSource.isValid())
+                        //     {
+                        //         marimbaSource->addEffect<DelayEffect>(0, spec.freq * .25f, .20f, .4f);
+                        //         marimbaSource->setSpeed(2.f);
+                        //         marimbaSource->setPaused(false);
+                        //     }
+                        // } break;
+                        //
+                        // case SDL_SCANCODE_I:
+                        // {
+                        //     engine.playSound(&pizz, false, false, true, nullptr);
+                        // } break;
+                        //
+                        // case SDL_SCANCODE_J:
+                        // {
+                        //     engine.playSound(&arp, false, false, true, nullptr);
+                        // } break;
+                        //
+                        // case SDL_SCANCODE_K:
+                        // {
+                        //     engine.playSound(&orch, false, false, true, nullptr);
+                        // } break;
+                        //
+                        // case SDL_SCANCODE_B:
+                        // {
+                        //     engine.playSound(&bach, false, false, true, nullptr);
+                        // } break;
 
                         case SDL_SCANCODE_Z: // Set myBus left pan =>
                         {
@@ -317,6 +333,33 @@ int main()
             }
         }
 
+        if (!sourcesWereLoaded)
+        {
+            bool allLoaded = true;
+            for (auto sound : sounds)
+            {
+                if (!sound->isLoaded())
+                {
+                    allLoaded = false;
+                    break;
+                }
+            }
+
+            if (allLoaded)
+            {
+                sourcesWereLoaded = true;
+                engine.playSound(sounds[0], false, true, false, myBus, &sources[0]);
+                engine.playSound(sounds[1], false, true, false, myBus, &sources[1]);
+                engine.playSound(sounds[2], false, true, false, myBus, &sources[2]);
+                engine.playSound(sounds[3], false, true, false, myBus, &sources[3]);
+                std::cout << "Sounds loaded!\n";
+            }
+            else
+            {
+                std::cout << "Not loaded yet!\n";
+            }
+        }
+
         engine.update();
 
         SDL_SetRenderDrawColor(renderer, 128, 128, 255, 255);
@@ -330,7 +373,7 @@ int main()
 #endif
 
     engine.close();
-
+    t.join();
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();

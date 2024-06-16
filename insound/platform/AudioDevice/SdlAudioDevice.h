@@ -1,5 +1,5 @@
 #pragma once
-#include <insound/AudioDevice.h>
+#include "../../AudioDevice.h"
 
 namespace insound {
 

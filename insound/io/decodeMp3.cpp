@@ -1,31 +1,19 @@
-#pragma once
-#include "../AudioSpec.h"
-#include "../Error.h"
+#include "decodeMp3.h"
 
-#include <cstdint>
-#include <filesystem>
+#include <insound/Error.h>
 
 #ifdef INSOUND_DECODE_MP3
-#include "openFile.h"
 
 #define DR_MP3_IMPLEMENTATION
 #include <dr_mp3.h>
 
-#include <string>
-
 namespace insound {
-    inline bool decodeMp3(const std::filesystem::path &path, AudioSpec *outSpec, uint8_t **outData,
+    bool decodeMp3(const uint8_t *memory, uint32_t size, AudioSpec *outSpec, uint8_t **outData,
         uint32_t *outBufferSize)
     {
-        std::string fileData;
-        if (!openFile(path, &fileData))
-        {
-            return false;
-        }
-
         drmp3_uint64 frameCount;
         drmp3_config config;
-        auto pcmData = drmp3_open_memory_and_read_pcm_frames_f32(fileData.data(), fileData.size(), &config,
+        auto pcmData = drmp3_open_memory_and_read_pcm_frames_f32(memory, size, &config,
             &frameCount, nullptr);
 
         if (!pcmData)
@@ -50,7 +38,7 @@ namespace insound {
         }
         else
         {
-            drflac_free(pcmData, nullptr);
+            drmp3_free(pcmData, nullptr);
         }
 
         if (outBufferSize)
@@ -63,7 +51,7 @@ namespace insound {
 }
 #else
 namespace insound {
-    inline bool decodeMp3(const std::filesystem::path &path, AudioSpec *outSpec, uint8_t **outData,
+    bool decodeMp3(const uint8_t *memory, uint32_t size, AudioSpec *outSpec, uint8_t **outData,
         uint32_t *outBufferSize)
     {
         pushError(Result::NotSupported, "MP3 decoding is not supported, make sure to compile with "
