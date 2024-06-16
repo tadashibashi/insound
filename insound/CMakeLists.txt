@@ -70,6 +70,8 @@ endif()
 
 target_sources(insound
 PUBLIC
+    AudioDevice.h
+    AudioLoader.h
     AudioSpec.h
     Bus.h
     BufferView.h
@@ -95,15 +97,18 @@ PUBLIC
     Source.h
     SourceRef.h
     SourceRefFwd.h
+    TimeUnit.h
     util.h
 PRIVATE
-    AudioDevice.h
     AudioDevice.cpp
+    AudioLoader.cpp
     Bus.cpp
+    BufferView.cpp
     Effect.cpp
     effects/DelayEffect.cpp
     effects/PanEffect.cpp
     effects/VolumeEffect.cpp
+    external/ctpl_stl.h
     Engine.cpp
     Error.cpp
     io/decodeFLAC.cpp
@@ -114,7 +119,7 @@ PRIVATE
     io/openFile.cpp
     io/openFile.h
     io/loadAudio.cpp
-    util.cpp
+    MultiPool.cpp
     PCMSource.cpp
     platform/AudioDevice/SdlAudioDevice.cpp
     platform/AudioDevice/SdlAudioDevice.h
@@ -122,19 +127,12 @@ PRIVATE
     platform/AudioDevice/EmAudioDevice.h
     platform/getDefaultSampleRate.cpp
     platform/getDefaultSampleRate.h
+    Pool.cpp
     SampleFormat.cpp
     SoundBuffer.cpp
     Source.cpp
-
-    Pool.cpp
-    MultiPool.cpp
-
-
-
-    BufferView.cpp
-    external/ctpl_stl.h
-    AudioLoader.cpp
-    AudioLoader.h
+    TimeUnit.cpp
+    util.cpp
 
     private/SdlAudioGuard.cpp
     private/SdlAudioGuard.h
