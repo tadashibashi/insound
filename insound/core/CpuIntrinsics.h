@@ -1,15 +1,8 @@
 #pragma once
 
-#if __APPLE__
-#include <TargetConditionals.h>
-#if TARGET_CPU_X86_64
-
-#endif
-#endif
-
 #if INSOUND_CPU_INTRINSICS
 
-#if __ARM_NEON__                  // ARM Neon
+#if __ARM_NEON                  // ARM Neon
 #define INSOUND_ARM_NEON 1
 #include <arm_neon.h>
 
