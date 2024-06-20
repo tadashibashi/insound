@@ -1,0 +1,9 @@
+{
+  "name": "dev-server",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Serves as a replacement for `emrun` which is somewhat limited in developer experience with CMake.",
+  "dependencies": {
+    "ws": "^8.17.1"
+  }
+}
