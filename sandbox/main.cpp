@@ -23,7 +23,7 @@ void emMainLoop()
 
 using namespace insound;
 
-int mainNoEngine()
+static int mainNoEngine()
 {
     if (SDL_Init(SDL_INIT_VIDEO) != 0)
     {
@@ -86,7 +86,7 @@ int mainNoEngine()
     return 0;
 }
 
-int mainWithEngine()
+static int mainWithEngine()
 {
     if (SDL_Init(SDL_INIT_VIDEO) != 0)
     {
@@ -426,7 +426,7 @@ int mainWithEngine()
     return 0;
 }
 
-int main()
+int main(int argc, char *argv[])
 {
     return mainWithEngine();
 }

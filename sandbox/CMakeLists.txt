@@ -1,6 +1,12 @@
-add_executable(insound_sandbox main.cpp)
 
-target_link_libraries(insound_sandbox PRIVATE insound SDL2::SDL2)
+if (WIN32)
+    set(EXE_TYPE WIN32)
+else() 
+    set(EXE_TYPE)
+endif()
+add_executable(insound_sandbox ${EXE_TYPE} main.cpp)
+
+target_link_libraries(insound_sandbox PRIVATE insound SDL2::SDL2 SDL2::SDL2main)
 
 if (EMSCRIPTEN)
     target_link_options(insound_sandbox PRIVATE
