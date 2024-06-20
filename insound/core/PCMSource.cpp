@@ -1,7 +1,5 @@
 #include "PCMSource.h"
 
-#include <iostream>
-
 #include "Command.h"
 #include "CpuIntrinsics.h"
 #include "Engine.h"
@@ -9,6 +7,8 @@
 #include "SoundBuffer.h"
 
 namespace insound {
+    // Check if the handle is valid by checking the system error stack. Return false, if not.
+    // (should be thread-safe, since each thread has its own error and system error stacks)
 #define HANDLE_GUARD() do { if (detail::peekSystemError().code == Result::InvalidHandle) { \
         detail::popSystemError(); \
         pushError(Result::InvalidHandle, __FUNCTION__); \
@@ -128,10 +128,15 @@ namespace insound {
         const auto buffer = (float *)m_buffer->data();
         if (!buffer)
             return 0;
+
         const auto sampleSize = m_buffer->size() / sizeof(float);
         const auto frameSize = sampleSize / 2;
         const auto sampleLength = length / sizeof(float);
         const auto frameLength = sampleLength / 2;
+
+        if (m_isLooping && m_position >= frameSize) // prevent accidentally reading past buffer, this read probably occurred before the engine could clean the sound up
+            return 0;
+
         const int framesToRead = m_isLooping ? (int)frameLength : std::min<int>((int)frameLength, (int)frameSize - (int)std::ceil(m_position));
 
         // clear the write buffer
@@ -143,7 +148,7 @@ namespace insound {
         }
 
 
-        if (m_speed != 1.f) // ========= Interpolation ===================================
+        if (m_speed != 1.f) // ========= Sample Interpolation ===================================
         {
 #if INSOUND_SSE
             const auto oneVec = _mm_set1_ps(1.f);
@@ -157,12 +162,14 @@ namespace insound {
             constexpr int UnrolledSize = 8;
             for (; i <= framesToRead - UnrolledSize; i += UnrolledSize) // visit each frame
             {
-
+                // Collect interpolated sample data and t parameter values
                 alignas(16) float vals[UnrolledSize * 2], nextVals[UnrolledSize * 2];
-                alignas(16) float ts[UnrolledSize * 2]; // t values for each frame
+                alignas(16) float ts[UnrolledSize * 2];
+
+                // Whether this iteration contains the last frame of the buffer (when `i == UnrolledSize - 1`)
                 const bool touchesLastFrame = (i + UnrolledSize == framesToRead && (int)m_position + framesToRead + 1 >= frameSize);
 
-                if (m_isLooping)
+                if (m_isLooping) // (accounts for wrapping around buffer)
                 {
                     if (touchesLastFrame)
                     {
@@ -203,9 +210,14 @@ namespace insound {
                         }
                     }
                 }
-                else // non-looping
+                else // non-looping (less need for bounds checks and modulo operations)
                 {
                     float curFrame = m_position + ((float)(i) * speed);
+                    if (curFrame >= frameSize) // sound ended; TODO: solve miscalculation of the remaining frames?
+                    {
+                        i = framesToRead;
+                        break;
+                    }
 
                     if (touchesLastFrame)
                     {
@@ -246,12 +258,6 @@ namespace insound {
 
                             curFrame += speed;
                         }
-                    }
-
-                    if (touchesLastFrame)
-                    {
-                        nextVals[UnrolledSize-2] = 0;
-                        nextVals[UnrolledSize-1] = 0;
                     }
                 }
 
@@ -366,7 +372,6 @@ namespace insound {
 
             for (; i < framesToRead; ++i) // catch leftovers
             {
-                // m_position is the frame position
                 // current sample position
                 const float framef = std::fmodf(((float)m_position + ((float)i * m_speed)), (float)frameSize);
                 const float t = framef - std::floorf(framef);
@@ -384,19 +389,22 @@ namespace insound {
         }
         else // ====== No interpolation =======================================================
         {
+            // We just need to copy the bytes directly to the out buffer
             const auto basePosition = (int)m_position;
             const auto bufferBytePos = basePosition * sizeof(float) * 2;
             const auto bytesUntilEnd = ((long long)m_buffer->size() - (long long)bufferBytePos);
 
+            // Copy from here until end of requested length, or the end of the buffer
             std::memcpy(output, m_buffer->data() + bufferBytePos, std::min<size_t>(bytesUntilEnd, length));
 
+            // Add the remaining loop portion until we filled outbuffer
             if (m_isLooping && bytesUntilEnd - length < 0)
             {
                 std::memcpy(output + bytesUntilEnd, buffer, length - bytesUntilEnd);
             }
         }
 
-
+        // Update buffer position head
         if (m_isLooping)
         {
             m_position = std::fmodf(m_position + (float)framesToRead * m_speed, (float)frameSize);
@@ -404,6 +412,8 @@ namespace insound {
         else
         {
             m_position += (float)framesToRead * m_speed;
+
+            // Release sound if it ended and is a oneshot
             if (m_isOneShot && m_position >= (float)frameSize)
             {
                 Handle<PCMSource> handle;
@@ -412,6 +422,7 @@ namespace insound {
             }
         }
 
+        // Report the number of bytes read
         return (int)framesToRead * (int)sizeof(float) * 2;
     }
 
