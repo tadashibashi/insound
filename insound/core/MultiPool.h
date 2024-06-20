@@ -1,11 +1,15 @@
 #pragma once
+#include "Error.h"
 #include "Handle.h"
 #include "Pool.h"
 
+#include <cstdint>
+#include <exception>
 #include <map>
+#include <mutex>
 #include <typeindex>
 #include <unordered_map>
-#include <mutex>
+
 
 namespace insound {
     /// Pool that manages storage of any number of types of concrete objects.
@@ -29,7 +33,7 @@ namespace insound {
     /// Pool contains its own mutex, so that it is safe to use with multiple threads.
     class MultiPool {
     public:
-        MultiPool() : m_aliveCount(0) {}
+        MultiPool() = default;
         ~MultiPool()
         {
             for (auto &[type, pool] : m_pools)
@@ -37,6 +41,12 @@ namespace insound {
                 delete pool;
             }
         }
+
+        /// Allocate an object, specified by type
+        /// @tparam T type of object to allocate
+        /// @tparam ...TArgs type of arguments to forward to it's `init` function
+        /// @param ...args arguments to forward to the object's `init` function.
+        /// @return
         template <typename T, typename...TArgs>
         Handle<T> allocate(TArgs &&...args)
         {
@@ -59,12 +69,12 @@ namespace insound {
                 // Init the newly retrieved entity
                 ((T *)(pool->data() + id.index * elemSize))->init(std::forward<TArgs>(args)...); // `T` poolable must implement `init`
             }
-            catch(const std::exception &err) { // init threw an exception, deallocate
+            catch (const std::exception &err) { // init threw an exception, deallocate
                 pushError(Result::RuntimeErr, err.what());
                 pool->deallocate(id);
                 return {};
             }
-            catch(...) {
+            catch (...) {                       // unknown error thrown, deallocate
                 pushError(Result::RuntimeErr, "constructor threw unknown error");
                 pool->deallocate(id);
                 return {};
@@ -73,7 +83,7 @@ namespace insound {
             return Handle<T>(id, pool);
         }
 
-        /// Deallocate a handle that was retrieved via `MultiPool::allocate`
+        /// Deallocate a handle that was retrieved from `MultiPool::allocate()`
         /// @tparam T this actually does not matter here as the handle will deallocate from its
         ///           associated pool. It's just to satisfy the varied number of handles.
         /// @returns whether deallocation succeeded without problems. If false, handle was invalid, or an error was
@@ -89,12 +99,12 @@ namespace insound {
                 {
                     handle->release();
                 }
-                catch(const std::exception &err)
+                catch (const std::exception &err)
                 {
                     pushError(Result::RuntimeErr, err.what()); // don't propagate exception, just push as error
                     dtorThrew = true;
                 }
-                catch(...)
+                catch (...)
                 {
                     pushError(Result::RuntimeErr, "Unknown exception thrown in pool object `release()`");
                     dtorThrew = true;
@@ -112,11 +122,12 @@ namespace insound {
             return !dtorThrew;
         }
 
-        /// Try to find a handle from a raw pointer. Type `T` should be concrete, targeting
-        /// the actual final class (as opposed to a class up its hierarchy.
-        /// @param pointer   the pooled object pointer to query
-        /// @param outHandle [out] pointer to retrieve the handle if found
-        /// @returns whether a handle was found for the pointer.
+        /// Try to find a handle from a raw pointer.
+        /// @tparam T must be a concrete type, and target the final class (as opposed to a class up the heirarchy),
+        ///           you are looking for a pool of literal objects.
+        /// @param pointer   the pooled object pointer to query.
+        /// @param [out] outHandle pointer to retrieve the handle if found.
+        /// @returns whether a handle was found for the pointer; `outHandle` will remain unmodified on false.
         template <typename T>
         bool tryFind(T *pointer, Handle<T> *outHandle) const
         {
@@ -147,12 +158,16 @@ namespace insound {
             getPool<T>(size).second.reserve(size);
         }
     private:
+
+        /// Get an existing pool for type `T`, or it will create a new one if a pool for type T does not exist.
+        /// @tparam T must be concrete, since allocations to the pool are like calling `new`.
+        /// @returns `Pool<T> &`, which can be cast to `PoolBase &` for generic storage.
         template <typename T>
         auto &getPool() const
         {
             static_assert(!std::is_abstract_v<T>, "Cannot allocate an abstract class");
 
-            if (const auto it = m_indices.find(typeid(T));
+            if (const auto it = m_indices.find(std::type_index(typeid(T)));
                 it != m_indices.end())
             {
                 return *(Pool<T> *)m_poolPtrs[it->second];
@@ -160,18 +175,65 @@ namespace insound {
 
             auto newPool = new Pool<T>;
             m_pools.emplace(typeid(T), newPool);
-            m_indices.emplace(typeid(T), m_poolPtrs.size());
+            m_indices.emplace(
+                typeid(T),
+                static_cast<int>(m_poolPtrs.size()));
             m_poolPtrs.emplace_back(newPool);
 
             return *newPool;
         }
 
-        mutable std::unordered_map<std::type_index, int> m_indices;
-        mutable std::vector<PoolBase *> m_poolPtrs;
-        mutable std::map<std::type_index, PoolBase *> m_pools;
-        mutable size_t m_aliveCount;
-        mutable std::mutex m_mutex;
+        /// Much less efficient than `tryFind` as we need to query each pool,
+        /// but written here in case if needed later.
+        /// It gives you what you need to create a generic handle.
+        bool tryFindGeneric(void *ptr, PoolBase **outPool, PoolID *outID, std::type_index *outTypeIndex)
+        {
+            for (auto &[type, pool] : m_pools)
+            {
+                if (pool->tryFind(ptr, outID))
+                {
+                    if (outTypeIndex)
+                        *outTypeIndex = type;
+                    if (outPool)
+                        *outPool = pool;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        bool tryFindTypeIndex(void *ptr, std::type_index type, PoolBase **outPool, PoolID *outID)
+        {
+            if (auto it = m_indices.find(type); it != m_indices.end())
+            {
+                const auto index = it->second;
+                if (index >= m_poolPtrs.size()) // this would be an internal error, throw here?
+                    return false;
+
+                auto pool = m_poolPtrs[it->second];
+                if (pool == nullptr) // just in case
+                    return false;
+
+                if (pool->tryFind(ptr, outID))
+                {
+                    if (outPool)
+                        *outPool = pool;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+    private: // Member variables
+        mutable std::map<std::type_index, PoolBase *> m_pools;      ///< the internal pools
+        mutable std::mutex m_mutex;                                 ///< for syncing pool state across multiple threads
+
+        // for optimized lookups of pools (may be negligable)
+        mutable std::unordered_map<std::type_index, int> m_indices; ///< index lookup table by type; use it to query m_poolPtrs
+        mutable std::vector<PoolBase *> m_poolPtrs;                 ///< reference to pools, queried quickly by type via `m_indices`
+
     };
 }
-
 
