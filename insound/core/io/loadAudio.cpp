@@ -22,8 +22,8 @@ bool insound::loadAudio(const fs::path &path, const AudioSpec &targetSpec, uint8
     }
 
     // Uppercase extension
-    auto ext = path.extension().native();
-    for (char &c : ext)
+    auto ext = path.extension().string();
+    for (auto &c : ext)
     {
         c = (char)std::toupper(c);
     }
