@@ -16,6 +16,8 @@ namespace insound {
     class Effect;
 
     struct FadePoint {
+        FadePoint() : clock(), value() { }
+        FadePoint(uint32_t clock, float value) : clock(clock), value(value) { }
         uint32_t clock;
         float value;
     };

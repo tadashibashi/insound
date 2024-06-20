@@ -576,7 +576,7 @@ namespace insound {
 
             if (clock < it->clock)
             {
-                m_fadePoints.insert(it, FadePoint{.clock=clock, .value=value});
+                m_fadePoints.insert(it, FadePoint(clock, value));
                 didInsert = true;
                 break;
             }
@@ -584,7 +584,7 @@ namespace insound {
 
         if (!didInsert)
         {
-            m_fadePoints.emplace_back(FadePoint{.clock=clock, .value=value});
+            m_fadePoints.emplace_back(clock, value);
         }
     }
 
