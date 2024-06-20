@@ -1,5 +1,6 @@
 #include "Engine.h"
 
+#include "AlignedVector.h"
 #include "AudioDevice.h"
 #include "AudioSpec.h"
 #include "Bus.h"
@@ -7,9 +8,12 @@
 #include "Effect.h"
 #include "Error.h"
 #include "PCMSource.h"
+#include "Source.h"
 
 #include <mutex>
 #include <vector>
+
+
 
 namespace insound {
 #define ENGINE_INIT_GUARD() do { if (!isOpen()) { \
@@ -96,8 +100,8 @@ namespace insound {
         /// Pass null bus with default constructor `{}`
         bool playSound(const SoundBuffer *buffer, bool paused, bool looping, bool oneshot, const Handle<Bus> &bus, Handle<PCMSource> *outPcmSource)
         {
-            auto lockGuard = m_device->mixLockGuard();
             ENGINE_INIT_GUARD();
+            auto lockGuard = m_device->mixLockGuard();
 
             if (bus && !bus.isValid()) // if output bus was passed, and it's invalid => error
             {
@@ -136,8 +140,8 @@ namespace insound {
 
         bool createBus(bool paused, const Handle<Bus> &output, Handle<Bus> *outBus, bool isMaster)
         {
-            auto lockGuard = m_device->mixLockGuard();
             ENGINE_INIT_GUARD();
+            auto lockGuard = m_device->mixLockGuard();
 
             if (output && !output.isValid()) // if output was passed, and it's invalid => error
             {
@@ -247,8 +251,8 @@ namespace insound {
 
         bool setPaused(const bool value)
         {
-            auto lockGuard = m_device->mixLockGuard();
             ENGINE_INIT_GUARD();
+            auto lockGuard = m_device->mixLockGuard();
 
             if (value)
                 m_device->suspend();
@@ -259,9 +263,8 @@ namespace insound {
 
         bool update()
         {
-            auto lockGuard = m_device->mixLockGuard();
             ENGINE_INIT_GUARD();
-
+            auto lockGuard = m_device->mixLockGuard();
             {
                 auto deferredCommandGuard = std::lock_guard(m_deferredCommandMutex);
                 processCommands(this, m_deferredCommands);
@@ -370,11 +373,16 @@ namespace insound {
             return *m_device;
         }
     private:
+
+        /// Process a vector of commands
+        /// @param engine   context object, we may not need it
+        /// @param commands commands to apply
         static void processCommands(const Engine::Impl *engine, std::vector<Command> &commands)
         {
             if (commands.empty())
                 return;
 
+            // Call `applyCommand` on the target object by type
             for (auto &command : commands)
             {
                 switch(command.type)
@@ -413,6 +421,9 @@ namespace insound {
             commands.clear();
         }
 
+        /// Audio callback to pass to the device
+        /// @param userptr context object
+        /// @param outBuffer buffer to fill or swap, as long as the lengths are equal
         static void audioCallback(void *userptr, AlignedVector<uint8_t, 16> *outBuffer)
         {
             const auto engine = (Engine::Impl *)userptr;
