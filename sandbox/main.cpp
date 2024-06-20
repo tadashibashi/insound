@@ -114,7 +114,7 @@ static int mainWithEngine()
 
     Engine engine;
 
-    int bufferFrameSize = 1024;
+    int bufferFrameSize = 2048;
     if (!engine.open(0, bufferFrameSize))
     {
         printf("Failed to init sound engine\n");

@@ -1,5 +1,7 @@
 #include "PerfTimer.h"
+
 #include <chrono>
+#include <cstdio>
 
 using Clock = std::chrono::high_resolution_clock;
 using Nano = std::chrono::nanoseconds;

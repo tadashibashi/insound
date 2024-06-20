@@ -125,8 +125,6 @@ struct insound::SdlAudioDevice::Impl {
     SDL_Thread *mixThread{};
     std::chrono::microseconds threadDelayTarget{};
 
-    std::condition_variable bufferReady{};
-
     // Buffer
     AlignedVector<uint8_t, 16> buffer{};
     int bufferSize{}; // more like the target sdl buffer size

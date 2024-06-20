@@ -1,6 +1,7 @@
 #include "openFile.h"
 #include "../Error.h"
 
+#include <cstring>
 #include <fstream>
 #include <iostream>
 

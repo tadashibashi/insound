@@ -6,6 +6,8 @@
 #include "Error.h"
 #include "SoundBuffer.h"
 
+#include <cmath>
+
 namespace insound {
     // Check if the handle is valid by checking the system error stack. Return false, if not.
     // (should be thread-safe, since each thread has its own error and system error stacks)
@@ -173,7 +175,7 @@ namespace insound {
                 {
                     if (touchesLastFrame)
                     {
-                        float curFrame = std::fmodf((m_position + ((float)(i) * speed)), (float)frameSize);
+                        float curFrame = fmodf((m_position + ((float)(i) * speed)), (float)frameSize);
                         for (int j = 0; j < UnrolledSize; ++j)
                         {
                             const auto baseSample = (int)curFrame * 2;
@@ -182,17 +184,17 @@ namespace insound {
                             vals[j2+1] = buffer[baseSample + 1];
                             nextVals[j2] = buffer[baseSample + 2 % sampleSize];
                             nextVals[j2+1] = buffer[baseSample + 3 % sampleSize];
-                            ts[j2] = curFrame - std::floorf(curFrame);
+                            ts[j2] = curFrame - floorf(curFrame);
                             ts[j2 + 1] = ts[j2];
 
                             curFrame += speed;
                             if (curFrame > (float)frameSize)
-                                curFrame = std::fmodf(curFrame, (float)frameSize);
+                                curFrame = fmodf(curFrame, (float)frameSize);
                         }
                     }
                     else // this frame does not touch the last sample in the buffer
                     {
-                        float curFrame = std::fmodf(m_position + ((float)(i) * speed), (float)frameSize);
+                        float curFrame = fmodf(m_position + ((float)(i) * speed), (float)frameSize);
                         for (int j = 0; j < UnrolledSize; ++j)
                         {
                             const auto baseSample = (int)curFrame * 2;
@@ -201,12 +203,12 @@ namespace insound {
                             vals[j2+1] = buffer[baseSample + 1];
                             nextVals[j2] = buffer[baseSample + 2];
                             nextVals[j2+1] = buffer[baseSample + 3];
-                            ts[j2] = curFrame - std::floorf(curFrame);
+                            ts[j2] = curFrame - floorf(curFrame);
                             ts[j2 + 1] = ts[j2];
 
                             curFrame += speed;
                             if (curFrame > (float)frameSize)
-                                curFrame = std::fmodf(curFrame, (float)frameSize);
+                                curFrame = fmodf(curFrame, (float)frameSize);
                         }
                     }
                 }
@@ -229,7 +231,7 @@ namespace insound {
                             vals[j2+1] = buffer[baseSample + 1];
                             nextVals[j2] = buffer[baseSample + 2];
                             nextVals[j2+1] = buffer[baseSample + 3];
-                            ts[j2] = curFrame - std::floorf(curFrame);
+                            ts[j2] = curFrame - floorf(curFrame);
                             ts[j2 + 1] = ts[j2];
 
                             curFrame += speed;
@@ -240,7 +242,7 @@ namespace insound {
                         vals[UnrolledSize * 2 - 1] = buffer[sampleSize - 1];
                         nextVals[UnrolledSize * 2 - 2] = 0;
                         nextVals[UnrolledSize * 2 - 1] = 0;
-                        ts[UnrolledSize - 2] = curFrame - std::floorf(curFrame);
+                        ts[UnrolledSize - 2] = curFrame - floorf(curFrame);
                         ts[UnrolledSize - 1] = ts[UnrolledSize - 2];
                     }
                     else
@@ -253,7 +255,7 @@ namespace insound {
                             vals[j2+1] = buffer[baseSample + 1];
                             nextVals[j2] = buffer[baseSample + 2];
                             nextVals[j2+1] = buffer[baseSample + 3];
-                            ts[j2] = curFrame - std::floorf(curFrame);
+                            ts[j2] = curFrame - floorf(curFrame);
                             ts[j2+ 1] = ts[j2];
 
                             curFrame += speed;
@@ -373,8 +375,8 @@ namespace insound {
             for (; i < framesToRead; ++i) // catch leftovers
             {
                 // current sample position
-                const float framef = std::fmodf(((float)m_position + ((float)i * m_speed)), (float)frameSize);
-                const float t = framef - std::floorf(framef);
+                const float framef = fmodf(((float)m_position + ((float)i * m_speed)), (float)frameSize);
+                const float t = framef - floorf(framef);
 
                 const int indexL = (int)framef * 2; // left sample index
                 const int nextIndexL = (indexL + 2) % (int)sampleSize;
@@ -407,7 +409,7 @@ namespace insound {
         // Update buffer position head
         if (m_isLooping)
         {
-            m_position = std::fmodf(m_position + (float)framesToRead * m_speed, (float)frameSize);
+            m_position = fmodf(m_position + (float)framesToRead * m_speed, (float)frameSize);
         }
         else
         {

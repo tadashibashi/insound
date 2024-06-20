@@ -11,6 +11,8 @@
 #include "../Marker.h"
 #include "../io/openFile.h"
 
+#include <cmath>
+
 bool insound::loadAudio(const fs::path &path, const AudioSpec &targetSpec, uint8_t **outBuffer, uint32_t *outLength, std::map<uint32_t, Marker> *outMarkers)
 {
     // Detect audio file type by extension

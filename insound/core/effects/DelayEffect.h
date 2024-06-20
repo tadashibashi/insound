@@ -3,6 +3,7 @@
 #include "../Effect.h"
 
 #include <cstdint>
+#include <cstring>
 #include <vector>
 #include <insound/core/AlignedVector.h>
 

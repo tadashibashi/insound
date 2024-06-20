@@ -2,6 +2,9 @@
 #include "Error.h"
 
 #include <cstddef>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
 #include <functional>
 #include <unordered_map>
 

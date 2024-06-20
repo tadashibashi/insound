@@ -2,8 +2,13 @@
 #include "Error.h"
 
 #include <cassert>
+#include <cstring>
 
 namespace insound {
+    BufferView::BufferView(const char *buffer, const endian::type endianness) :
+            m_buf((uint8_t *)buffer), m_pos(0), m_size(std::strlen(buffer)), m_endian(endianness)
+        {}
+
     uint32_t BufferView::read(std::string &outString, const size_t maxSize)
     {
         // Current position already finished reading?

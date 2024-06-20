@@ -23,9 +23,7 @@ namespace insound {
         /// Create BufferView from null-terminated c-string
         /// @param buffer c string with memory to view
         /// @param endianness expected endianness of numeric data types (strings are always handled in little-endian order)
-        explicit BufferView(const char *buffer, const endian::type endianness = endian::little) :
-            m_buf((uint8_t *)buffer), m_pos(0), m_size(std::strlen(buffer)), m_endian(endianness)
-        {}
+        explicit BufferView(const char *buffer, const endian::type endianness = endian::little);
 
         /// Create BufferView from string of byte data
         /// @param buffer string containing memory to view
