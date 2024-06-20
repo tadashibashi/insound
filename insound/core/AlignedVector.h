@@ -38,6 +38,9 @@ namespace insound {
         void deallocate(T *ptr, std::size_t) noexcept {
             ::operator delete[] (ptr, Alignment);
         }
+
+        bool operator==(const AlignedAllocator &) const noexcept { return true; }
+        bool operator!=(const AlignedAllocator &) const noexcept { return false; }
     };
 
     template <typename T, size_t Alignment>
