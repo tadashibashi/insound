@@ -199,24 +199,162 @@ namespace insound {
             sample < end;
             )
         {
-            if (findFadePointIndex(m_fadePoints, fadeClock, &fadeIndex)) // calculate fade value
+            if (findFadePointIndex(m_fadePoints, fadeClock, &fadeIndex)) // returns whether we are currently in a fade
             {
-                const auto clock0 = m_fadePoints[fadeIndex].clock;
-                const auto clock1 = m_fadePoints[fadeIndex + 1].clock;
+                // Get fadepoint data
+                const auto clock0 = m_fadePoints[fadeIndex].clock; // starting clock
+                const auto value0 = m_fadePoints[fadeIndex].value; // starting value
 
-                const auto value0 = m_fadePoints[fadeIndex].value;
-                const auto value1 = m_fadePoints[fadeIndex + 1].value;
+                const auto clock1 = m_fadePoints[fadeIndex + 1].clock; // end clock
+                const auto value1 = m_fadePoints[fadeIndex + 1].value; // end value
 
                 // Perform fade until end or clock1, whichever comes first
-                const auto fadeEnd = std::min<uint32_t>(end - sample, clock1 + 1 - fadeClock);
+                const auto fadeEnd = std::min<uint32_t>((end - sample) / 2 , clock1 + 1 - fadeClock);
                 const auto clockDiff = clock1 - clock0;
                 const auto valueDiff = value1 - value0;
 
-                for (uint32_t f = 0; f < fadeEnd; ++f)
+                uint32_t f = 0;
+#if INSOUND_SSE
+                const auto clockDiffVec = _mm_set1_ps((float)clockDiff);
+                const auto valueDiffVec = _mm_set1_ps(valueDiff);
+                const auto value0Vec = _mm_set1_ps(value0);
+                for (; f <= fadeEnd - 16; f += 16)
+                {
+                    const auto clockOffsetVec = _mm_set1_ps((float)fadeClock - (float)clock0);
+
+                    const auto amounts0 = _mm_div_ps(_mm_add_ps(_mm_set_ps(1, 1, 0, 0), clockOffsetVec), clockDiffVec);
+                    const auto amounts1 = _mm_div_ps(_mm_add_ps(_mm_set_ps(3, 3, 2, 2), clockOffsetVec), clockDiffVec);
+                    const auto amounts2 = _mm_div_ps(_mm_add_ps(_mm_set_ps(5, 5, 4, 4), clockOffsetVec), clockDiffVec);
+                    const auto amounts3 = _mm_div_ps(_mm_add_ps(_mm_set_ps(7, 7, 6, 6), clockOffsetVec), clockDiffVec);
+                    const auto amounts4 = _mm_div_ps(_mm_add_ps(_mm_set_ps(9, 9, 8, 8), clockOffsetVec), clockDiffVec);
+                    const auto amounts5 = _mm_div_ps(_mm_add_ps(_mm_set_ps(11, 11, 10, 10), clockOffsetVec), clockDiffVec);
+                    const auto amounts6 = _mm_div_ps(_mm_add_ps(_mm_set_ps(13, 13, 12, 12), clockOffsetVec), clockDiffVec);
+                    const auto amounts7 = _mm_div_ps(_mm_add_ps(_mm_set_ps(15, 15, 14, 14), clockOffsetVec), clockDiffVec);
+                    const auto result0 = _mm_add_ps(_mm_mul_ps(valueDiffVec, amounts0), value0Vec);
+                    const auto result1 = _mm_add_ps(_mm_mul_ps(valueDiffVec, amounts1), value0Vec);
+                    const auto result2 = _mm_add_ps(_mm_mul_ps(valueDiffVec, amounts2), value0Vec);
+                    const auto result3 = _mm_add_ps(_mm_mul_ps(valueDiffVec, amounts3), value0Vec);
+                    const auto result4 = _mm_add_ps(_mm_mul_ps(valueDiffVec, amounts4), value0Vec);
+                    const auto result5 = _mm_add_ps(_mm_mul_ps(valueDiffVec, amounts5), value0Vec);
+                    const auto result6 = _mm_add_ps(_mm_mul_ps(valueDiffVec, amounts6), value0Vec);
+                    const auto result7 = _mm_add_ps(_mm_mul_ps(valueDiffVec, amounts7), value0Vec);
+                    _mm_store_ps(sample, _mm_mul_ps(_mm_load_ps(sample), result0));
+                    _mm_store_ps(sample + 4, _mm_mul_ps(_mm_load_ps(sample + 4), result1));
+                    _mm_store_ps(sample + 8, _mm_mul_ps(_mm_load_ps(sample + 8), result2));
+                    _mm_store_ps(sample + 12, _mm_mul_ps(_mm_load_ps(sample + 12), result3));
+                    _mm_store_ps(sample + 16, _mm_mul_ps(_mm_load_ps(sample + 16), result4));
+                    _mm_store_ps(sample + 20, _mm_mul_ps(_mm_load_ps(sample + 20), result5));
+                    _mm_store_ps(sample + 24, _mm_mul_ps(_mm_load_ps(sample + 24), result6));
+                    _mm_store_ps(sample + 28, _mm_mul_ps(_mm_load_ps(sample + 28), result7));
+
+                    fadeClock += 16;
+                    sample += 32;
+                }
+#elif INSOUND_WASM_SIMD
+                const auto clockDiffVec = wasm_f32x4_splat(static_cast<float>(clockDiff));
+                const auto valueDiffVec = wasm_f32x4_splat(valueDiff);
+                const auto value0Vec = wasm_f32x4_splat(value0);
+                for (; f <= fadeEnd - 16; f += 16)
+                {
+                    const auto clockOffsetVec = wasm_f32x4_splat(static_cast<float>(fadeClock) - static_cast<float>(clock0));
+                    const auto amounts0 = wasm_f32x4_div(wasm_f32x4_add(wasm_f32x4_make(0, 0, 1, 1), clockOffsetVec), clockDiffVec);
+                    const auto amounts1 = wasm_f32x4_div(wasm_f32x4_add(wasm_f32x4_make(2, 2, 3, 3), clockOffsetVec), clockDiffVec);
+                    const auto amounts2 = wasm_f32x4_div(wasm_f32x4_add(wasm_f32x4_make(4, 4, 5, 5), clockOffsetVec), clockDiffVec);
+                    const auto amounts3 = wasm_f32x4_div(wasm_f32x4_add(wasm_f32x4_make(6, 6, 7, 7), clockOffsetVec), clockDiffVec);
+                    const auto amounts4 = wasm_f32x4_div(wasm_f32x4_add(wasm_f32x4_make(8, 8, 9, 9), clockOffsetVec), clockDiffVec);
+                    const auto amounts5 = wasm_f32x4_div(wasm_f32x4_add(wasm_f32x4_make(10, 10, 11, 11), clockOffsetVec), clockDiffVec);
+                    const auto amounts6 = wasm_f32x4_div(wasm_f32x4_add(wasm_f32x4_make(12, 12, 13, 13), clockOffsetVec), clockDiffVec);
+                    const auto amounts7 = wasm_f32x4_div(wasm_f32x4_add(wasm_f32x4_make(14, 14, 15, 15), clockOffsetVec), clockDiffVec);
+
+                    const auto results0 = wasm_f32x4_add(wasm_f32x4_mul(valueDiffVec, amounts0), value0Vec);
+                    const auto results1 = wasm_f32x4_add(wasm_f32x4_mul(valueDiffVec, amounts1), value0Vec);
+                    const auto results2 = wasm_f32x4_add(wasm_f32x4_mul(valueDiffVec, amounts2), value0Vec);
+                    const auto results3 = wasm_f32x4_add(wasm_f32x4_mul(valueDiffVec, amounts3), value0Vec);
+                    const auto results4 = wasm_f32x4_add(wasm_f32x4_mul(valueDiffVec, amounts4), value0Vec);
+                    const auto results5 = wasm_f32x4_add(wasm_f32x4_mul(valueDiffVec, amounts5), value0Vec);
+                    const auto results6 = wasm_f32x4_add(wasm_f32x4_mul(valueDiffVec, amounts6), value0Vec);
+                    const auto results7 = wasm_f32x4_add(wasm_f32x4_mul(valueDiffVec, amounts7), value0Vec);
+
+                    wasm_v128_store(sample, wasm_f32x4_mul(wasm_v128_load(sample), results0));
+                    wasm_v128_store(sample + 4, wasm_f32x4_mul(wasm_v128_load(sample + 4), results1));
+                    wasm_v128_store(sample + 8, wasm_f32x4_mul(wasm_v128_load(sample + 8), results2));
+                    wasm_v128_store(sample + 12, wasm_f32x4_mul(wasm_v128_load(sample + 12), results3));
+                    wasm_v128_store(sample + 16, wasm_f32x4_mul(wasm_v128_load(sample + 16), results4));
+                    wasm_v128_store(sample + 20, wasm_f32x4_mul(wasm_v128_load(sample + 20), results5));
+                    wasm_v128_store(sample + 24, wasm_f32x4_mul(wasm_v128_load(sample + 24), results6));
+                    wasm_v128_store(sample + 28, wasm_f32x4_mul(wasm_v128_load(sample + 28), results7));
+
+                    fadeClock += 16;
+                    sample += 32;
+                }
+#elif INSOUND_ARM_NEON
+                const auto clockDiffVec = vdupq_n_f32(static_cast<float>(clockDiff));
+                const auto valueDiffVec = vdupq_n_f32(static_cast<float>(valueDiff));
+                const auto value0Vec = vdupq_n_f32(static_cast<float>(value0));
+                for (; f < fadeEnd - 16; f += 16)
+                {
+                    const auto clockOffsetVec = vdupq_n_f32(static_cast<float>(fadeClock) - static_cast<float>(clock0));
+                    const auto amounts0 = vdivq_f32(vaddq_f32(float32x4_t{0, 0, 1, 1}, clockOffsetVec), clockDiffVec);
+                    const auto amounts1 = vdivq_f32(vaddq_f32(float32x4_t{2, 2, 3, 3}, clockOffsetVec), clockDiffVec);
+                    const auto amounts2 = vdivq_f32(vaddq_f32(float32x4_t{4, 4, 5, 5}, clockOffsetVec), clockDiffVec);
+                    const auto amounts3 = vdivq_f32(vaddq_f32(float32x4_t{6, 6, 7, 7}, clockOffsetVec), clockDiffVec);
+                    const auto amounts4 = vdivq_f32(vaddq_f32(float32x4_t{8, 8, 9, 9}, clockOffsetVec), clockDiffVec);
+                    const auto amounts5 = vdivq_f32(vaddq_f32(float32x4_t{10, 10, 11, 11}, clockOffsetVec), clockDiffVec);
+                    const auto amounts6 = vdivq_f32(vaddq_f32(float32x4_t{12, 12, 13, 13}, clockOffsetVec), clockDiffVec);
+                    const auto amounts7 = vdivq_f32(vaddq_f32(float32x4_t{14, 14, 15, 15}, clockOffsetVec), clockDiffVec);
+
+                    const auto results0 = vaddq_f32(vmulq_f32(valueDiffVec, amounts0), value0Vec);
+                    const auto results1 = vaddq_f32(vmulq_f32(valueDiffVec, amounts1), value0Vec);
+                    const auto results2 = vaddq_f32(vmulq_f32(valueDiffVec, amounts2), value0Vec);
+                    const auto results3 = vaddq_f32(vmulq_f32(valueDiffVec, amounts3), value0Vec);
+                    const auto results4 = vaddq_f32(vmulq_f32(valueDiffVec, amounts4), value0Vec);
+                    const auto results5 = vaddq_f32(vmulq_f32(valueDiffVec, amounts5), value0Vec);
+                    const auto results6 = vaddq_f32(vmulq_f32(valueDiffVec, amounts6), value0Vec);
+                    const auto results7 = vaddq_f32(vmulq_f32(valueDiffVec, amounts7), value0Vec);
+
+                    vst1q_f32(sample, vmulq_f32(vld1q_f32(sample), results0));
+                    vst1q_f32(sample + 4, vmulq_f32(vld1q_f32(sample + 4), results1));
+                    vst1q_f32(sample + 8, vmulq_f32(vld1q_f32(sample + 8), results2));
+                    vst1q_f32(sample + 12, vmulq_f32(vld1q_f32(sample + 12), results3));
+                    vst1q_f32(sample + 16, vmulq_f32(vld1q_f32(sample + 16), results4));
+                    vst1q_f32(sample + 20, vmulq_f32(vld1q_f32(sample + 20), results5));
+                    vst1q_f32(sample + 24, vmulq_f32(vld1q_f32(sample + 24), results6));
+                    vst1q_f32(sample + 28, vmulq_f32(vld1q_f32(sample + 28), results7));
+
+                    sample += 32;
+                    fadeClock += 16;
+                }
+#else
+                for (; f <= fadeEnd - 4; f += 4)
+                {
+                    const auto clockOffset = fadeClock - clock0; // current offset from clock0
+                    const float amount0 = (float)(clockOffset) / (float)(clockDiff);
+                    const float amount1 = (float)(clockOffset + 1) / (float)(clockDiff);
+                    const float amount2 = (float)(clockOffset + 2) / (float)(clockDiff);
+                    const float amount3 = (float)(clockOffset + 3) / (float)(clockDiff);
+                    const auto result0 = valueDiff * amount0 + value0;
+                    const auto result1 = valueDiff * amount1 + value0;
+                    const auto result2 = valueDiff * amount2 + value0;
+                    const auto result3 = valueDiff * amount3 + value0;
+                    sample[0] *= result0;
+                    sample[1] *= result0;
+                    sample[2] *= result1;
+                    sample[3] *= result1;
+                    sample[4] *= result2;
+                    sample[5] *= result2;
+                    sample[6] *= result3;
+                    sample[7] *= result3;
+
+                    fadeClock += 4;
+                    sample += 8;
+                }
+#endif
+                for (;f < fadeEnd; ++f)
                 {
                     const float amount = (float)(fadeClock - clock0) / (float)(clockDiff);
-                    auto value = valueDiff * amount + value0;
-                    *sample++ *= value;
+                    const auto result = valueDiff * amount + value0;
+                    *sample++ *= result;
+                    *sample++ *= result;
                     ++fadeClock;
                 }
 
