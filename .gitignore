@@ -4,6 +4,10 @@
 .vs/
 .cache/
 
+*.sublime-workspace
+
+CMakeUserPresets.json
+
 # Build directories
 out/
 build/

@@ -17,5 +17,5 @@ else()
     endif()
 endif()
 
-include(add_emrun_target)
-add_emrun_target(insound_sandbox)
+include(add_devserver_target)
+add_devserver_target(insound_sandbox)

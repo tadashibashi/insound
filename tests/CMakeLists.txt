@@ -1,7 +1,7 @@
 include (FetchContent)
 
 # Get Catch2
-if (NOT EXISTS CATCH2::Catch2)
+if (NOT TARGET CATCH2::Catch2)
     FetchContent_Declare(Catch2
         GIT_REPOSITORY https://github.com/catchorg/Catch2.git
         GIT_TAG        4e8d92bf02f7d1c8006a0e7a5ecabd8e62d98502
