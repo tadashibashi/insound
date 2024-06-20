@@ -78,7 +78,7 @@ struct insound::SdlAudioDevice::Impl {
             {
                 auto lockGuard = std::lock_guard(device->mixMutex);
 
-                while ((int)SDL_GetQueuedAudioSize(device->id) - device->bufferSize <= 0)
+                while ((int)SDL_GetQueuedAudioSize(device->id) - device->bufferSize * 2 <= 0)
                 {
                     device->callback(device->userData, &device->buffer);
                     if (SDL_QueueAudio(device->id, device->buffer.data(),(uint32_t)device->buffer.size()) != 0)
