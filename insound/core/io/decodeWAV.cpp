@@ -1,12 +1,13 @@
 #include "decodeWAV.h"
 
-#include <map>
 #include "../AudioSpec.h"
 #include "../BufferView.h"
 #include "../Error.h"
 
 #include <SDL2/SDL_audio.h>
 
+#include <cmath>
+#include <map>
 namespace insound {
 
 #define WAVREAD_CHECK(bytesRead, expectedCount) do { if ((bytesRead) != (expectedCount)) \
