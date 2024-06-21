@@ -1,6 +1,6 @@
-import os from "node:os";
-import path from "node:path";
-import {exec} from "node:child_process";
+const child_process  = require("node:child_process");
+const os             = require("node:os");
+const path           = require("node:path");
 
 /**
  * Get platform-specific open command for opening default web browser via url
@@ -26,16 +26,16 @@ const openCommand = getOpenCommand();
  * @param {string} url - url to open. It may be a file url too.
  * @returns {void}
  */
-export function open(url)
+module.exports.openURL = function(url)
 {
-    exec(`${openCommand} ${url}`);
+    child_process.exec(`${openCommand} ${url}`);
 }
 
 /**
  * Get mime type from a file name.
  * @param {string} filename
  */
-export function getMimeType(filename)
+module.exports.getMimeType = function(filename)
 {
     const extname = path.extname(filename).toLowerCase();
     switch(extname)

@@ -8,15 +8,9 @@ macro(add_devserver_target TARGET_NAME)
     if (EMSCRIPTEN)
         set(SERVE_TARGET serve_${TARGET_NAME})
         find_program(NODE node)
-        find_program(NPM npm)
-        set(DEVSERVER ${INSOUND_ROOT_DIR}/tools/dev-server/server.js)
+        set(DEVSERVER ${INSOUND_ROOT_DIR}/tools/dev-server/main.js)
 
-        if (NODE AND NPM)
-            # Initialize server dependencies if uninitialized
-            if (NOT EXISTS ${INSOUND_ROOT_DIR}/tools/dev-server/node_modules)
-                execute_process(COMMAND "cd ${INSOUND_ROOT_DIR}/tools/dev-server && ${NPM} init")
-            endif()
-
+        if (NODE)
             add_custom_target(${SERVE_TARGET}
                 COMMAND ${NODE} ${DEVSERVER} $<TARGET_FILE:${TARGET_NAME}>
                 USES_TERMINAL
