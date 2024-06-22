@@ -15,6 +15,7 @@ namespace insound {
             EngineNotInit, ///< Engine was not initialized when depended on.
             NotSupported,  ///< Feature is not supported.
             FileOpenErr,   ///< Error when attempting to open a file
+            InvalidSoundBuffer, ///< SoundBuffer provided was null, or not loaded
             UnexpectedData,///< Unexpected data in buffer, may be due to a malformed file or a bug in the file parsing logic.
             EndOfBuffer,   ///< Buffer attempted to read past end of buffer
             GmeErr,        ///< LibGME runtime error.

@@ -1,5 +1,7 @@
 #include "Engine.h"
 
+#include <iostream>
+
 #include "AlignedVector.h"
 #include "AudioDevice.h"
 #include "AudioSpec.h"
@@ -8,18 +10,23 @@
 #include "Effect.h"
 #include "Error.h"
 #include "PCMSource.h"
+#include "SoundBuffer.h"
 #include "Source.h"
 
 #include <mutex>
 #include <vector>
 
-
-
 namespace insound {
+#ifdef INSOUND_DEBUG
+/// Checks that engine is open before performing a function.
+/// Return type of the function called in most be `bool`
 #define ENGINE_INIT_GUARD() do { if (!isOpen()) { \
         pushError(Result::EngineNotInit, __FUNCTION__); \
         return false; \
     } } while(0)
+#else
+#define ENGINE_INIT_GUARD()
+#endif
 
     struct Engine::Impl {
     public:
@@ -64,14 +71,16 @@ namespace insound {
                 if (m_masterBus.isValid())
                 {
                     auto lockGuard = m_device->mixLockGuard();
-                    m_masterBus->m_isMaster = false;
-                    release((Handle<Source>)m_masterBus, true);
+                    m_masterBus->m_isMaster = false; // enable bus deletion
+                    release(
+                        static_cast<Handle<Source>>(m_masterBus), true);
 
                     processCommands(this, m_immediateCommands); // flush command buffers
                     processCommands(this, m_deferredCommands);
 
                     m_masterBus->processRemovals();
-                    m_engine->destroySource((Handle<Source>)m_masterBus);
+                    m_engine->destroySource(
+                        static_cast<Handle<Source>>(m_masterBus));
                     m_masterBus = {};
                 }
 
@@ -101,13 +110,20 @@ namespace insound {
         bool playSound(const SoundBuffer *buffer, bool paused, bool looping, bool oneshot, const Handle<Bus> &bus, Handle<PCMSource> *outPcmSource)
         {
             ENGINE_INIT_GUARD();
-            auto lockGuard = m_device->mixLockGuard();
 
+            if (!buffer || !buffer->isLoaded())
+            {
+                pushError(Result::InvalidSoundBuffer, "Failed to play sound");
+                return false;
+            }
+
+            auto lockGuard = m_device->mixLockGuard();
             if (bus && !bus.isValid()) // if output bus was passed, and it's invalid => error
             {
                 pushError(Result::InvalidHandle, "Engine::Impl::createBus failed because output Bus was invalid");
                 return false;
             }
+
 
             uint32_t clock;
             bool result;
@@ -121,15 +137,17 @@ namespace insound {
                 return false;
             }
 
-            auto newSource = m_objectPool.allocate<PCMSource>(m_engine, buffer, clock, paused, looping, oneshot);
-
+            const auto newSource = m_objectPool.allocate<PCMSource>(
+                m_engine, buffer, clock, paused, looping, oneshot);
             if (bus)
             {
-                bus->applyAppendSource((Handle<Source>)newSource);
+                bus->applyAppendSource(
+                    static_cast<Handle<Source>>(newSource));
             }
             else
             {
-                m_masterBus->applyAppendSource((Handle<Source>)newSource);
+                m_masterBus->applyAppendSource(
+                    static_cast<Handle<Source>>(newSource));
             }
 
             if (outPcmSource)
@@ -138,7 +156,7 @@ namespace insound {
             return true;
         }
 
-        bool createBus(bool paused, const Handle<Bus> &output, Handle<Bus> *outBus, bool isMaster)
+        bool createBus(bool paused, const Handle<Bus> &output, Handle<Bus> *outBus, const bool isMaster)
         {
             ENGINE_INIT_GUARD();
             auto lockGuard = m_device->mixLockGuard();
@@ -160,7 +178,7 @@ namespace insound {
 
             // Connect bus to output
             if (outputBus)
-                Bus::connect(outputBus, (Handle<Source>)newBusHandle);
+                Bus::connect(outputBus, static_cast<Handle<Source>>(newBusHandle));
 
             if (isMaster) // flag master
                 newBusHandle->m_isMaster = true;
@@ -173,7 +191,7 @@ namespace insound {
             return true;
         }
 
-        bool release(const Handle<Source> &source, bool recursive)
+        bool release(const Handle<Source> &source, const bool recursive)
         {
             ENGINE_INIT_GUARD();
 
@@ -184,15 +202,17 @@ namespace insound {
             }
 
             m_discardFlag = true;
-            return m_engine->pushCommand(Command::makeEngineDeallocateSource(m_engine, source, recursive));
+            return m_engine->pushCommand(
+                Command::makeEngineDeallocateSource(m_engine, source, recursive));
         }
 
-        bool releaseRaw(Source *source, bool recursive)
+        bool releaseRaw(Source *source, const bool recursive)
         {
             ENGINE_INIT_GUARD();
 
             m_discardFlag = true;
-            return m_engine->pushCommand(Command::makeEngineDeallocateSourceRaw(m_engine, source, recursive));
+            return m_engine->pushCommand(
+                Command::makeEngineDeallocateSourceRaw(m_engine, source, recursive));
         }
 
         /// Non-zero positive number if open, zero if not
@@ -291,18 +311,18 @@ namespace insound {
 
         bool pushCommand(const Command &command)
         {
-            std::lock_guard lockGuard(m_deferredCommandMutex);
             ENGINE_INIT_GUARD();
 
+            std::lock_guard lockGuard(m_deferredCommandMutex);
             m_deferredCommands.emplace_back(command);
             return true;
         }
 
         bool pushImmediateCommand(const Command &command)
         {
-            std::lock_guard lockGuard(m_immediateCommandMutex);
             ENGINE_INIT_GUARD();
 
+            std::lock_guard lockGuard(m_immediateCommandMutex);
             m_immediateCommands.emplace_back(command);
             return true;
         }
@@ -319,7 +339,7 @@ namespace insound {
                     if (!source)
                         break;
 
-                    if (auto bus = source.getAs<Bus>())
+                    if (const auto bus = source.getAs<Bus>())
                     {
                         bus->release(command.deallocsource.recursive);
                     }
@@ -333,11 +353,11 @@ namespace insound {
 
                 case EngineCommand::ReleaseSourceRaw:
                 {
-                    auto source = command.deallocsourceraw.source;
+                    const auto source = command.deallocsourceraw.source;
                     if (!source)
                         break;
 
-                    if (auto bus = dynamic_cast<Bus *>(source))
+                    if (const auto bus = dynamic_cast<Bus *>(source))
                     {
                         bus->release(command.deallocsourceraw.recursive);
                     }
@@ -377,7 +397,8 @@ namespace insound {
         /// Process a vector of commands
         /// @param engine   context object, we may not need it
         /// @param commands commands to apply
-        static void processCommands(const Engine::Impl *engine, std::vector<Command> &commands)
+        static void processCommands([[maybe_unused]] const Impl *engine,
+            std::vector<Command> &commands)
         {
             if (commands.empty())
                 return;
@@ -418,6 +439,7 @@ namespace insound {
                     } break;
                 }
             }
+
             commands.clear();
         }
 
@@ -426,7 +448,7 @@ namespace insound {
         /// @param outBuffer buffer to fill or swap, as long as the lengths are equal
         static void audioCallback(void *userptr, AlignedVector<uint8_t, 16> *outBuffer)
         {
-            const auto engine = (Engine::Impl *)userptr;
+            const auto engine = static_cast<Impl *>(userptr);
             if (!engine->isOpen())
                 return;
 
@@ -436,9 +458,8 @@ namespace insound {
                 if (!engine->m_immediateCommands.empty())
                     Engine::Impl::processCommands(engine, engine->m_immediateCommands);
             }
-
             const auto size = outBuffer->size();
-            engine->m_masterBus->read(nullptr, (int)size);
+            engine->m_masterBus->read(nullptr, static_cast<int>(size));
             engine->m_clock += size / (2 * sizeof(float));
             engine->m_masterBus->updateParentClock(engine->m_clock);
 
@@ -470,7 +491,7 @@ namespace insound {
         delete m;
     }
 
-    bool Engine::open(int samplerate, int bufferFrameSize)
+    bool Engine::open(const int samplerate, const int bufferFrameSize)
     {
         return m->open(samplerate, bufferFrameSize);
     }
@@ -485,39 +506,41 @@ namespace insound {
         return m->isOpen();
     }
 
-    bool Engine::playSound(const SoundBuffer *buffer, bool paused, bool looping, bool oneshot, Handle<Bus> bus, Handle<PCMSource> *outPcmSource)
+    bool Engine::playSound(const SoundBuffer *buffer, const bool paused, const bool looping,
+                           const bool oneshot, const Handle<Bus> &bus, Handle<PCMSource> *outPcmSource)
     {
         return m->playSound(buffer, paused, looping, oneshot, bus, outPcmSource);
     }
 
-    bool Engine::playSound(const SoundBuffer *buffer, bool paused, bool looping, bool oneshot, Handle<PCMSource> *outPcmSource)
+    bool Engine::playSound(const SoundBuffer *buffer, const bool paused, const bool looping,
+        const bool oneshot, Handle<PCMSource> *outPcmSource)
     {
         return m->playSound(buffer, paused, looping, oneshot, {}, outPcmSource);
     }
 
-    bool Engine::createBus(bool paused, const Handle<Bus> &output, Handle<Bus> *outBus)
+    bool Engine::createBus(const bool paused, const Handle<Bus> &output, Handle<Bus> *outBus)
     {
         return m->createBus(paused, output, outBus, false);
     }
 
-    bool Engine::createBus(bool paused, Handle<Bus> *outBus)
+    bool Engine::createBus(const bool paused, Handle<Bus> *outBus)
     {
         return m->createBus(paused, {}, outBus, false);
     }
 
-    bool Engine::releaseSoundImpl(Handle<Source> source)
+    bool Engine::releaseSoundImpl(const Handle<Source> &source)
     {
         return m->release(source, false);
     }
 
-    bool Engine::releaseSoundRaw(Source *source, bool recursive)
+    bool Engine::releaseSoundRaw(Source *source, const bool recursive)
     {
         return m->releaseRaw(source, recursive);
     }
 
-    bool Engine::releaseBus(const Handle<Bus> &bus, bool recursive)
+    bool Engine::releaseBus(const Handle<Bus> &bus, const bool recursive)
     {
-        return m->release((Handle<Source>)bus, recursive);
+        return m->release(static_cast<Handle<Source>>(bus), recursive);
     }
 
     bool Engine::getDeviceID(uint32_t *outDeviceID) const
@@ -550,7 +573,7 @@ namespace insound {
         return m->pushImmediateCommand(command);
     }
 
-    bool Engine::setPaused(bool value)
+    bool Engine::setPaused(const bool value)
     {
         return m->setPaused(value);
     }
@@ -585,7 +608,7 @@ namespace insound {
         return m->getAudioDevice();
     }
 
-    void Engine::applyCommand(EngineCommand &command)
+    void Engine::applyCommand(const EngineCommand &command)
     {
         m->processCommand(command);
     }

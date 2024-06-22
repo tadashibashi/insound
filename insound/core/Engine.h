@@ -35,7 +35,7 @@ namespace insound {
         /// @param oneshot whether to release sound resources at end, (will not auto-release while looping is true)
         /// @param bus     bus this source should output to; left null the master bus will be used
         /// @param outPcmSource pointer to receive pcm source, nullable if you don't need it e.g. a oneshot sound
-        bool playSound(const SoundBuffer *buffer, bool paused, bool looping, bool oneshot, Handle<Bus> bus, Handle<PCMSource> *outPcmSource);
+        bool playSound(const SoundBuffer *buffer, bool paused, bool looping, bool oneshot, const Handle<Bus> &bus, Handle<PCMSource> *outPcmSource);
         bool playSound(const SoundBuffer *buffer, bool paused, bool looping, bool oneshot, Handle<PCMSource> *outPcmSource);
 
         /// Create a new bus to use in the mixing graph
@@ -103,7 +103,7 @@ namespace insound {
             return getObjectPool().allocate<T>(std::forward<TArgs>(args)...);
         }
 
-        bool releaseSoundImpl(Handle<Source> source);
+        bool releaseSoundImpl(const Handle<Source> &source);
         bool releaseSoundRaw(Source *source, bool recursive);
         void destroySource(const Handle<Source> &source);
         [[nodiscard]]
@@ -113,7 +113,7 @@ namespace insound {
 
         AudioDevice &device();
 
-        void applyCommand(EngineCommand &command);
+        void applyCommand(const EngineCommand &command);
         Impl *m;
     };
 }

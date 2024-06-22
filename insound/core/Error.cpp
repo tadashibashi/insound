@@ -22,6 +22,7 @@ namespace insound {
         "Engine uninitialized",
         "Feature unsupported",
         "File failed to open",
+        "SoundBuffer was null or not loaded",
         "Unexpected data found in buffer",
         "Attempted to read past end of buffer",
         "LibGME Runtime Error",
