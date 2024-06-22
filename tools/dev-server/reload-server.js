@@ -24,6 +24,13 @@ let targetFile = "";
 // Cached reload command message
 const ReloadMessage = encodeWebSocketTextFrame("RELOAD");
 
+// Defers reload until there are no more file changes detected.
+// Sometimes there will be rapid file changes
+// when the compiler generates the new files. This helps make
+// sure we receive the last "correct" version of the file before reloading.
+const ReloadCoolDown = 250; // in milliseconds
+let reloadTimeout = null;
+
 
 // ===== Public API ===========================================================
 /**
@@ -49,8 +56,15 @@ function open(hostname, port, fileToWatch, initCallback = ()=>{})
         {
             if (socket.readyState === "open")
             {
-                socket.write(ReloadMessage);
+                if (reloadTimeout != null)
+                {
+                    clearTimeout(reloadTimeout);
+                }
 
+                reloadTimeout = setTimeout(() => {
+                    socket.write(ReloadMessage);
+                    reloadTimeout = null;
+                }, ReloadCoolDown);
             }
         }
 

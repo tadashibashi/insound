@@ -6,20 +6,20 @@ const path           = require("node:path");
  * Get platform-specific open command for opening default web browser via url
  * @returns {string} command name
  */
-function getOpenCommand()
+function getPlatformOpenCommand()
 {
     const platform = os.platform();
     switch(platform)
     {
         case "linux": return "xdg-open";
         case "win32": return "start";
-        case "darwin": return "open -n";
+        case "darwin": return "open";
         case "cygwin": return "cygstart";
     }
 }
 
 // Cache the value
-const openCommand = getOpenCommand();
+const openCommand = getPlatformOpenCommand();
 
 /**
  * Open a url on desktop platforms.
