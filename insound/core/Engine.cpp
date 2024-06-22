@@ -202,7 +202,7 @@ namespace insound {
             }
 
             m_discardFlag = true;
-            return m_engine->pushCommand(
+            return pushCommand(
                 Command::makeEngineDeallocateSource(m_engine, source, recursive));
         }
 
@@ -211,7 +211,7 @@ namespace insound {
             ENGINE_INIT_GUARD();
 
             m_discardFlag = true;
-            return m_engine->pushCommand(
+            return pushCommand(
                 Command::makeEngineDeallocateSourceRaw(m_engine, source, recursive));
         }
 
@@ -470,7 +470,6 @@ namespace insound {
         uint32_t m_clock;
 
         Handle<Bus> m_masterBus;
-
         AudioDevice *m_device;
 
         std::vector<Command> m_deferredCommands;

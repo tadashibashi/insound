@@ -58,7 +58,6 @@ namespace insound {
         bool releaseBus(const Handle<Bus> &bus, bool recursive);
 
         /// Retrieve the engine's device ID. If zero, the audio device is uninitialized.
-        [[nodiscard]]
         bool getDeviceID(uint32_t *outDeviceID) const;
 
         /// Get audio spec
