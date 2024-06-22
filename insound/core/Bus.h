@@ -15,6 +15,7 @@ namespace insound {
     public:
         /// @note do not lock the mix thread before calling this, since this constructor defers a command which locks mix thread
         explicit Bus();
+        Bus(Bus &&other) noexcept;
         ~Bus() override = default;
 
         bool init(Engine *engine, const Handle<Bus> &parent, bool paused);

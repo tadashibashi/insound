@@ -8,6 +8,12 @@
 #include "SourceRef.h"
 
 namespace insound {
+#define HANDLE_GUARD() do { if (detail::peekSystemError().code == Result::InvalidHandle) { \
+    detail::popSystemError(); \
+    pushError(Result::InvalidHandle, __FUNCTION__); \
+    return false; \
+} } while(0)
+
     Bus::Bus() :
         Source(),
         m_sources(), m_buffer(), m_parent(), m_isMaster()
@@ -292,12 +298,7 @@ namespace insound {
 
     bool Bus::release(bool recursive)
     {
-        if (detail::peekSystemError().code == Result::InvalidHandle)
-        {
-            detail::popSystemError();
-            pushError(Result::InvalidHandle);
-            return false;
-        }
+        HANDLE_GUARD();
 
         if (m_isMaster)
         {
@@ -337,11 +338,7 @@ namespace insound {
 
     bool Bus::release()
     {
-        if (detail::popSystemError().code == Result::InvalidHandle)
-        {
-            pushError(Result::InvalidHandle);
-            return false;
-        }
+        HANDLE_GUARD();
 
         if (m_isMaster)
         {
@@ -411,11 +408,7 @@ namespace insound {
 
     bool Bus::getOutputBus(Handle<Bus> *outBus)
     {
-        if (detail::popSystemError().code == Result::InvalidHandle)
-        {
-            pushError(Result::InvalidHandle);
-            return false;
-        }
+        HANDLE_GUARD();
 
         if (outBus)
             *outBus = m_parent;
