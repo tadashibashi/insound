@@ -7,15 +7,18 @@
 #include "SoundBuffer.h"
 
 #include <cmath>
+#include <iostream>
 
 namespace insound {
-    // Check if the handle is valid by checking the system error stack. Return false, if not.
-    // (should be thread-safe, since each thread has its own error and system error stacks)
+
+/// Check if the handle is valid by checking the system error stack. Return false, if not.
+/// (should be thread-safe, since each thread has its own error and system error stacks)
 #define HANDLE_GUARD() do { if (detail::peekSystemError().code == Result::InvalidHandle) { \
         detail::popSystemError(); \
         pushError(Result::InvalidHandle, __FUNCTION__); \
         return false; \
     } } while(0)
+
 
     PCMSource::PCMSource() : Source(),
         m_buffer(), m_position(0), m_isLooping(),
@@ -175,6 +178,8 @@ namespace insound {
                 {
                     if (touchesLastFrame)
                     {
+                        // note: `std::` is omitted from math functions ending with `f` because they don't exist in the
+                        //       std namespace in GCC
                         float curFrame = fmodf((m_position + ((float)(i) * speed)), (float)frameSize);
                         for (int j = 0; j < UnrolledSize; ++j)
                         {
@@ -223,7 +228,7 @@ namespace insound {
 
                     if (touchesLastFrame)
                     {
-                        for (int j = 0; j < UnrolledSize-1; ++j)
+                        for (int j = 0; j < UnrolledSize-1 && curFrame < (float)frameSize - speed; ++j)
                         {
                             const auto baseSample = (int)curFrame * 2;
                             const auto j2 = j * 2;
@@ -247,7 +252,7 @@ namespace insound {
                     }
                     else
                     {
-                        for (int j = 0; j < UnrolledSize; ++j)
+                        for (int j = 0; j < UnrolledSize && (int)curFrame < frameSize; ++j)
                         {
                             const auto baseSample = (int)curFrame * 2;
                             const auto j2 = j * 2;

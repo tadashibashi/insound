@@ -1,21 +1,25 @@
 #include "Source.h"
 
+#include "Command.h"
+#include "CpuIntrinsics.h"
 #include "Effect.h"
 #include "Engine.h"
 #include "Error.h"
-#include "Command.h"
-#include "CpuIntrinsics.h"
 
 #include "effects/PanEffect.h"
 #include "effects/VolumeEffect.h"
 
 namespace insound {
 
+#ifdef INSOUND_DEBUG
 #define HANDLE_GUARD() do { if (detail::peekSystemError().code == Result::InvalidHandle) { \
         detail::popSystemError(); \
         pushError(Result::InvalidHandle, __FUNCTION__); \
         return false; \
     } } while(0)
+#else
+#define HANDLE_GUARD()
+#endif
 
     Source::Source() :
         m_engine(),
@@ -148,7 +152,8 @@ namespace insound {
                 const int bytesToRead = pauseThisFrame ? (int)pauseClock : length - i;
 
                 // read bytes here
-                readImpl(m_outBuffer.data() + i, bytesToRead);
+                if (bytesToRead > 0)
+                    readImpl(m_outBuffer.data() + i, bytesToRead);
 
                 i += bytesToRead;
 
@@ -215,12 +220,13 @@ namespace insound {
 
                 uint32_t f = 0;
 #if INSOUND_SSE
-                const auto clockDiffVec = _mm_set1_ps((float)clockDiff);
+                const auto clockDiffVec = _mm_set1_ps(static_cast<float>(clockDiff));
                 const auto valueDiffVec = _mm_set1_ps(valueDiff);
                 const auto value0Vec = _mm_set1_ps(value0);
                 for (; f <= fadeEnd - 16; f += 16)
                 {
-                    const auto clockOffsetVec = _mm_set1_ps((float)fadeClock - (float)clock0);
+                    const auto clockOffsetVec = _mm_set1_ps(
+                        static_cast<float>(fadeClock) - static_cast<float>(clock0));
 
                     const auto amounts0 = _mm_div_ps(_mm_add_ps(_mm_set_ps(1, 1, 0, 0), clockOffsetVec), clockDiffVec);
                     const auto amounts1 = _mm_div_ps(_mm_add_ps(_mm_set_ps(3, 3, 2, 2), clockOffsetVec), clockDiffVec);
@@ -745,6 +751,8 @@ namespace insound {
 
     bool Source::updateParentClock(uint32_t parentClock)
     {
+        HANDLE_GUARD();
+
         m_parentClock = parentClock;
         return true;
     }

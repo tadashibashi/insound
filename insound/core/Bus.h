@@ -55,7 +55,7 @@ namespace insound {
 
     private: // Members
         std::vector<Handle<Source>> m_sources;
-        std::vector<float> m_buffer; ///< temp buffer to calculate mix
+        AlignedVector<float, 16> m_buffer; ///< temp buffer to calculate mix
         Handle<Bus> m_parent;
         bool m_isMaster;
     };
