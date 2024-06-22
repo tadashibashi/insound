@@ -7,7 +7,7 @@
 insound::AudioDevice *insound::AudioDevice::create()
 {
 #ifdef INSOUND_THREADING // Use AudioWorklet backend
-    return new EmAudioDevice;
+    return new EmAudioDevice();
 #else                    // Use ScriptProcessorNode backend
     return new SdlAudioDevice;
 #endif

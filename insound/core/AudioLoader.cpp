@@ -9,7 +9,7 @@
 
 namespace insound {
     struct AudioLoader::Impl {
-        explicit Impl(const Engine *engine) : m_targetSpec(), m_threads(4)
+        explicit Impl(const Engine *engine) : m_targetSpec(), m_threads(2)
         {
             engine->getSpec(&m_targetSpec);
         }
