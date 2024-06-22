@@ -10,6 +10,7 @@ namespace insound {
     class PCMSource final : public Source {
     public:
         PCMSource();
+        PCMSource(PCMSource &&other) noexcept;
 
         bool init(Engine *engine, const SoundBuffer *buffer, uint32_t parentClock, bool paused = false,
             bool looping = false, bool oneShot = false);

@@ -15,8 +15,11 @@ namespace insound {
     Bus::Bus() :
         Source(),
         m_sources(), m_buffer(), m_parent(), m_isMaster()
-    {
-    }
+    {}
+
+    Bus::Bus(Bus &&other) noexcept : Source(std::move(other)), m_sources(std::move(other.m_sources)),
+        m_buffer(std::move(other.m_buffer)), m_parent(other.m_parent), m_isMaster(other.m_isMaster)
+    {}
 
     bool Bus::updateParentClock(const uint32_t parentClock)
     {

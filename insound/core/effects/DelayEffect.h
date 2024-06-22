@@ -12,25 +12,13 @@ namespace insound {
     public:
         DelayEffect();
         ~DelayEffect() override = default;
+        DelayEffect(DelayEffect &&other) noexcept;
 
         /// Initialize the DelayEffect
         /// @param delayTime number of samples to delay
         /// @param wet       percentage of the effect signal to output, dry signal is calculated as `1.f - wet`.
         /// @param feedback  percentage of signal to capture
-        bool init(uint32_t delayTime, float wet, float feedback)
-        {
-            if (!Effect::init())
-                return false;
-
-            m_delayTime = delayTime;
-            m_wet = wet;
-            m_feedback = feedback;
-
-            m_buffer.resize(delayTime * 2);
-            std::memset(m_buffer.data(), 0, m_buffer.size() * sizeof(float));
-
-            return true;
-        }
+        bool init(uint32_t delayTime, float wet, float feedback);
 
         bool process(const float *input, float *output, int count) override;
 

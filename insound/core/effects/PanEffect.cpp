@@ -1,11 +1,17 @@
 #include "PanEffect.h"
 
 #include "../CpuIntrinsics.h"
-
 #include "../Error.h"
 #include "../util.h"
 
+#include <utility>
+
 namespace insound {
+    PanEffect::PanEffect(PanEffect &&other) noexcept : Effect(std::move(other)),
+        m_left(other.m_left), m_right(other.m_right)
+    {
+    }
+
     bool PanEffect::process(const float *input, float *output, const int count)
     {
         if (m_left == 1.f && m_right == 1.f)

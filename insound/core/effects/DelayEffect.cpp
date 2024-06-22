@@ -9,6 +9,30 @@ insound::DelayEffect::DelayEffect() :
 {
 }
 
+insound::DelayEffect::DelayEffect(DelayEffect &&other) noexcept : Effect(std::move(other)),
+    m_delayTime(other.m_delayTime), m_feedback(other.m_feedback), m_wet(other.m_wet),
+    m_delayHead(other.m_delayHead), m_buffer(std::move(other.m_buffer))
+{
+}
+
+bool insound::DelayEffect::init(uint32_t delayTime, float wet, float feedback)
+{
+    if (!Effect::init())
+        return false;
+
+    if (delayTime < 256) // minimum size = number of samples per WebAudio frame
+        delayTime = 256;
+
+    m_delayTime = delayTime;
+    m_wet = wet;
+    m_feedback = feedback;
+
+    m_buffer.resize(delayTime * 2);
+    std::memset(m_buffer.data(), 0, m_buffer.size() * sizeof(float));
+
+    return true;
+}
+
 bool insound::DelayEffect::process(const float *input, float *output, const int count)
 {
     const auto bufSize = m_buffer.size();
@@ -162,7 +186,11 @@ bool insound::DelayEffect::process(const float *input, float *output, const int 
         }
 
         processed += (int)readThisFrame;
-        m_delayHead = (delayHead + readThisFrame) % bufSize;
+
+        if (bufSize > 0)
+            m_delayHead = (delayHead + readThisFrame) % bufSize;
+        else
+            m_delayHead = 0;
     }
 
     return true;

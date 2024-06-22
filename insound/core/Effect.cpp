@@ -9,6 +9,9 @@ namespace insound {
     return false; \
 } } while(0)
 
+    Effect::Effect(Effect &&other) noexcept : m_engine(other.m_engine)
+    {}
+
     bool Effect::sendFloat(int index, float value)
     {
         HANDLE_GUARD();

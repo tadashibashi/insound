@@ -9,6 +9,8 @@ namespace insound {
         {
         }
 
+        VolumeEffect(VolumeEffect &&other) noexcept;
+
         bool init(float volume = 1.f)
         {
             if (!Effect::init())

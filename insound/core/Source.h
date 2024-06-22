@@ -29,6 +29,7 @@ namespace insound {
     class Source {
     public:
         virtual ~Source() = default;
+        Source(Source &&other) noexcept;
 
         /// Get paused status of the sound source.
         /// @param outPaused pointer to receive paused state.
@@ -43,7 +44,7 @@ namespace insound {
         /// @param releaseOnPause    whether to fully stop and release the sound at the clock time.
         ///                      The handle becomes invalid after this point. Default: `false`.
         /// @returns whether function succeeded; check `popError()` for details.
-        bool pauseAt(uint32_t clock, bool shouldStop = false);
+        bool pauseAt(uint32_t clock, bool releaseOnPause = false);
 
         /// Unpause the sound source at a specific clock time.
         /// @param clock        when to apply unpause in parent clocks; use `getParentClock` to get current clock value.

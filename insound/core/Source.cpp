@@ -11,15 +11,11 @@
 
 namespace insound {
 
-#ifdef INSOUND_DEBUG
 #define HANDLE_GUARD() do { if (detail::peekSystemError().code == Result::InvalidHandle) { \
-        detail::popSystemError(); \
-        pushError(Result::InvalidHandle, __FUNCTION__); \
-        return false; \
-    } } while(0)
-#else
-#define HANDLE_GUARD()
-#endif
+    detail::popSystemError(); \
+    pushError(Result::InvalidHandle, __FUNCTION__); \
+    return false; \
+} } while(0)
 
     Source::Source() :
         m_engine(),
@@ -173,7 +169,6 @@ namespace insound {
                         m_engine->releaseSoundRaw(this, false);
                         break;
                     }
-
                 }
 
                 if (pauseClock > -1)
@@ -400,6 +395,15 @@ namespace insound {
         m_clock += length / (2 * sizeof(float));
         return length;
     }
+
+    Source::Source(Source &&other) noexcept : m_engine(other.m_engine),
+        m_panner(other.m_panner), m_volume(other.m_volume), m_effects(std::move(other.m_effects)),
+        m_outBuffer(std::move(other.m_outBuffer)), m_inBuffer(std::move(other.m_inBuffer)),
+        m_fadePoints(std::move(other.m_fadePoints)), m_fadeValue(other.m_fadeValue),
+        m_clock(other.m_clock), m_parentClock(other.m_parentClock),
+        m_paused(other.m_paused), m_pauseClock(other.m_pauseClock), m_unpauseClock(other.m_unpauseClock),
+        m_releaseOnPauseClock(other.m_releaseOnPauseClock), m_shouldDiscard(other.m_shouldDiscard)
+    {}
 
     bool Source::getPaused(bool *outPaused) const
     {

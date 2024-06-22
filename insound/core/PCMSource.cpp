@@ -26,8 +26,16 @@ namespace insound {
     {
     }
 
+    PCMSource::PCMSource(PCMSource &&other) noexcept : Source(std::move(other)),
+        m_buffer(other.m_buffer),
+        m_position(other.m_position), m_isLooping(other.m_isLooping), m_isOneShot(other.m_isOneShot),
+        m_speed(other.m_speed)
+    {
+
+    }
+
     bool PCMSource::init(Engine *engine, const SoundBuffer *buffer, uint32_t parentClock, bool paused,
-        bool looping, bool oneShot)
+                         bool looping, bool oneShot)
     {
         if (!Source::init(engine, parentClock, paused))
             return false;

@@ -3,7 +3,14 @@
 #include "../CpuIntrinsics.h"
 #include "../Error.h"
 
+#include <utility>
+
 namespace insound {
+    VolumeEffect::VolumeEffect(VolumeEffect &&other) noexcept : Effect(std::move(other)),
+        m_volume(other.m_volume)
+    {
+    }
+
     bool VolumeEffect::process(const float *input, float *output, int count)
     {
         const auto volume = m_volume;

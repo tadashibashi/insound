@@ -7,6 +7,7 @@ namespace insound {
     public:
         PanEffect() : m_left(1.f), m_right(1.f) { }
         PanEffect(float left, float right) : m_left(left), m_right(right) { }
+        PanEffect(PanEffect &&other) noexcept;
 
         bool process(const float *input, float *output, int count) override;
 

@@ -10,6 +10,7 @@ namespace insound {
         virtual ~Effect() = default;
     protected:
         Effect() : m_engine() { }
+        Effect(Effect &&other) noexcept;
 
         /// Set a floating point parameter value
         /// @param index id of the parameter to send
