@@ -248,6 +248,11 @@ namespace insound {
         SDL_PauseAudioDevice(m->id, SDL_FALSE);
     }
 
+    bool SdlAudioDevice::isOpen() const
+    {
+        return m->id != 0;
+    }
+
     bool SdlAudioDevice::isRunning() const
     {
         return SDL_GetAudioDeviceStatus(m->id) == SDL_AUDIO_PLAYING;

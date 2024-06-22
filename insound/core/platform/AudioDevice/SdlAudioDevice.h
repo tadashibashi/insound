@@ -16,6 +16,7 @@ namespace insound {
         void suspend() override;
         void resume() override;
 
+        [[nodiscard]] bool isOpen() const override;
         [[nodiscard]] bool isRunning() const override;
         [[nodiscard]] uint32_t id() const override;
         [[nodiscard]] const AudioSpec &spec() const override;

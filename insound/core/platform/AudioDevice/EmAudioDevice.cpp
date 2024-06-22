@@ -216,6 +216,11 @@ namespace insound {
         });
     }
 
+    bool EmAudioDevice::isOpen() const
+    {
+        return m->id() != 0;
+    }
+
     uint32_t EmAudioDevice::id() const
     {
         return m->context;

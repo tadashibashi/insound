@@ -32,6 +32,7 @@ namespace insound {
 
         /// Provide the audio worklet node to this device
         void setAudioWorkletNode(void *node);
+        [[nodiscard]] bool isOpen() const override;
     private:
         void mixCallback();
         struct Impl;

@@ -49,7 +49,7 @@ namespace insound {
 
         /// Whether this device was opened
         [[nodiscard]]
-        bool isOpen() const { return id() != 0; }
+        virtual bool isOpen() const = 0;
 
         /// Device ID, 0 means that the device has not been initialized
         [[nodiscard]]
