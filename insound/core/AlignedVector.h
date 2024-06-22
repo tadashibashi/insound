@@ -1,7 +1,5 @@
 #pragma once
 
-#include "util.h"
-
 #include <cstddef>
 #include <new>
 #include <vector>

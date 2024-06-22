@@ -57,8 +57,6 @@ namespace insound {
             }
 
             auto sndBuffer = &emplacedIt->second;
-            const auto &targetSpec = m_targetSpec;
-            auto &count = m_count;
             auto future = m_threads.push([path, sndBuffer, this](const int id) {
                 if (sndBuffer->load(path, m_targetSpec))
                     m_count.store(m_count.load() + 1);
