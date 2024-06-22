@@ -4,8 +4,6 @@
 #include "CpuIntrinsics.h"
 #include "Engine.h"
 #include "Error.h"
-#include "PerfTimer.h"
-#include "SourceRef.h"
 
 namespace insound {
 #define HANDLE_GUARD() do { if (detail::peekSystemError().code == Result::InvalidHandle) { \
@@ -93,22 +91,6 @@ namespace insound {
 
                 // Remove source from this bus
                 applyRemoveSource(source);
-
-                // // Re-attach source to master bus
-                // if (!m_isMaster)
-                // {
-                //     if (auto subBus = source.getAs<Bus>())
-                //     {
-                //         Handle<Bus> masterBus;
-                //         if (m_engine->getMasterBus(&masterBus))
-                //         {
-                //             masterBus->applyAppendSource(source);
-                //             subBus->m_parent = masterBus;
-                //         }
-                //     }
-                // }
-
-
             } break;
 
             default:
@@ -124,10 +106,12 @@ namespace insound {
         int sourcei = 0;
         for (const int sourcemax = static_cast<int>(m_sources.size()) - 4; sourcei <= sourcemax; sourcei += 4)
         {
-            const auto sourceA = m_sources[sourcei].get();
-            const auto sourceB = m_sources[sourcei + 1].get();
-            const auto sourceC = m_sources[sourcei + 2].get();
-            const auto sourceD = m_sources[sourcei + 3].get();
+            // Read data from sources (unrolled).
+            // note: these should be guaranteed valid because invalidation won't take place until deferred commands
+            const auto &sourceA = m_sources[sourcei].get();
+            const auto &sourceB = m_sources[sourcei + 1].get();
+            const auto &sourceC = m_sources[sourcei + 2].get();
+            const auto &sourceD = m_sources[sourcei + 3].get();
 
             const float *dataA, *dataB, *dataC, *dataD;
             sourceA->read(reinterpret_cast<const uint8_t **>(&dataA), length);
@@ -135,6 +119,7 @@ namespace insound {
             sourceC->read(reinterpret_cast<const uint8_t **>(&dataC), length);
             sourceD->read(reinterpret_cast<const uint8_t **>(&dataD), length);
 
+            // Sum each source together with output
             const auto sampleLength = length / sizeof(float);
             auto head = reinterpret_cast<float *>(output);
             int i = 0;
@@ -244,24 +229,22 @@ namespace insound {
                 vst1q_f32(head + i + 12, vaddq_f32(head3, sample3));
             }
 #endif
-            for (; i <= sampleLength - 4; i += 4)
+            // Catch the leftover samples (should be divisible by 2 because of stereo)
+            for (; i <= sampleLength - 2; i += 2)
             {
                 const auto sample0 = dataA[i] + dataB[i] + dataC[i] + dataD[i];
                 const auto sample1 = dataA[i + 1] + dataB[i + 1] + dataC[i + 1] + dataD[i + 1];
-                const auto sample2 = dataA[i + 2] + dataB[i + 2] + dataC[i + 2] + dataD[i + 2];
-                const auto sample3 = dataA[i + 3] + dataB[i + 3] + dataC[i + 3] + dataD[i + 3];
                 head[i] += sample0;
                 head[i + 1] += sample1;
-                head[i + 2] += sample2;
-                head[i + 3] += sample3;
             }
         }
+        // Catch the leftover sources
         for (const int sourcecount = (int)m_sources.size(); sourcei < sourcecount; ++sourcei)
         {
-            auto source0 = m_sources[sourcei].get();
+            auto source = m_sources[sourcei].get();
 
             const float *data0;
-            auto floatsToRead0 = source0->read((const uint8_t **)&data0, length) / sizeof(float);
+            auto floatsToRead0 = source->read((const uint8_t **)&data0, length) / sizeof(float);
 
             auto head = reinterpret_cast<float *>(output);
             for (int i = 0; i < floatsToRead0; i += 4)
