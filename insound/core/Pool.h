@@ -79,8 +79,6 @@ public:
     /// Returns `nullptr` if id is invalid
     void *get(const PoolID &id)
     {
-        if (!isValid(id))
-            detail::pushSystemError(Result::InvalidHandle);
         return m_memory + id.index * m_elemSize;
     }
 

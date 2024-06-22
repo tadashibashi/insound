@@ -12,9 +12,13 @@ namespace insound {
         [[nodiscard]]
         T *operator ->() const
         {
+            if (!isValid())
+                detail::pushSystemError(Result::InvalidHandle);
             return (T *)m_pool->get(m_id);
         }
 
+        /// Get raw pointer, it's best to check `Handle::isValid()`
+        /// first unless you are sure it's valid.
         [[nodiscard]]
         T *get() const { return (T *)m_pool->get(m_id); }
 
@@ -32,7 +36,8 @@ namespace insound {
         [[nodiscard]]
         bool isValid() const
         {
-            return m_pool && m_pool->isValid(m_id);
+            // checking for `nullptr` covers default-constructed null handles
+            return m_pool != nullptr && m_pool->isValid(m_id);
         }
 
         [[nodiscard]]
@@ -45,15 +50,13 @@ namespace insound {
         explicit operator Handle<U>() const
         {
             auto uptr = dynamic_cast<U *>(get());
-
-
             return uptr ? Handle<U>(m_id, m_pool) : Handle<U>();
         }
 
         template <typename U>
         Handle<U> cast() const
         {
-            return (Handle<U>)(*this);
+            return static_cast<Handle<U>>(*this);
         }
 
         template <typename U>
