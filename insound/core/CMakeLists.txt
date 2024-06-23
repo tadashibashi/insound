@@ -98,6 +98,7 @@ PUBLIC
     io/decodeMp3.h
     io/decodeFLAC.h
     io/decodeGME.h
+    logging.h
     Marker.h
     MultiPool.h
     PCMSource.h
@@ -152,10 +153,9 @@ target_include_directories(insound PUBLIC ${INSOUND_ROOT_DIR})
 
 if ("${CMAKE_BUILD_TYPE}" MATCHES "Deb")
     set(INSOUND_DEBUG TRUE)
-    target_compile_definitions(insound PRIVATE -DINSOUND_DEBUG=1)
+    target_compile_definitions(insound PUBLIC -DINSOUND_DEBUG=1)
 else()
     set(INSOUND_DEBUG FALSE)
-    target_compile_definitions(insound PRIVATE -DINSOUND_DEBUG=0)
 endif()
 
 if (APPLE)
@@ -210,8 +210,8 @@ if (EMSCRIPTEN)
         target_link_options(insound PUBLIC -O0 -g -g3 -gsource-map)
         target_compile_options(insound PUBLIC -O0 -g -g3 -gsource-map)
     else()
-        target_link_options(insound PUBLIC -Ofast -flto)
-        target_compile_options(insound PUBLIC -Ofast -flto)
+        target_link_options(insound PUBLIC -Ofast)
+        target_compile_options(insound PUBLIC -Ofast)
     endif()
 endif()
 

@@ -1,7 +1,6 @@
 #include "DelayEffect.h"
 
 #include "../CpuIntrinsics.h"
-#include "../Engine.h"
 #include "../Error.h"
 
 insound::DelayEffect::DelayEffect() :
@@ -9,7 +8,8 @@ insound::DelayEffect::DelayEffect() :
 {
 }
 
-insound::DelayEffect::DelayEffect(DelayEffect &&other) noexcept : Effect(std::move(other)),
+insound::DelayEffect::DelayEffect(DelayEffect &&other) noexcept :
+    Effect(std::move(other)),
     m_delayTime(other.m_delayTime), m_feedback(other.m_feedback), m_wet(other.m_wet),
     m_delayHead(other.m_delayHead), m_buffer(std::move(other.m_buffer))
 {

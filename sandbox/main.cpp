@@ -11,7 +11,6 @@ struct AppContext {
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
-#include <emscripten/html5.h>
 #include <functional>
 
 std::function<void()> emMainLoopCallback;
@@ -140,11 +139,11 @@ static int mainWithEngine()
         buffers.loadAsync("assets/snare-hat.wav"),
     };
 
-     const SoundBuffer pizz("assets/vln_pizz.ogg", spec);
-     const SoundBuffer orch("assets/orch_scene.mp3", spec);
-     const SoundBuffer arp("assets/arp.flac", spec);
-     const SoundBuffer marimba("assets/marimba.wav", spec);
-     const SoundBuffer bach("assets/test.nsf", spec);
+     const SoundBuffer *pizz = buffers.loadAsync("assets/vln_pizz.ogg");
+     const SoundBuffer *orch = buffers.loadAsync("assets/orch_scene.mp3");
+     const SoundBuffer *arp = buffers.loadAsync("assets/arp.flac");
+     const SoundBuffer *marimba = buffers.loadAsync("assets/marimba.wav");
+     const SoundBuffer *bach = buffers.loadAsync("assets/test.nsf");
 
     Handle<PCMSource> sources[4];
     bool sourcesWereLoaded = false;
@@ -254,7 +253,7 @@ static int mainWithEngine()
                         case SDL_SCANCODE_O: { // play one shot
 
                             Handle<PCMSource> marimbaSource;
-                            engine.playSound(&marimba, true, false, true, &marimbaSource);
+                            engine.playSound(marimba, true, false, true, &marimbaSource);
 
                             if (marimbaSource.isValid())
                             {
@@ -266,22 +265,22 @@ static int mainWithEngine()
 
                         case SDL_SCANCODE_I:
                         {
-                            engine.playSound(&pizz, false, false, true, nullptr);
+                            engine.playSound(pizz, false, false, true, nullptr);
                         } break;
 
                         case SDL_SCANCODE_J:
                         {
-                            engine.playSound(&arp, false, false, true, nullptr);
+                            engine.playSound(arp, false, false, true, nullptr);
                         } break;
 
                         case SDL_SCANCODE_K:
                         {
-                            engine.playSound(&orch, false, false, true, nullptr);
+                            engine.playSound(orch, false, false, true, nullptr);
                         } break;
 
                         case SDL_SCANCODE_B:
                         {
-                            engine.playSound(&bach, false, false, true, nullptr);
+                            engine.playSound(bach, false, false, true, nullptr);
                         } break;
 
                         case SDL_SCANCODE_Z: // Set myBus left pan =>
@@ -399,11 +398,11 @@ static int mainWithEngine()
                 sources[1]->setPaused(false);
                 sources[2]->setPaused(false);
                 sources[3]->setPaused(false);
-                printf("Sounds loaded!\n");
+                INSOUND_LOG("Sounds loaded!\n");
             }
             else
             {
-                printf("Not loaded yet!\n");
+                INSOUND_LOG("Not loaded yet!\n");
             }
         }
 

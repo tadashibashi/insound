@@ -1,11 +1,7 @@
 #pragma once
-#include "SourceRefFwd.h"
 #include "Source.h"
 
 #include <vector>
-
-#include "Pool.h"
-#include "MultiPool.h"
 
 namespace insound {
     struct BusCommand;
@@ -13,7 +9,6 @@ namespace insound {
     /// An audio bus that contains a list of audio sources and sums them into one output stream
     class Bus : public Source {
     public:
-        /// @note do not lock the mix thread before calling this, since this constructor defers a command which locks mix thread
         explicit Bus();
         Bus(Bus &&other) noexcept;
         ~Bus() override = default;

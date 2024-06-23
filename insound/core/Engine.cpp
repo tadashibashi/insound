@@ -1,7 +1,5 @@
 #include "Engine.h"
 
-#include <iostream>
-
 #include "AlignedVector.h"
 #include "AudioDevice.h"
 #include "AudioSpec.h"
@@ -47,7 +45,7 @@ namespace insound {
 
         bool open(const int frequency = 0, const int samples = 1024)
         {
-            if (!m_device->open(frequency, samples, Impl::audioCallback, this))
+            if (!m_device->open(frequency, samples, &Impl::audioCallback, this))
             {
                 return false;
             }
@@ -289,7 +287,6 @@ namespace insound {
                 auto deferredCommandGuard = std::lock_guard(m_deferredCommandMutex);
                 processCommands(this, m_deferredCommands);
             }
-
 
             if (m_discardFlag)
             {
