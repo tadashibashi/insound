@@ -35,6 +35,10 @@ PoolBase::PoolBase(PoolBase &&other) noexcept : m_memory(other.m_memory), m_meta
 
 PoolBase &PoolBase::operator=(PoolBase &&other) noexcept
 {
+    // clean up existing memory
+    std::free(m_memory);
+    std::free(m_meta);
+
     m_memory = other.m_memory;
     m_meta = other.m_meta;
     m_size = other.m_size;
@@ -73,7 +77,10 @@ PoolID PoolBase::allocate()
 
 void PoolBase::reserve(size_t size)
 {
+    const auto lastSize = m_size;
     expand(size);
+    if (m_nextFree == SIZE_MAX)
+        m_nextFree = lastSize;
 }
 
 void PoolBase::deallocate(const PoolID &id)
@@ -113,57 +120,6 @@ void PoolBase::clear()
     m_meta[size - 1].nextFree = SIZE_MAX;
     m_nextFree = 0;
 }
-
-// bool PoolBase::shrink(size_t newSize, std::unordered_map<size_t, size_t> *outIndices)
-// {
-//     if (newSize >= m_size) // no need to shrink if bigger
-//         return false;
-//
-//     if (newSize < m_aliveCount) // new size must be greater to or equal to the number of alive entities
-//         newSize = m_aliveCount;
-//
-//     // allocate new memory
-//     auto newMemory = (char *)std::aligned_alloc(m_alignment, m_elemSize * newSize);
-//
-//     constexpr auto metaSize = (sizeof(Meta) + alignof(Meta) - 1) & ~(alignof(Meta) - 1);
-//     auto newMeta = (Meta *)std::aligned_alloc(alignof(Meta), metaSize * newSize);
-//
-//     // defragment/copy into new memory
-//     size_t metaCount = 0;
-//     for (size_t i = 0; i < m_size; ++i)
-//     {
-//         auto &oldMeta = m_meta[i];
-//         if (oldMeta.id.id != SIZE_MAX) // valid id
-//         {
-//             new (newMeta + metaCount) Meta(PoolID(metaCount, oldMeta.id.id), metaCount + 1);
-//             new (newMemory + m_elemSize * metaCount), m_memory + m_elemSize * oldMeta.id.index);
-//             ++metaCount;
-//         }
-//     }
-//     newMeta[metaCount-1].nextFree = SIZE_MAX;
-//
-//     assert(metaCount == m_aliveCount);
-//
-//     if (outIndices)
-//     {
-//         std::unordered_map<size_t, size_t> indices;
-//         for (size_t i = 0; i < metaCount; ++i)
-//         {
-//             const auto &meta = newMeta[i];
-//             indices.emplace(meta.id.id, meta.id.index);
-//         }
-//
-//         outIndices->swap(indices);
-//     }
-//
-//     // done, commit changes
-//     std::free(m_memory);
-//     std::free(m_meta);
-//     m_memory = newMemory;
-//     m_meta = newMeta;
-//     m_size = newSize;
-//     return true;
-// }
 
 bool PoolBase::isFull() const { return m_nextFree == SIZE_MAX; }
 

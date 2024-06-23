@@ -35,27 +35,23 @@ struct PoolID {
     };
 };
 
-/// Stores fixed blocks of memory.
-/// Number of slots expands when it reaches full capacity.
-/// Intended as an array for any single type of data.
-
+/// Abstract class.
+/// Stores fixed blocks of memory, expanding when full capacity is reached.
+/// This class is intended to be a generic base to group pools under.
+/// @note Use Pool<T> for type-safe pools.
 class PoolBase {
 public:
-
-    struct Meta {
-        Meta(const PoolID id, const size_t nextFree) : id(id), nextFree(nextFree) { }
-        PoolID id;
-        size_t nextFree;
-    };
-
     /// @param elemSize size of one slot in bytes
     explicit PoolBase(size_t elemSize);
+    virtual ~PoolBase();
+
+    // Non-copyable
     PoolBase(const PoolBase &) = delete;
     PoolBase &operator=(const PoolBase &) = delete;
+
+    // Movable
     PoolBase(PoolBase &&other) noexcept;
     PoolBase &operator=(PoolBase &&other) noexcept;
-
-    virtual ~PoolBase();
 
     /// Get a slot of pool data. Pool may expand if it is full.
     PoolID allocate();
@@ -112,8 +108,14 @@ public:
     // bool shrink(size_t newSize, std::unordered_map<size_t, size_t> *outIndices = nullptr);
 
 protected:
-    [[nodiscard]]
-    bool isFull() const;
+    struct Meta {
+        Meta(const PoolID id, const size_t nextFree) : id(id), nextFree(nextFree) { }
+        PoolID id;
+        size_t nextFree;
+    };
+
+    /// Check if pool is currently filled to maximum capacity
+    [[nodiscard]] bool isFull() const;
 
     virtual void expand(size_t newSize) = 0;
 
@@ -129,13 +131,27 @@ protected:
 template <typename T>
 class Pool final : public PoolBase {
 public:
-    explicit Pool() : PoolBase(sizeof(T)) { }
+    Pool() : PoolBase(sizeof(T)) { }
+    explicit Pool(size_t initSize) : PoolBase(sizeof(T))
+    {
+        reserve(initSize);
+    }
+
+    Pool(Pool &&other) : PoolBase(std::move(other)) { }
+    Pool &operator=(Pool &&other)
+    {
+        if (this != &other)
+        {
+            cleanup(); // destruct all pool elements before freeing
+            PoolBase::operator=(std::move(other));
+        }
+
+        return this;
+    }
+
     ~Pool() override
     {
-        for (auto ptr = (T *)m_memory, end = (T *)m_memory + m_size; ptr != end; ++ptr)
-        {
-            ptr->~T();
-        }
+        cleanup();
     }
 
     void expand(size_t newSize) override
@@ -178,6 +194,15 @@ public:
 
         m_meta[newSize - 1].nextFree = SIZE_MAX;
         m_size = newSize;
+    }
+
+private:
+    void cleanup()
+    {
+        for (auto ptr = (T *)m_memory, end = (T *)m_memory + m_size; ptr != end; ++ptr)
+        {
+            ptr->~T();
+        }
     }
 };
 
