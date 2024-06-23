@@ -1,4 +1,5 @@
 #include "PerfTimer.h"
+#include "logging.h"
 
 #include <chrono>
 #include <cstdio>
@@ -23,7 +24,11 @@ unsigned long long insound::PerfTimer::stop(const bool log)
 
     if (log)
     {
-        std::printf("Time in ns: %llu\n", ns);
+#ifdef __EMSCRIPTEN__ // Web environment only supports accuracy in milliseconds
+        INSOUND_LOG("Time in ms: %llu\n", static_cast<uint64_t>(ns * 0.000001));
+#else
+        INSOUND_LOG("Time in ns: %llu\n", ns);
+#endif
     }
 
     return ns;
