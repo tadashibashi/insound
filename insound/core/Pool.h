@@ -169,7 +169,7 @@ public:
         }
 
         // TODO: unroll these loops?
-        // Initialize new meta objects
+        // Initialize objects in new indices
         for (size_t i = lastSize; i < newSize; ++i)
         {
             new (m_meta + i) Meta(PoolID(i, SIZE_MAX), i+1);
