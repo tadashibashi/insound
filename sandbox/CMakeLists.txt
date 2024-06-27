@@ -1,27 +1,8 @@
+add_subdirectory(common)
 
-if (WIN32)
-    set(EXE_TYPE WIN32)
-else() 
-    set(EXE_TYPE)
-endif()
-add_executable(insound_sandbox ${EXE_TYPE} main.cpp)
-
-target_link_libraries(insound_sandbox PRIVATE insound SDL2::SDL2 SDL2::SDL2main)
-
-if (EMSCRIPTEN)
-    target_link_options(insound_sandbox PRIVATE
-        --preload-file ${CMAKE_CURRENT_SOURCE_DIR}/assets@assets
-    )
-    set_target_properties(insound_sandbox PROPERTIES
-        SUFFIX .html
-    )
-else()
-    if (NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/assets)
-        execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink
-            ${CMAKE_CURRENT_SOURCE_DIR}/assets ${CMAKE_CURRENT_BINARY_DIR}/assets)
-
-    endif()
+set (TARGET_ASSETS_FOLDER ${CMAKE_CURRENT_SOURCE_DIR}/android/app/src/main/assets/assets)
+if (NOT EXISTS ${TARGET_ASSETS_FOLDER})
+    execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets ${TARGET_ASSETS_FOLDER})
 endif()
 
-include(add_devserver_target)
-add_devserver_target(insound_sandbox)

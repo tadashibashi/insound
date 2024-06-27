@@ -1,13 +1,9 @@
+#include "common.h"
 
 #include <insound/core.h>
+using namespace insound;
 
 #include <SDL2/SDL.h>
-
-struct AppContext {
-    insound::Engine *audio;
-    SDL_Window *window;
-    SDL_Renderer *renderer;
-};
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
@@ -18,29 +14,48 @@ void emMainLoop()
 {
     emMainLoopCallback();
 }
+
 #endif
 
-using namespace insound;
-
-static int mainNoEngine()
+const std::string &getRootDir()
 {
-    if (SDL_Init(SDL_INIT_VIDEO) != 0)
+    static std::string rootDir;
+    if (rootDir.empty())
     {
-        printf("Failed to init SDL2 %s\n", SDL_GetError());
+#ifdef __ANDROID__
+        return "";
+#else
+        auto path = SDL_GetBasePath();
+        if (path)
+        {
+            rootDir.assign(path);
+            SDL_free(path);
+        }
+#endif
+    }
+
+    return rootDir;
+}
+
+int mainNoEngine()
+{
+    if (SDL_Init(SDL_INIT_EVENTS) != 0)
+    {
+        printf("Failed to init SDL2: %s\n", SDL_GetError());
         return -1;
     }
 
-    AppContext app{};
-
-    const auto window = SDL_CreateWindow("Mixer test", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-        400, 400, 0);
+    const auto window = SDL_CreateWindow("Mixer test", SDL_WINDOWPOS_UNDEFINED,
+                                         SDL_WINDOWPOS_UNDEFINED,
+                                         400, 400, 0);
     if (!window)
     {
         printf("SDL window failed to create: %s\n", SDL_GetError());
         return -1;
     }
 
-    const auto renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    const auto renderer = SDL_CreateRenderer(window, -1,
+        SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (!renderer)
     {
         printf("SDL renderer failed to create: %s\n", SDL_GetError());
@@ -85,30 +100,30 @@ static int mainNoEngine()
     return 0;
 }
 
-static int mainWithEngine()
+int mainWithEngine()
 {
-    if (SDL_Init(SDL_INIT_VIDEO) != 0)
+    if (SDL_Init(SDL_INIT_EVENTS | SDL_INIT_VIDEO) != 0)
     {
         printf("Failed to init SDL2 %s\n", SDL_GetError());
         return -1;
     }
 
-    AppContext app{};
+     const auto window = SDL_CreateWindow("Mixer test", SDL_WINDOWPOS_UNDEFINED,
+                                          SDL_WINDOWPOS_UNDEFINED,
+                                          400, 400, 0);
+     if (!window)
+     {
+         printf("SDL window failed to create: %s\n", SDL_GetError());
+         return -1;
+     }
 
-    const auto window = SDL_CreateWindow("Mixer test", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-        400, 400, 0);
-    if (!window)
-    {
-        printf("SDL window failed to create: %s\n", SDL_GetError());
-        return -1;
-    }
-
-    const auto renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-    if (!renderer)
-    {
-        printf("SDL renderer failed to create: %s\n", SDL_GetError());
-        return -1;
-    }
+     const auto renderer = SDL_CreateRenderer(window, -1,
+         SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+     if (!renderer)
+     {
+         printf("SDL renderer failed to create: %s\n", SDL_GetError());
+         return -1;
+     }
     SDL_SetRenderDrawColor(renderer, 128, 128, 255, 255);
 
     Engine engine;
@@ -120,10 +135,6 @@ static int mainWithEngine()
         return -1;
     }
 
-    app.audio = &engine;
-    app.window = window;
-    app.renderer = renderer;
-
     AudioSpec spec;
     engine.getSpec(&spec);
 
@@ -131,6 +142,7 @@ static int mainWithEngine()
     engine.createBus(false, &myBus);
 
     AudioLoader buffers(&engine);
+    buffers.setBaseDir(getRootDir());
 
     const SoundBuffer *sounds[4] = {
         buffers.loadAsync("assets/bassdrum.wav"),
@@ -322,6 +334,11 @@ static int mainWithEngine()
                             }
                         } break;
 
+                        case SDL_SCANCODE_N:
+                        {
+                            engine.playStream("assets/test.nsf", false, true, true, {}, nullptr);
+                        } break;
+
                         // Reset the sound sources
                         case SDL_SCANCODE_R:
                         {
@@ -361,6 +378,13 @@ static int mainWithEngine()
                             masterBus->fadeTo(masterBusFade, spec.freq * .5);
                         } break;
 
+                        case SDL_SCANCODE_M:
+                        {
+                            bool suspended;
+                            engine.getPaused(&suspended);
+                            engine.setPaused(!suspended);
+                        } break;
+
                         default:
                             break;
                     }
@@ -398,11 +422,11 @@ static int mainWithEngine()
                 sources[1]->setPaused(false);
                 sources[2]->setPaused(false);
                 sources[3]->setPaused(false);
-                INSOUND_LOG("Sounds loaded!\n");
+                SDL_Log("Sounds loaded!\n");
             }
             else
             {
-                INSOUND_LOG("Not loaded yet!\n");
+                SDL_Log("Not loaded yet!\n");
             }
         }
 
@@ -411,6 +435,7 @@ static int mainWithEngine()
         SDL_SetRenderDrawColor(renderer, 128, 128, 255, 255);
         SDL_RenderClear(renderer);
         SDL_RenderPresent(renderer);
+        std::this_thread::sleep_for(std::chrono::nanoseconds(16666667));
     }
 #ifdef __EMSCRIPTEN__
     };
@@ -423,9 +448,4 @@ static int mainWithEngine()
     SDL_DestroyWindow(window);
     SDL_Quit();
     return 0;
-}
-
-int main(int argc, char *argv[])
-{
-    return mainWithEngine();
 }
