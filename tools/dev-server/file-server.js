@@ -35,7 +35,7 @@ function open(hostname, port, root, mainFile, initCallback = ()=>{})
         let pathname = url.pathname;
         switch(pathname)
         {
-            case "/client.js":
+            case "/client.js": // special case, serve the client file from this directory
                 pathname = path.join(__dirname, "client.js");
                 break;
             case "/":
@@ -62,6 +62,7 @@ function open(hostname, port, root, mainFile, initCallback = ()=>{})
                 res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
                 res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
                 res.setHeader("Content-Type", util.getMimeType(pathname));
+                res.setHeader("Content-Length", data.length);
                 res.statusCode = 200;
                 res.end(data);
             }
