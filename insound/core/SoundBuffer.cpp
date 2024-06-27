@@ -17,7 +17,7 @@ namespace insound {
         load(filepath, targetSpec);
     }
 
-    SoundBuffer::SoundBuffer(uint8_t *buffer, size_t bufferSize, const AudioSpec &spec, std::vector<Marker> &&markers) :
+    SoundBuffer::SoundBuffer(uint8_t *buffer, uint32_t bufferSize, const AudioSpec &spec, std::vector<Marker> &&markers) :
         m_bufferSize(bufferSize), m_buffer(buffer), m_spec(spec), m_markers()
     {
         m_markers.swap(markers);

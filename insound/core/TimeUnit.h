@@ -10,7 +10,7 @@ namespace insound {
     enum class TimeUnit {
         Micros,    ///< Microseconds: milliseconds / 1000
         Millis,    ///< Milliseconds: seconds / 1000
-        PCM,       ///< PCM samples:  samplerate * seconds
+        PCM,       ///< PCM sample frames:  samplerate * seconds
         PCMBytes,  ///< PCM bytes:    frames * channels * data width (32-bit => 4 bytes)
     };
 

@@ -123,7 +123,7 @@ namespace insound {
             sourceD->read(reinterpret_cast<const uint8_t **>(&dataD), length);
 
             // Sum each source together with output
-            const auto sampleLength = length / sizeof(float);
+            const auto sampleLength =static_cast<int>(length / sizeof(float));
             auto head = reinterpret_cast<float *>(output);
             int i = 0;
 #if INSOUND_SSE
@@ -197,7 +197,7 @@ namespace insound {
                 wasm_v128_store(head + i + 12, wasm_f32x4_add(head3, sample3));
             }
 #elif INSOUND_ARM_NEON
-            for (; i <= sampleLength - 16; i += 16)
+            for (; i <= (int)sampleLength - 16; i += 16)
             {
                 const auto a0 = vld1q_f32(dataA + i);
                 const auto a1 = vld1q_f32(dataA + i + 4);

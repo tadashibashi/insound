@@ -1,9 +1,14 @@
 #include "openFile.h"
 #include "../Error.h"
+#include "Rstream.h"
 
 #include <cstring>
 #include <fstream>
 #include <iostream>
+
+#include <SDL2/SDL_rwops.h>
+
+using namespace insound;
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/fetch.h>
@@ -55,20 +60,8 @@ static bool openFileURLSync(const fs::path &url, std::string *outData)
 
 #endif
 
-bool insound::openFile(const fs::path &path, std::string *outData)
+static bool openFileFstream(const fs::path &path, std::string *outData)
 {
-#ifdef __EMSCRIPTEN__
-    if (!emscripten_is_main_browser_thread())
-    {
-        const std::string_view pathView(path.native());
-        if (pathView.size() > 4 && pathView.substr(0, 4) == "http")
-        {
-            return openFileURLSync(path, outData);
-        }
-    }
-#else
-    // todo: curl implementation
-#endif
     // Open the file
     std::ifstream file(path, std::ios::in | std::ios::binary);
     if (!file.is_open())
@@ -114,6 +107,62 @@ bool insound::openFile(const fs::path &path, std::string *outData)
     }
 
     // Return the out value
+    if (outData)
+    {
+        outData->swap(data);
+    }
+
+    return true;
+}
+
+static constexpr int CHUNK_SIZE = 1024;
+
+bool insound::openFile(const fs::path &path, std::string *outData)
+{
+#ifdef __EMSCRIPTEN__
+    if (!emscripten_is_main_browser_thread())
+    {
+        const std::string_view pathView(path.native());
+        if (pathView.size() > 4 && pathView.substr(0, 4) == "http")
+        {
+            return openFileURLSync(path, outData);
+        }
+    }
+#else
+    // todo: curl implementation
+#endif
+
+    Rstream file;
+    if (!file.open(path))
+    {
+        return false;
+    }
+
+    const auto dataSize = file.size();
+
+    std::string data;
+    data.resize(dataSize, 0);
+
+    int64_t i = 0;
+    for (; i <= dataSize - CHUNK_SIZE; i += CHUNK_SIZE) // read file in chunks
+    {
+        if (file.read((uint8_t *)data.data() + i, CHUNK_SIZE) <= 0)
+        {
+            // failure during read
+            return false;
+        }
+    }
+
+    // Get leftovers
+    if (i < dataSize)
+    {
+        if (file.read((uint8_t *)data.data() + i, dataSize - i) <= 0)
+        {
+            // failure during read
+            return false;
+        }
+    }
+
     if (outData)
     {
         outData->swap(data);

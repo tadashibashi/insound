@@ -53,7 +53,7 @@ namespace insound {
         /// @returns number of bytes read; if > 0, `outVal` will contain the read data;
         ///          if 0, `outVal` will be unmodified. Check sdgl::getError on 0 for more details.
         template <typename T>
-        uint32_t read(T &outVal)
+        size_t read(T &outVal)
         {
             return readRaw(&outVal, sizeof(T));
         }
@@ -77,7 +77,7 @@ namespace insound {
         ///          if > 0 `outString` will contain data, otherwise `outString` will remain unmodified.
         ///          Check sdgl::getError() for more information when 0 is returned.
         ///          Note: this number may differ from string length + 1 if `maxSize` clipped the out value.
-        uint32_t read(std::string &outString, size_t maxSize = SIZE_MAX);
+        size_t read(std::string &outString, size_t maxSize = SIZE_MAX);
 
         /// Read a string with an expected length
         /// @param outString [out] string to receive the data
@@ -85,7 +85,7 @@ namespace insound {
         /// @returns the number of bytes read (including null terminator) -
         ///          if > 0 `outString` will contain data, otherwise `outString` will remain unmodified.
         ///          Check sdgl::getError() for more information when 0 is returned.
-        uint32_t readFixedString(std::string &outString, size_t length);
+        size_t readFixedString(std::string &outString, size_t length);
 
         /// Read a null-terminated string from the buffer
         /// @param outBuffer [out] pointer to a string buffer to receive the data
@@ -97,7 +97,7 @@ namespace insound {
         ///          if > 0 `outBuffer` will contain data, otherwise `outBuffer` will remain unmodified.
         ///          Check sdgl::getError for more info when 0 is returned.
         ///          Note: this number may differ from string length + 1 if `maxSize` clipped the out value.
-        uint32_t read(char *outBuffer, size_t maxSize);
+        size_t read(char *outBuffer, size_t maxSize);
 
 
         /// Peek relative to the current location. In debug mode, an assertion is made to check bounds.
@@ -138,7 +138,7 @@ namespace insound {
             m_pos = offset;
         }
 
-        uint32_t readRaw(void *buffer, size_t size);
+        size_t readRaw(void *buffer, size_t size);
     protected:
         uint8_t *m_buf;
         size_t m_pos;
@@ -153,22 +153,22 @@ namespace insound {
             BufferView(buffer.data(), buffer.size(), endianness) { }
 
         template <typename T>
-        uint32_t write(T value)
+        size_t write(T value)
         {
             return writeImpl(&value, sizeof(T));
         }
         /// Write null-terminated string into the buffer
         /// @note make sure there is enough space in the buffer for a null-terminator
         /// @returns the number of bytes written, this includes the string's null terminator
-        uint32_t write(const std::string &str);
+        size_t write(const std::string &str);
 
         /// Write string into the buffer
         /// @note make sure there is enough space for a null-terminator
         /// @returns the number of bytes read (including null terminator)
-        uint32_t write(std::string_view str);
+        size_t write(std::string_view str);
 
-        uint32_t write(const char *str, size_t length);
+        size_t write(const char *str, size_t length);
     private:
-        uint32_t writeImpl(const void *data, size_t size);
+        size_t writeImpl(const void *data, size_t size);
     };
 }

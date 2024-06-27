@@ -1,8 +1,12 @@
 #include "decodeGME.h"
 
-#include "../Error.h"
+#include <iostream>
 
 #ifdef INSOUND_DECODE_GME
+#include "../Error.h"
+#include "Rstream.h"
+#include "Rstreamable.h"
+
 #include <gme/gme.h>
 
 #include <climits>
@@ -114,3 +118,212 @@ bool insound::decodeGME(const uint8_t *memory, uint32_t size, int samplerate, in
     return false;
 }
 #endif
+
+namespace insound {
+#ifdef INSOUND_DEBUG
+#define INIT_GUARD() do { if (!isOpen()) { \
+    pushError(Result::LogicErr, "GmeDecoder::Impl::emu was not init"); \
+    return false; \
+} } while(0)
+#define GME_ERR_CHECK(statement) do { if (const auto result = (statement); result != nullptr) { \
+        pushError(Result::GmeErr, result); \
+        return false; \
+    } } while(0)
+#else
+#define INIT_GUARD()
+#define GME_ERR_CHECK(statement) (statement)
+#endif
+
+    static gme_err_t gme_read_rstream(void *userdata, void *out, const int count)
+    {
+        auto stream = static_cast<Rstreamable *>(userdata);
+        if (const auto bytesRead = stream->read(static_cast<uint8_t *>(out), count);
+            bytesRead < 0)
+        {
+            return "Rstream failed during read of GME file";
+        }
+
+        return nullptr;
+    }
+
+    struct GmeDecoder::Impl {
+        Music_Emu *emu{};
+        Rstream stream;
+        int trackNumber;
+    };
+
+    GmeDecoder::GmeDecoder(GmeDecoder &&other) noexcept :
+        AudioDecoder(std::move(other)), m(other.m)
+    {
+        other.m = nullptr;
+    }
+
+    GmeDecoder::GmeDecoder(const int samplerate) : m(new Impl)
+    {
+        m_spec.freq = samplerate;
+    }
+
+    GmeDecoder::~GmeDecoder()
+    {
+        if (m && m->emu)
+            gme_delete(m->emu);
+
+        delete m;
+    }
+
+    int GmeDecoder::read(const int sampleFrames, uint8_t *data)
+    {
+        const auto lastSamples = gme_tell_samples(m->emu);
+
+        if (const auto result = gme_play(m->emu, sampleFrames * 2, (short *)data);
+            result != nullptr)
+        {
+            pushError(Result::GmeErr, result); // todo: this could lead to a stack overflow
+            return 0;
+        }
+
+        return (gme_tell_samples(m->emu) - lastSamples) / 2;
+    }
+
+    bool GmeDecoder::getTrackCount(int *outTrackCount) const
+    {
+        INIT_GUARD();
+
+        if (outTrackCount)
+            *outTrackCount = gme_track_count(m->emu);
+        return true;
+    }
+
+    bool GmeDecoder::isOpen() const
+    {
+        return m != nullptr && m->emu != nullptr;
+    }
+
+    bool GmeDecoder::setTrack(int track)
+    {
+        INIT_GUARD();
+
+        GME_ERR_CHECK(gme_start_track(m->emu, track));
+        m->trackNumber = track;
+        return true;
+    }
+
+    bool GmeDecoder::getTrack(int *outTrack) const
+    {
+        INIT_GUARD();
+
+        if (outTrack)
+            *outTrack = m->trackNumber;
+        return true;
+    }
+
+    bool GmeDecoder::setPosition(TimeUnit units, uint64_t position)
+    {
+        INIT_GUARD();
+
+        const auto samples = std::round(
+            convert(position, units, TimeUnit::PCM, m_spec) * 2.0);
+
+        GME_ERR_CHECK(gme_seek_samples(m->emu, static_cast<int>(samples)));
+        return true;
+    }
+
+    bool GmeDecoder::getPosition(TimeUnit units, double *outPosition) const
+    {
+        INIT_GUARD();
+
+        const auto samples = gme_tell_samples(m->emu);
+
+        if (outPosition)
+            *outPosition = convert(samples / 2, TimeUnit::PCM, units, m_spec);
+        return true;
+    }
+
+    void GmeDecoder::close() {
+        if (m->emu)
+        {
+            gme_delete(m->emu);
+            m->emu = nullptr;
+        }
+        m->stream.close();
+    }
+
+    bool GmeDecoder::open(const fs::path &path) {
+        if (!m->stream.open(path))
+        {
+            return false;
+        }
+
+        // Find the GME file type
+        gme_type_t fileType = gme_identify_extension(path.c_str());
+        if (!fileType)
+        {
+            char header[4];
+            if (m->stream.read(reinterpret_cast<uint8_t *>(header), sizeof(header)) < sizeof(header))
+            {
+                pushError(Result::UnexpectedData, "Failed to read file header, not a valid GME file");
+                m->stream.close();
+                return false;
+            }
+            if (!m->stream.seek(0))
+            {
+                pushError(Result::RuntimeErr, "Failed to seek back to stream start of GME file");
+                m->stream.close();
+                return false;
+            }
+
+            fileType = gme_identify_extension(gme_identify_header(header));
+            if (!fileType)
+            {
+                pushError(Result::GmeErr, gme_wrong_file_type);
+                return false;
+            }
+        }
+
+        // Create the emulator
+        const auto emu = gme_new_emu(fileType, m_spec.freq);
+        if (!emu)
+        {
+            pushError(Result::GmeErr, "gme_new_emu_multi_channel failed");
+            m->stream.close();
+            return false;
+        }
+
+        // Load the stream
+        if (const auto result = gme_load_custom(emu, &gme_read_rstream, m->stream.size(), m->stream.stream());
+            result != nullptr)
+        {
+            pushError(Result::GmeErr, result);
+            m->stream.close();
+            gme_delete(emu);
+            return false;
+        }
+        // Music_Emu *emu;
+        // if (const auto result = gme_open_file(path.c_str(), &emu, m_spec.freq); result != nullptr)
+        // {
+        //     pushError(Result::GmeErr, result);
+        //     return false;
+        // }
+
+        if (const auto result = gme_start_track(emu, 0); result != nullptr)
+        {
+            pushError(Result::GmeErr, result);
+            gme_delete(emu);
+            return false;
+        }
+
+        // Clean up any pre-existing emulator
+        if (m->emu != nullptr)
+        {
+            gme_delete(m->emu);
+        }
+
+        m_spec.channels = 2;
+        m_spec.format = SampleFormat(sizeof(short) * CHAR_BIT, false, false, true);
+        m->emu = emu;
+        m->trackNumber = 0;
+        return true;
+    }
+
+}
+

@@ -38,6 +38,10 @@ namespace insound {
 
         [[nodiscard]]
         bool empty() const;
+
+        [[nodiscard]]
+        const fs::path &baseDir() const;
+        void setBaseDir(const fs::path &path);
     private:
         struct Impl;
         Impl *m;

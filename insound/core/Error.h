@@ -13,6 +13,7 @@ namespace insound {
             InvalidArg,    ///< Invalid argument passed to a function.
             InvalidHandle, ///< Attempted to use invalid handle.
             EngineNotInit, ///< Engine was not initialized when depended on.
+            DecoderNotInit,///< AudioDecoder was not opened when attempted to use it.
             NotSupported,  ///< Feature is not supported.
             FileOpenErr,   ///< Error when attempting to open a file
             InvalidSoundBuffer, ///< SoundBuffer provided was null, or not loaded

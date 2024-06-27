@@ -3,6 +3,8 @@
 #include <stack>
 #include <utility>
 
+#include <SDL2/SDL.h> // for SDL_Log TODO: remove this dependency? Android won't log from printf...
+
 namespace insound {
     /// Each thread has its own error stack to prevent data races
     thread_local static std::stack<Result> s_errors;    // client error stack
@@ -20,6 +22,7 @@ namespace insound {
         "Invalid Argument",
         "Invalid Handle",
         "Engine uninitialized",
+        "AudioDecoder unitialized",
         "Feature unsupported",
         "File failed to open",
         "SoundBuffer was null or not loaded",
@@ -43,12 +46,12 @@ namespace insound {
 
         if (message)
         {
-            fprintf(stderr, "INSOUND ERROR: %s: %s\n", s_codeNames[code],
+            SDL_LogError(SDL_LOG_PRIORITY_ERROR, "INSOUND ERROR: %s: %s\n", s_codeNames[code],
                 s_errors.emplace(code, message).message);
         }
         else
         {
-            fprintf(stderr, "INSOUND ERROR: %s\n", s_codeNames[code]);
+            SDL_LogError(SDL_LOG_PRIORITY_ERROR, "INSOUND ERROR: %s\n", s_codeNames[code]);
             s_errors.emplace(code, "");
         }
 #else

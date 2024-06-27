@@ -180,49 +180,25 @@ namespace insound {
                 alignas(16) float ts[UnrolledSize * 2];
 
                 // Whether this iteration contains the last frame of the buffer (when `i == UnrolledSize - 1`)
-                const bool touchesLastFrame = (i + UnrolledSize == framesToRead && (int)m_position + framesToRead + 1 >= frameSize);
+                const bool touchesLastFrame = (i + UnrolledSize == framesToRead || (int)m_position + framesToRead + 1 >= frameSize);
 
                 if (m_isLooping) // (accounts for wrapping around buffer)
                 {
-                    if (touchesLastFrame)
+                    float curFrame = fmodf((m_position + ((float)(i) * speed)), (float)frameSize);
+                    for (int j = 0; j < UnrolledSize; ++j)
                     {
-                        // note: `std::` is omitted from math functions ending with `f` because they don't exist in the
-                        //       std namespace in GCC
-                        float curFrame = fmodf((m_position + ((float)(i) * speed)), (float)frameSize);
-                        for (int j = 0; j < UnrolledSize; ++j)
-                        {
-                            const auto baseSample = (int)curFrame * 2;
-                            const auto j2 = j * 2;
-                            vals[j2] = buffer[baseSample];
-                            vals[j2+1] = buffer[baseSample + 1];
-                            nextVals[j2] = buffer[baseSample + 2 % sampleSize];
-                            nextVals[j2+1] = buffer[baseSample + 3 % sampleSize];
-                            ts[j2] = curFrame - floorf(curFrame);
-                            ts[j2 + 1] = ts[j2];
+                        const auto baseSample = (int)curFrame * 2 % sampleSize;
+                        const auto j2 = j * 2;
+                        vals[j2] = buffer[baseSample];
+                        vals[j2+1] = buffer[baseSample + 1];
+                        nextVals[j2] = buffer[(baseSample + 2) % sampleSize];
+                        nextVals[j2+1] = buffer[(baseSample + 3) % sampleSize];
+                        ts[j2] = curFrame - floorf(curFrame);
+                        ts[j2 + 1] = ts[j2];
 
-                            curFrame += speed;
-                            if (curFrame > (float)frameSize)
-                                curFrame = fmodf(curFrame, (float)frameSize);
-                        }
-                    }
-                    else // this frame does not touch the last sample in the buffer
-                    {
-                        float curFrame = fmodf(m_position + ((float)(i) * speed), (float)frameSize);
-                        for (int j = 0; j < UnrolledSize; ++j)
-                        {
-                            const auto baseSample = (int)curFrame * 2;
-                            const auto j2 = j * 2;
-                            vals[j2] = buffer[baseSample];
-                            vals[j2+1] = buffer[baseSample + 1];
-                            nextVals[j2] = buffer[baseSample + 2];
-                            nextVals[j2+1] = buffer[baseSample + 3];
-                            ts[j2] = curFrame - floorf(curFrame);
-                            ts[j2 + 1] = ts[j2];
-
-                            curFrame += speed;
-                            if (curFrame > (float)frameSize)
-                                curFrame = fmodf(curFrame, (float)frameSize);
-                        }
+                        curFrame += speed;
+                        if (curFrame > (float)frameSize)
+                            curFrame = fmodf(curFrame, (float)frameSize);
                     }
                 }
                 else // non-looping (less need for bounds checks and modulo operations)

@@ -9,7 +9,7 @@ namespace insound {
             m_buf((uint8_t *)buffer), m_pos(0), m_size(std::strlen(buffer)), m_endian(endianness)
         {}
 
-    uint32_t BufferView::read(std::string &outString, const size_t maxSize)
+    size_t BufferView::read(std::string &outString, const size_t maxSize)
     {
         // Current position already finished reading?
         if (m_pos >= m_size)
@@ -38,7 +38,7 @@ namespace insound {
             }
 
             m_pos = termPos + 1;
-            return outString.size() + 1u; // +1 includes the null-terminator
+            return static_cast<uint32_t>(outString.size()) + 1U; // +1 includes the null-terminator
         }
         catch(const std::exception &e)
         {
@@ -52,7 +52,7 @@ namespace insound {
         }
     }
 
-    uint32_t BufferView::readFixedString(std::string &outString, size_t length)
+    size_t BufferView::readFixedString(std::string &outString, size_t length)
     {
         if (m_pos + length > m_size)
         {
@@ -65,7 +65,7 @@ namespace insound {
         return length;
     }
 
-    uint32_t BufferView::read(char *outBuffer, const size_t maxSize)
+    size_t BufferView::read(char *outBuffer, const size_t maxSize)
     {
         // Current position already finished reading?
         if (m_pos >= m_size)
@@ -121,7 +121,7 @@ namespace insound {
         return m_buf[index];
     }
 
-    uint32_t BufferView::readRaw(void *buffer, const size_t size)
+    size_t BufferView::readRaw(void *buffer, const size_t size)
     {
         if (size == 0) return 0; // edge case
 
@@ -151,7 +151,7 @@ namespace insound {
         return size;
     }
 
-    uint32_t BufferWriter::writeImpl(const void *data, size_t size)
+    size_t BufferWriter::writeImpl(const void *data, size_t size)
     {
         if (size == 0) return 0; // edge case
 
@@ -180,17 +180,17 @@ namespace insound {
         return size;
     }
 
-    uint32_t BufferWriter::write(const std::string &str)
+    size_t BufferWriter::write(const std::string &str)
     {
         return write(str.data(), str.size());
     }
 
-    uint32_t BufferWriter::write(const std::string_view str)
+    size_t BufferWriter::write(const std::string_view str)
     {
         return write(str.data(), str.size());
     }
 
-    uint32_t BufferWriter::write(const char *str, size_t length)
+    size_t BufferWriter::write(const char *str, size_t length)
     {
         if (length + m_pos + 1 > m_size) // +1 for null terminator
         {

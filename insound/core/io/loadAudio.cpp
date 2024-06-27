@@ -22,7 +22,7 @@ bool insound::loadAudio(const fs::path &path, const AudioSpec &targetSpec, uint8
     }
 
     // Uppercase extension
-    auto ext = path.extension().string();
+    std::string ext = path.extension().string();
     for (auto &c : ext)
     {
         c = (char)std::toupper(c);
@@ -40,34 +40,60 @@ bool insound::loadAudio(const fs::path &path, const AudioSpec &targetSpec, uint8
     uint32_t bufferSize;
     std::map<uint32_t, Marker> markers;
 
+    const auto fileDataBuf = (uint8_t *)fileData.data();
+    const auto fileDataSize = static_cast<uint32_t>(fileData.size());
+
     if (ext == ".WAV")
     {
-        if (decodeWAV_v2((uint8_t *)fileData.data(), fileData.size(), &spec, &buffer, &bufferSize, &markers) != WAVResult::Ok)
+        if (decodeWAV_v2(fileDataBuf, fileDataSize, &spec, &buffer, &bufferSize, &markers) != WAVResult::Ok)
         {
             // fallback to SDL's WAV parser
-            if (!decodeWAV((uint8_t *)fileData.data(), fileData.size(), &spec, &buffer, &bufferSize))
+            if (!decodeWAV((uint8_t *)fileData.data(), fileDataSize, &spec, &buffer, &bufferSize))
                 return false;
         }
     }
     else if (ext == ".OGG")
     {
-        if (!decodeVorbis((uint8_t *)fileData.data(), fileData.size(), &spec, &buffer, &bufferSize))
+#ifdef INSOUND_DECODE_VORBIS
+        if (!decodeVorbis(fileDataBuf, fileDataSize, &spec, &buffer, &bufferSize))
             return false;
+#else
+        pushError(Result::NotSupported, "Vorbis decoding is not supported, make sure to compile with "
+            "INSOUND_DECODE_VORBIS defined");
+#endif
     }
     else if (ext == ".FLAC")
     {
-        if (!decodeFLAC((uint8_t *)fileData.data(), fileData.size(), &spec, &buffer, &bufferSize))
+#ifdef INSOUND_DECODE_FLAC
+        if (!decodeFLAC(fileDataBuf, fileDataSize, &spec, &buffer, &bufferSize))
             return false;
+#else
+        pushError(Result::NotSupported, "FLAC decoding is not supported, make sure to compile with "
+            "INSOUND_DECODE_FLAC defined");
+        return false;
+#endif
     }
     else if (ext == ".MP3")
     {
-        if (!decodeMp3((uint8_t *)fileData.data(), fileData.size(), &spec, &buffer, &bufferSize))
+#ifdef INSOUND_DECODE_MP3
+        if (!decodeMp3(fileDataBuf, fileDataSize, &spec, &buffer, &bufferSize))
             return false;
+#else
+        pushError(Result::NotSupported, "MP3 decoding is not supported, make sure to compile with "
+            "INSOUND_DECODE_MP3 defined");
+        return false;
+#endif
     }
     else
     {
-        if (!decodeGME((uint8_t *)fileData.data(), fileData.size(), targetSpec.freq, 0, -1, &spec, &buffer, &bufferSize))
+#ifdef INSOUND_DECODE_GME
+        if (!decodeGME(fileDataBuf, fileDataSize, targetSpec.freq, 0, -1, &spec, &buffer, &bufferSize))
             return false;
+#else
+        pushError(Result::NotSupported, "GME decoding is not supported, make sure to compile with "
+            "INSOUND_DECODE_GME defined");
+        return false;
+#endif
     }
 
     uint32_t newSize;

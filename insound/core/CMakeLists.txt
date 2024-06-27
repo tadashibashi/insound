@@ -1,22 +1,23 @@
 project(insound)
 include(FetchContent)
 
-add_library(insound
-    PerfTimer.h
-    PerfTimer.cpp)
+add_library(insound)
 
 if (NOT TARGET SDL2::SDL2-static) # user can provide their own SDL2 submodule, but we may want to enforce a minimum version
     FetchContent_Declare(Insound_SDL2
-        GIT_REPOSITORY https://github.com/tadashibashi/SDL.git
-        GIT_TAG        506002b71e0ccfd89b2d25091d684943be7ebbf5
+        GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
+        GIT_TAG        fb1497566c5a05e2babdcf45ef0ab5c7cca2c4ae
     )
 
-    set(SDL_STATIC             ON  CACHE BOOL "" FORCE)
-    set(SDL_SHARED             OFF CACHE BOOL "" FORCE)
-    set(SDL2_DISABLE_UNINSTALL ON  CACHE BOOL "" FORCE)
-    set(SDL2_DISABLE_INSTALL   ON  CACHE BOOL "" FORCE)
-    set(SDL_TEST               OFF CACHE BOOL "" FORCE)
-    set(SDL_PTHREADS           NOT ${INSOUND_NO_PTHREAD} CACHE BOOL "" FORCE)
+    set(SDL_STATIC             ON )
+    set(SDL_SHARED             OFF)
+    set(SDL2_DISABLE_UNINSTALL ON )
+    set(SDL2_DISABLE_INSTALL   ON )
+    set(SDL_TEST               OFF)
+    set(SDL_ASSEMBLY           ON)
+    set(SDL_ARMNEON            ON)
+    set(SDL_PTHREADS           NOT ${INSOUND_NO_PTHREAD})
+
     FetchContent_MakeAvailable(Insound_SDL2)
 endif()
 
@@ -58,16 +59,16 @@ if (INSOUND_DECODE_GME)
     )
 
     if (EMSCRIPTEN)
-        set(GME_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+        set(GME_BUILD_SHARED  OFF)
     else()
-        set(GME_BUILD_SHARED ON CACHE BOOL "" FORCE)  # leave this ON to avoid forcing consumer app to be LGPL
+        set(GME_BUILD_SHARED  ON)  # leave this ON to avoid forcing consumer app to be LGPL
     endif()
-    set(GME_ENABLE_UBSAN      OFF CACHE BOOL "" FORCE)
+    set(GME_ENABLE_UBSAN      OFF)
 
     set_property(GLOBAL PROPERTY CTEST_TARGETS_ADDED TRUE)
 
     FetchContent_MakeAvailable(libgme)
-    target_link_libraries(insound PRIVATE gme)
+    target_link_libraries(insound PUBLIC gme::gme)
     target_compile_definitions(insound PRIVATE -DINSOUND_DECODE_GME=1)
 endif()
 
@@ -78,6 +79,7 @@ endif()
 target_sources(insound
 PUBLIC
     AlignedVector.h
+    AudioDecoder.h
     AudioDevice.h
     AudioLoader.h
     AudioSpec.h
@@ -98,19 +100,25 @@ PUBLIC
     io/decodeMp3.h
     io/decodeFLAC.h
     io/decodeGME.h
+    io/Rstream.h
     logging.h
     Marker.h
     MultiPool.h
     PCMSource.h
+    PerfTimer.h
     Pool.h
     SampleFormat.h
     SoundBuffer.h
     Source.h
     SourceRef.h
     SourceRefFwd.h
+    StreamManager.h
+    StreamSource.h
     TimeUnit.h
     util.h
+
 PRIVATE
+    AudioDecoder.cpp
     AudioDevice.cpp
     AudioLoader.cpp
     Bus.cpp
@@ -130,7 +138,18 @@ PRIVATE
     io/openFile.cpp
     io/openFile.h
     io/loadAudio.cpp
+    io/Rstreamable.h
+    io/RStream.cpp
+    io/RstreamableAAsset.h
+    io/RstreamableAAsset.cpp
+    io/RstreamableFile.cpp
+    io/RstreamableFile.h
     PCMSource.cpp
+    PerfTimer.cpp
+    platform/AndroidNative.cpp
+    platform/AndroidNative.h
+    platform/AudioDevice/AAudioDevice.cpp
+    platform/AudioDevice/AAudioDevice.h
     platform/AudioDevice/SdlAudioDevice.cpp
     platform/AudioDevice/SdlAudioDevice.h
     platform/AudioDevice/EmAudioDevice.cpp
@@ -141,6 +160,8 @@ PRIVATE
     SampleFormat.cpp
     SoundBuffer.cpp
     Source.cpp
+    StreamSource.cpp
+    StreamManager.cpp
     TimeUnit.cpp
     util.cpp
 
@@ -158,19 +179,11 @@ else()
     set(INSOUND_DEBUG FALSE)
 endif()
 
-if (APPLE)
-    if (INSOUND_DEBUG)
-        target_link_options(insound PUBLIC -O0 -g)
-        target_compile_options(insound PUBLIC -O0 -g)
-    else()
-        target_link_options(insound PUBLIC -Ofast -g)
-        target_compile_options(insound PUBLIC -Ofast -g)
-    endif()
+if (ANDROID)
+    target_link_libraries(insound PRIVATE aaudio)
 endif()
 
 if (EMSCRIPTEN)
-    find_program(EMRUN emrun PATHS "$ENV{EMSDK}/upstream/emscripten")
-
     target_link_options(insound
     PUBLIC
         -sALLOW_MEMORY_GROWTH=1
@@ -192,10 +205,6 @@ if (EMSCRIPTEN)
         )
     endif()
 
-    if (EMRUN)
-        target_link_options(insound PUBLIC --emrun)
-    endif()
-
     if (NOT INSOUND_NO_PTHREAD)
             target_link_options(insound PUBLIC
                 -pthread
@@ -207,11 +216,19 @@ if (EMSCRIPTEN)
     endif()
 
     if (INSOUND_DEBUG)
-        target_link_options(insound PUBLIC -O0 -g -g3 -gsource-map)
-        target_compile_options(insound PUBLIC -O0 -g -g3 -gsource-map)
+        target_link_options(insound PRIVATE -O0 -g -g3 -gsource-map)
+        target_compile_options(insound PRIVATE -O0 -g -g3 -gsource-map)
     else()
-        target_link_options(insound PUBLIC -Ofast)
-        target_compile_options(insound PUBLIC -Ofast)
+        target_link_options(insound PRIVATE -Ofast)
+        target_compile_options(insound PRIVATE -Ofast)
+    endif()
+else() # Non-emscripten platforms
+    if (INSOUND_DEBUG)
+        target_link_options(insound PRIVATE -O0 -g)
+        target_compile_options(insound PRIVATE -O0 -g)
+    else()
+        target_link_options(insound PRIVATE -Ofast -flto)
+        target_compile_options(insound PRIVATE -Ofast -flto)
     endif()
 endif()
 

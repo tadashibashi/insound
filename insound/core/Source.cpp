@@ -147,11 +147,12 @@ namespace insound {
                 const bool pauseThisFrame = (pauseClock < (length - i) / (2 * sizeof(float)) && pauseClock > -1);
                 const int bytesToRead = pauseThisFrame ? (int)pauseClock : length - i;
 
+                int bytesRead = 0;
                 // read bytes here
                 if (bytesToRead > 0)
-                    readImpl(m_outBuffer.data() + i, bytesToRead);
+                    bytesRead = readImpl(m_outBuffer.data() + i, bytesToRead);
 
-                i += bytesToRead;
+                i += bytesRead;
 
                 if (pauseThisFrame)
                 {
@@ -209,7 +210,7 @@ namespace insound {
                 const auto value1 = m_fadePoints[fadeIndex + 1].value; // end value
 
                 // Perform fade until end or clock1, whichever comes first
-                const auto fadeEnd = std::min<uint32_t>((end - sample) / 2 , clock1 + 1 - fadeClock);
+                const auto fadeEnd = std::min<uint32_t>(static_cast<uint32_t>(end - sample) / 2U, clock1 + 1 - fadeClock);
                 const auto clockDiff = clock1 - clock0;
                 const auto valueDiff = value1 - value0;
 
@@ -367,11 +368,11 @@ namespace insound {
                 uint32_t endIndex;
                 if (fadeIndex + 1 < m_fadePoints.size()) // there's next fadepoint
                 {
-                    endIndex = std::min<uint32_t>(m_fadePoints[fadeIndex + 1].clock - fadeClock, end - sample);
+                    endIndex = std::min<uint32_t>(m_fadePoints[fadeIndex + 1].clock - fadeClock, static_cast<uint32_t>(end - sample));
                 }
                 else
                 {
-                    endIndex = end - sample;
+                    endIndex = static_cast<uint32_t>(end - sample);
                 }
 
                 if (m_fadeValue == 1.f) // fade of 1 has no effect, just move the sample ptr

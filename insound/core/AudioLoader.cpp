@@ -1,15 +1,13 @@
 #include "AudioLoader.h"
 
 #include "Engine.h"
-
 #include "external/ctpl_stl.h"
-#include "io/loadAudio.h"
 
 #include <map>
 
 namespace insound {
     struct AudioLoader::Impl {
-        explicit Impl(const Engine *engine) : m_targetSpec(), m_threads(2)
+        explicit Impl(const Engine *engine) : m_targetSpec(), m_threads(2), m_baseDir(), m_count()
         {
             engine->getSpec(&m_targetSpec);
         }
@@ -21,7 +19,6 @@ namespace insound {
 
         const SoundBuffer *load(const fs::path &path)
         {
-
             if (const auto it = m_buffers.find(path); it != m_buffers.end())
             {
                 return &it->second;
@@ -45,20 +42,21 @@ namespace insound {
 
         const SoundBuffer *loadAsync(const fs::path &path, std::future<void> *outFuture)
         {
-            if (const auto it = m_buffers.find(path); it != m_buffers.end())
+            auto finalPath = m_baseDir / path;
+            if (const auto it = m_buffers.find(finalPath); it != m_buffers.end())
             {
                 return &it->second;
             }
 
-            const auto &[emplacedIt, success] = m_buffers.emplace(path.native(), SoundBuffer());
+            const auto &[emplacedIt, success] = m_buffers.emplace(finalPath.native(), SoundBuffer());
             if (!success)
             {
                 return nullptr;
             }
 
             auto sndBuffer = &emplacedIt->second;
-            auto future = m_threads.push([path, sndBuffer, this](const int id) {
-                if (sndBuffer->load(path, m_targetSpec))
+            auto future = m_threads.push([finalPath, sndBuffer, this](const int id) {
+                if (sndBuffer->load(finalPath, m_targetSpec))
                     m_count.store(m_count.load() + 1);
             });
 
@@ -72,7 +70,8 @@ namespace insound {
 
         bool unload(const fs::path &path)
         {
-            auto it = m_buffers.find(path.native());
+            const auto finalPath = m_baseDir / path;
+            auto it = m_buffers.find(finalPath.native());
             if (it != m_buffers.end() && it->second.isLoaded())
             {
                 m_buffers.erase(it);
@@ -109,6 +108,7 @@ namespace insound {
 
         std::map<fs::path::string_type, SoundBuffer> m_buffers;
         std::atomic<size_t> m_count;
+        fs::path m_baseDir;
     };
 
     AudioLoader::AudioLoader(const Engine *engine) : m(new Impl(engine))
@@ -153,5 +153,15 @@ namespace insound {
     bool AudioLoader::empty() const
     {
         return m->empty();
+    }
+
+    const fs::path &AudioLoader::baseDir() const
+    {
+        return m->m_baseDir;
+    }
+
+    void AudioLoader::setBaseDir(const fs::path &path)
+    {
+        m->m_baseDir = path;
     }
 }

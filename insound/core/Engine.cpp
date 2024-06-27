@@ -9,10 +9,13 @@
 #include "Error.h"
 #include "PCMSource.h"
 #include "SoundBuffer.h"
+#include "StreamSource.h"
 #include "Source.h"
 
 #include <mutex>
 #include <vector>
+
+#include "PerfTimer.h"
 
 namespace insound {
 #ifdef INSOUND_DEBUG
@@ -105,7 +108,9 @@ namespace insound {
         }
 
         /// Pass null bus with default constructor `{}`
-        bool playSound(const SoundBuffer *buffer, bool paused, bool looping, bool oneshot, const Handle<Bus> &bus, Handle<PCMSource> *outPcmSource)
+        bool playSound(const SoundBuffer *buffer, bool paused, bool looping,
+                       bool oneshot, const Handle<Bus> &bus,
+                       Handle<PCMSource> *outPcmSource)
         {
             ENGINE_INIT_GUARD();
 
@@ -118,7 +123,8 @@ namespace insound {
             auto lockGuard = m_device->mixLockGuard();
             if (bus && !bus.isValid()) // if output bus was passed, and it's invalid => error
             {
-                pushError(Result::InvalidHandle, "Engine::Impl::createBus failed because output Bus was invalid");
+                pushError(Result::InvalidHandle,
+                          "Engine::Impl::createBus failed because output Bus was invalid");
                 return false;
             }
 
@@ -150,6 +156,38 @@ namespace insound {
 
             if (outPcmSource)
                 *outPcmSource = newSource;
+
+            return true;
+        }
+
+        bool playStream(const fs::path &filepath, bool paused, bool looping,
+                        bool oneshot, const Handle<Bus> &bus,
+                        Handle<StreamSource> *outSource)
+        {
+            ENGINE_INIT_GUARD();
+            auto lockGuard = m_device->mixLockGuard();
+
+            uint32_t clock;
+            bool result = bus ?
+                bus->getClock(&clock) : m_masterBus->getClock(&clock);
+
+            if (!result)
+                return false;
+
+            const auto newSource = m_objectPool.allocate<StreamSource>(
+                m_engine, filepath, clock, paused, looping, oneshot);
+            if (bus)
+            {
+                bus->applyAppendSource(static_cast<Handle<Source>>(newSource));
+            }
+            else
+            {
+                m_masterBus->applyAppendSource(
+                   static_cast<Handle<Source>>(newSource));
+            }
+
+            if (outSource)
+                *outSource = newSource;
 
             return true;
         }
@@ -261,7 +299,7 @@ namespace insound {
 
             if (outValue)
             {
-                *outValue = m_device->isRunning();
+                *outValue = !m_device->isRunning();
             }
 
             return true;
@@ -282,6 +320,7 @@ namespace insound {
         bool update()
         {
             ENGINE_INIT_GUARD();
+
             auto lockGuard = m_device->mixLockGuard();
             {
                 auto deferredCommandGuard = std::lock_guard(m_deferredCommandMutex);
@@ -455,8 +494,10 @@ namespace insound {
                 if (!engine->m_immediateCommands.empty())
                     Engine::Impl::processCommands(engine, engine->m_immediateCommands);
             }
+
             const auto size = outBuffer->size();
             engine->m_masterBus->read(nullptr, static_cast<int>(size));
+
             engine->m_clock += size / (2 * sizeof(float));
             engine->m_masterBus->updateParentClock(engine->m_clock);
 
@@ -608,4 +649,11 @@ namespace insound {
     {
         m->processCommand(command);
     }
+
+    bool Engine::playStream(const fs::path &filepath, bool paused, bool looping,
+        bool oneshot, const Handle<Bus> &bus, Handle<StreamSource> *outSource)
+    {
+        return m->playStream(filepath, paused, looping, oneshot, bus, outSource);
+    }
+
 }

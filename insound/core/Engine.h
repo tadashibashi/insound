@@ -1,21 +1,25 @@
 #pragma once
+#include "AudioDevice.h"
+#include "MultiPool.h"
 #include "SourceRefFwd.h"
 
-#include "MultiPool.h"
-
 #include <cstdint>
+#include <filesystem>
 
-#include "AudioDevice.h"
+
 
 namespace insound {
-    class BufferPool;
+    namespace fs = std::filesystem;
+
     struct AudioSpec;
+    class BufferPool;
     class Bus;
     struct Command;
     struct EngineCommand;
+    class PCMSource;
     class SoundBuffer;
     class Source;
-    class PCMSource;
+    class StreamSource;
 
     class Engine {
     public:
@@ -37,6 +41,8 @@ namespace insound {
         /// @param outPcmSource pointer to receive pcm source, nullable if you don't need it e.g. a oneshot sound
         bool playSound(const SoundBuffer *buffer, bool paused, bool looping, bool oneshot, const Handle<Bus> &bus, Handle<PCMSource> *outPcmSource);
         bool playSound(const SoundBuffer *buffer, bool paused, bool looping, bool oneshot, Handle<PCMSource> *outPcmSource);
+
+        bool playStream(const fs::path &filepath, bool paused, bool looping, bool oneshot, const Handle<Bus> &bus, Handle<StreamSource> *outSource);
 
         /// Create a new bus to use in the mixing graph
         /// @param paused whether bus should start off paused on initialization

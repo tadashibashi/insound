@@ -2,10 +2,8 @@
 #include <filesystem>
 #include <string>
 
-namespace fs = std::filesystem;
-
 namespace insound {
-
+    namespace fs = std::filesystem;
 
     /// Open a file and populate a buffer with its contents. Blocking function.
     /// @param path    path to the file to open. TODO: support emscripten_fetch, and curl on non-emscripten platforms

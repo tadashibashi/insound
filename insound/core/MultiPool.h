@@ -45,26 +45,22 @@ namespace insound {
         /// Allocate an object, specified by type
         /// @tparam T type of object to allocate
         /// @tparam ...TArgs type of arguments to forward to it's `init` function
+        ///
         /// @param ...args arguments to forward to the object's `init` function.
-        /// @return
+        /// @return a handle to the new object; object can be accessed via pointer semantics; if an error occurred during the
+        ///    call to `T::init` then a null object will be returned, taking back the allocation. In this case, check `popError()`
+        ///    for  more details.
         template <typename T, typename...TArgs>
-        Handle<T> allocate(TArgs &&...args)
+        Handle<T> allocate(TArgs &&...args) noexcept
         {
             static_assert(!std::is_abstract_v<T>, "Cannot allocate an abstract class");
+            std::lock_guard lockGuard(m_mutex);
 
-            PoolBase *pool;
-            PoolID id;
-            uint32_t elemSize;
-            {
-                std::lock_guard lockGuard(m_mutex);
+            PoolBase *pool = &getPool<T>();
+            const auto elemSize = static_cast<uint32_t>(pool->elemSize());
 
-                pool = &getPool<T>();
-                elemSize = pool->elemSize();
-
-                // Allocate new entity
-                id = pool->allocate();
-            }
-
+            // Allocate new entity
+            PoolID id = pool->allocate();
             try {
                 // Init the newly retrieved entity
                 ((T *)(pool->data() + id.index * elemSize))->init(std::forward<TArgs>(args)...); // `T` poolable must implement `init`
@@ -90,8 +86,10 @@ namespace insound {
         ///          thrown in the destructor. Check `popError()` for details. Object will still deallocate back to
         ///          the pool if if a valid handle was passed.
         template <typename T>
-        bool deallocate(const Handle<T> &handle)
+        bool deallocate(const Handle<T> &handle) noexcept
         {
+            std::lock_guard lockGuard(m_mutex);
+
             bool dtorThrew = false;
             if (handle.isValid())
             {
@@ -116,9 +114,7 @@ namespace insound {
                 return false;
             }
 
-            std::lock_guard lockGuard(m_mutex);
             handle.m_pool->deallocate(handle.m_id);
-
             return !dtorThrew;
         }
 
@@ -228,7 +224,7 @@ namespace insound {
 
     private: // Member variables
         mutable std::map<std::type_index, PoolBase *> m_pools;      ///< the internal pools
-        mutable std::mutex m_mutex;                                 ///< for syncing pool state across multiple threads
+        mutable std::recursive_mutex m_mutex;                                 ///< for syncing pool state across multiple threads
 
         // for optimized lookups of pools (may be negligable)
         mutable std::unordered_map<std::type_index, int> m_indices; ///< index lookup table by type; use it to query m_poolPtrs

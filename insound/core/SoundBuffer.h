@@ -16,7 +16,7 @@ namespace insound {
     public:
         SoundBuffer();
         SoundBuffer(const fs::path &filepath, const AudioSpec &targetSpec);
-        SoundBuffer(uint8_t *m_buffer, size_t bufferSize, const AudioSpec &spec, std::vector<Marker> &&markers);
+        SoundBuffer(uint8_t *m_buffer, uint32_t bufferSize, const AudioSpec &spec, std::vector<Marker> &&markers);
         ~SoundBuffer();
 
         SoundBuffer(SoundBuffer &&other) noexcept;
