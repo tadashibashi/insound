@@ -13,9 +13,6 @@ namespace insound {
 
         bool init()
         {
-            if (!Effect::init())
-                return false;
-
             m_left = 1.f;
             m_right = 1.f;
 

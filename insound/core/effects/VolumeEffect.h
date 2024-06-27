@@ -13,9 +13,6 @@ namespace insound {
 
         bool init(float volume = 1.f)
         {
-            if (!Effect::init())
-                return false;
-
             m_volume = volume;
 
             return true;

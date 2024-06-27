@@ -30,10 +30,6 @@ namespace insound {
         [[nodiscard]]
         const Engine *engine() const { return m_engine; }
 
-        /// `init` must be implemented by child classes, and children must call their direct parent's `init`
-        /// It isn't virtual so no override is necessary.
-        bool init() { return true; }
-
         /// Clean up logic
         virtual void release() { }
     private:

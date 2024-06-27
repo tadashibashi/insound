@@ -27,7 +27,7 @@ namespace insound {
 
         /// Get the current delay time in sample frames
         [[nodiscard]]
-        uint32_t delayTime() const { return m_delayTime; }
+        auto delayTime() const { return m_delayTime; }
 
         /// Set the input feedback percentage, where 0 = 0% through 1.f = 100%
         void feedback(float value);
@@ -62,10 +62,10 @@ namespace insound {
 
     private:
         AlignedVector<float, 16> m_buffer;
-        uint32_t m_delayTime; // delay time in sample frames
+        size_t m_delayTime; // delay time in sample frames
         float m_feedback;
         float m_wet;
 
-        uint32_t m_delayHead;
+        size_t m_delayHead;
     };
 }
