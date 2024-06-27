@@ -10,7 +10,7 @@ namespace insound {
 
         bool open(int frequency,
             int sampleFrameBufferSize,
-            AudioCallback callback,
+            AudioCallback engineCallback,
             void *userdata) override;
         void close() override;
         void suspend() override;

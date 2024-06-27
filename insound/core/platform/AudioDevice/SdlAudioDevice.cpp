@@ -9,7 +9,7 @@
 
 #include <vector>
 
-#ifdef INSOUND_THREADING // Implementation using pthreads
+#if defined(INSOUND_THREADING) && !defined(__ANDROID__) // Implementation using pthreads
 #include <thread>
 struct insound::SdlAudioDevice::Impl {
     explicit Impl(SdlAudioDevice *device) : mixMutex(device->m_mixMutex) { }
@@ -24,6 +24,8 @@ struct insound::SdlAudioDevice::Impl {
         desired.channels = 2;
         desired.format = AUDIO_F32;
         desired.freq = frequency > 0 ? frequency : getDefaultSampleRate();
+        if (desired.freq == -1)
+            desired.freq = 48000;
         desired.samples = sampleFrameBufferSize;
 
         // Open device
@@ -55,7 +57,7 @@ struct insound::SdlAudioDevice::Impl {
 
         // Start mix thread
         threadDelayTarget = std::chrono::microseconds((int)((float)sampleFrameBufferSize / (float)obtained.freq * 500000.f) );
-        mixThread = SDL_CreateThread(mixCallback, "Audio Mix", this);
+        mixThread = std::thread(mixCallback, this);
 
         return true;
     }
@@ -63,8 +65,6 @@ struct insound::SdlAudioDevice::Impl {
     /// Code run in the mix thread. It feeds the SDL audio queue with data it retrieves from the mixed data from the user callback.
     static int mixCallback(void *userptr)
     {
-        SDL_SetThreadPriority(SDL_THREAD_PRIORITY_TIME_CRITICAL);
-
         auto device = (SdlAudioDevice::Impl *)userptr;
         while (true)
         {
@@ -107,8 +107,7 @@ struct insound::SdlAudioDevice::Impl {
                 id = 0; // flag mix thread to close
             }
 
-            SDL_WaitThread(mixThread, nullptr);
-            mixThread = nullptr;
+            mixThread.join();
 
             SDL_CloseAudioDevice(deviceID);
         }
@@ -122,7 +121,7 @@ struct insound::SdlAudioDevice::Impl {
 
     // Mix thread info
     std::recursive_mutex &mixMutex;
-    SDL_Thread *mixThread{};
+    std::thread mixThread{};
     std::chrono::microseconds threadDelayTarget{};
 
     // Buffer
@@ -137,7 +136,7 @@ struct insound::SdlAudioDevice::Impl {
 struct insound::SdlAudioDevice::Impl {
     Impl(SdlAudioDevice *device) { }
 
-    void (*callback)(void *userdata, std::vector<uint8_t> *stream){};
+    AudioCallback callback{};
     void *userData{};
 
     SDL_AudioDeviceID id{};
@@ -145,7 +144,7 @@ struct insound::SdlAudioDevice::Impl {
 
     /// Open the SDL audio device, setting up the audio callback
     bool open(int frequency, int sampleFrameBufferSize,
-              void(*audioCallback)(void *userdata, std::vector<uint8_t> *stream),
+              AudioCallback engineCallback,
               void *userdata)
     {
         // Setup configurations
@@ -154,8 +153,10 @@ struct insound::SdlAudioDevice::Impl {
         desired.channels = 2;
         desired.format = AUDIO_F32;
         desired.freq = frequency > 0 ? frequency : getDefaultSampleRate();
+        if (desired.freq == -1)
+            desired.freq = 48000;
         desired.samples = sampleFrameBufferSize;
-        desired.callback = audioCallback;
+        desired.callback = Impl::audioCallback;
         desired.userdata = this;
 
         // Open the device
@@ -181,14 +182,14 @@ struct insound::SdlAudioDevice::Impl {
         buffer.resize(bufferSize, 0);                   // TODO: this can potentially result in all buffers being quite large
 
         id = deviceID;
-        callback = audioCallback;
+        callback = engineCallback;
         userData = userdata;
 
         return true;
     }
 
     /// SDL audio callback
-    void audioCallback(void *userdata, uint8_t *stream, int length)
+    static void audioCallback(void *userdata, uint8_t *stream, int length)
     {
         auto device = (SdlAudioDevice::Impl *)(userdata);
         if (device->buffer.size() != length)
@@ -206,12 +207,12 @@ struct insound::SdlAudioDevice::Impl {
     {
         if (id != 0)
         {
-            SDL_CloseAudioDevice(m->id);
-            m->id = 0;
+            SDL_CloseAudioDevice(id);
+            id = 0;
         }
     }
 
-    std::vector<uint8_t> buffer{};
+    AlignedVector<uint8_t, 16> buffer{};
     int bufferSize{};
     detail::SdlAudioGuard m_initGuard{};
 };
@@ -228,9 +229,9 @@ namespace insound {
     }
 
     bool SdlAudioDevice::open(int frequency, int sampleFrameBufferSize,
-       AudioCallback audioCallback, void *userdata)
+                              AudioCallback engineCallback, void *userdata)
     {
-        return m->open(frequency, sampleFrameBufferSize, audioCallback, userdata);
+        return m->open(frequency, sampleFrameBufferSize, engineCallback, userdata);
     }
 
     void SdlAudioDevice::close()
