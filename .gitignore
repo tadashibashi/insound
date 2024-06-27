@@ -2,9 +2,12 @@
 .idea/
 .vscode/
 .vs/
-.cache/
-
 *.sublime-workspace
+
+.cache/
+.gradle/
+local.properties
+.cxx
 
 CMakeUserPresets.json
 

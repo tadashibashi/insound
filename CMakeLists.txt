@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.20)
 project(insound)
 
+set(CMAKE_POLICY_DEFAULT_CMP0077 NEW CACHE STRING "")
+cmake_policy(SET CMP0077 NEW)
+
 # C++ Standard
 set(CMAKE_CXX_STANDARD_REQUIRED 17)
 if (NOT DEFINED CMAKE_CXX_STANDARD)
@@ -29,8 +32,8 @@ endif()
 # Audio file decoder
 option(INSOUND_DECODE_VORBIS  "Include ogg vorbis file decoding in build."           ON)
 option(INSOUND_DECODE_MP3     "Include mp3 file decoding in build."                  ON)
-option(INSOUND_DECODE_FLAC    "Include flac file decoding in build."                 ON)
-option(INSOUND_DECODE_GME     "Include classic game emu decoding in build."          ON)
+option(INSOUND_DECODE_FLAC    "Include flac file decoding in build."                  ON)
+option(INSOUND_DECODE_GME     "Include classic game emu decoding in build."         ON)
 
 option(INSOUND_NO_PTHREAD     "Turn pthreads off. (Only affects Emscripten builds)"  OFF)
 
@@ -51,6 +54,12 @@ add_subdirectory(insound)
 
 if (INSOUND_BUILD_EXAMPLES)
     add_subdirectory(sandbox)
+    # Create symlink inside of the Android project
+    if (NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/sandbox/android/app/jni/insound)
+        execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink
+            ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/sandbox/android/app/jni/insound
+        )
+    endif()
 endif()
 
 if (INSOUND_BUILD_TESTS)

@@ -12,6 +12,15 @@ insound::AudioDevice *insound::AudioDevice::create()
     return new SdlAudioDevice;
 #endif
 }
+#elif __ANDROID__
+//#include "platform/AudioDevice/AAudioDevice.h"
+#include "platform/AudioDevice/SdlAudioDevice.h"
+insound::AudioDevice *insound::AudioDevice::create()
+{
+    return new SdlAudioDevice();
+    //return new AAudioDevice();
+}
+
 #else
 #include "platform/AudioDevice/SdlAudioDevice.h"
 insound::AudioDevice *insound::AudioDevice::create()
