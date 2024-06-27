@@ -1,23 +1,24 @@
+#include <insound/core/logging.h>
 #ifdef __EMSCRIPTEN__
+
 #include "EmAudioDevice.h"
 #include "../../AudioSpec.h"
 #include "../../Error.h"
 #include "../../platform/getDefaultSampleRate.h"
 
-#include <emscripten/atomic.h>
 #include <emscripten/webaudio.h>
 
+#include <atomic>
 #include <cassert>
 #include <vector>
 
 namespace insound {
     static constexpr int AudioStackSize = 1024 * 1024 * 2; // 2MB
+    static_assert(AudioStackSize % 16 == 0, "AudioStackSize must be a multiple of 16");
 
     struct EmAudioDevice::Impl {
-        Impl()
-        {
-            m_audioThreadStack = (uint8_t *)std::aligned_alloc(16, AudioStackSize);
-        }
+        Impl() : m_audioThreadStack(static_cast<uint8_t *>(std::aligned_alloc(16, AudioStackSize)))
+        { }
 
         ~Impl()
         {
@@ -26,30 +27,63 @@ namespace insound {
 
         [[nodiscard]] bool isBufferReady() const
         {
-            return emscripten_atomic_load_u8((const void *)&m_bufferReady);
+            return m_bufferReady.load();
         }
 
         [[nodiscard]] bool isRunning() const
         {
-            return emscripten_atomic_load_u8((const void *)&m_isRunning);
+            return m_isRunning.load();
         }
 
-        bool open(int frequency, int sampleFrameBufferSize,
-            AudioCallback audioCallback, void *userdata)
+        // Opens device without creating the audio context. Waits for user interaction to create.
+        // Currently not working, as the engine fails when attempting to create busses, add sounds, etc.
+        bool open2(const int frequency, int sampleFrameBufferSize,
+            const AudioCallback audioCallback, void *userdata)
         {
-            // Create AudioContext
-            EmscriptenWebAudioCreateAttributes attr;
-            attr.sampleRate = frequency > 0 ? frequency : getDefaultSampleRate();
-            attr.latencyHint = "interactive";
-            const auto context = emscripten_create_audio_context(&attr);
-
-            close();
             m_spec.channels = 2;
             m_spec.freq = frequency > 0 ? frequency : getDefaultSampleRate();
             m_spec.format = SampleFormat(sizeof(float) * CHAR_BIT, true, false, true);
 
-            m_bufferSize = sampleFrameBufferSize * (int)sizeof(float) * 2;
-            assert(sampleFrameBufferSize >= 128 * 2); // should b e>= than emscripten's minimum callback byte size
+            if (sampleFrameBufferSize < 128) // buffer should be >= WebAudio callback's minimum frame size
+                sampleFrameBufferSize = 128;
+            m_bufferSize = sampleFrameBufferSize * static_cast<int>(sizeof(float)) * 2;
+
+            m_buffer.resize(m_bufferSize, 0);
+            m_nextBuffer.resize(m_bufferSize, 0);
+
+            m_context = 0;
+            m_callback = audioCallback;
+            m_userData = userdata;
+
+            m_curBufferOffset = 0;
+            m_bufferReady.store(false);
+            m_isRunning.store(false);
+
+            emscripten_set_click_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, this, 0, onWindowClick2);
+            return true;
+        }
+
+        bool open(const int frequency, int sampleFrameBufferSize,
+            const AudioCallback audioCallback, void *userdata)
+        {
+            const auto defaultSampleRate = getDefaultSampleRate();
+
+            // Create AudioContext
+            EmscriptenWebAudioCreateAttributes attr;
+            attr.sampleRate = frequency > 0 ? frequency : defaultSampleRate;
+            attr.latencyHint = "interactive";
+            const auto context = emscripten_create_audio_context(&attr); // todo: error handling here?
+
+            // Initialize internals before starting worklet thread
+            close();
+            m_spec.channels = 2;
+            m_spec.freq = frequency > 0 ? frequency : defaultSampleRate;
+            m_spec.format = SampleFormat(sizeof(float) * CHAR_BIT, true, false, true);
+
+            if (sampleFrameBufferSize < 128) // buffer should be >= WebAudio callback's minimum frame size
+                sampleFrameBufferSize = 128;
+            m_bufferSize = sampleFrameBufferSize * static_cast<int>(sizeof(float)) * 2;
+
             m_buffer.resize(m_bufferSize, 0);
             m_nextBuffer.resize(m_bufferSize, 0);
 
@@ -80,7 +114,7 @@ namespace insound {
 
         void suspend()
         {
-            if (isRunning())
+            if (isRunning() && m_userInteracted.load())
             {
                 EM_ASM({
                     var audioContext = emscriptenGetAudioObject($0);
@@ -89,26 +123,32 @@ namespace insound {
                         audioContext.suspend();
                     }
                 }, m_context);
+
                 setIsRunning(false);
             }
         }
 
         void resumeAsync()
         {
-            emscripten_resume_audio_context_async(m_context, audioContextResumed, this);
+            if (m_userInteracted.load())
+                emscripten_resume_audio_context_async(m_context, audioContextResumed, this);
         }
 
         void resume()
         {
-            emscripten_resume_audio_context_sync(m_context);
-            setIsRunning(true);
+            if (m_userInteracted.load())
+            {
+                emscripten_resume_audio_context_sync(m_context);
+                setIsRunning(true);
+            }
+
         }
 
-        void read(const float **data, int length)
+        void read(const float **data, const int length)
         {
             if (!isRunning())
             {
-                *data = (float *)m_buffer.data();
+                *data = reinterpret_cast<float *>(m_buffer.data());
                 return;
             }
 
@@ -120,18 +160,9 @@ namespace insound {
 
             if (m_curBufferOffset >= m_bufferSize)
             {
-                if (isBufferReady())
-                {
-                    m_buffer.swap(m_nextBuffer);
-                    m_curBufferOffset = 0;
-                    setBufferReady(false); // signal the mix thread to start processing next buffer
-                }
-                else
-                {
-                    // oh no, buffer starvation :(
-                    *data = (float *)m_buffer.data();
-                    return;
-                }
+                m_buffer.swap(m_nextBuffer);
+                m_curBufferOffset = 0;
+                setBufferReady(false); // signal the mix thread to start processing next buffer
             }
 
             *data = reinterpret_cast<float *>(m_buffer.data() + m_curBufferOffset);
@@ -160,23 +191,25 @@ namespace insound {
         EMSCRIPTEN_AUDIO_WORKLET_NODE_T m_audioWorkletNode{0};
         int m_curBufferOffset{0};
 
-        volatile uint8_t m_isRunning{0};
-        volatile uint8_t m_bufferReady{0};
+        std::atomic<bool> m_isRunning{false};
+        std::atomic<bool> m_bufferReady{false};
+        std::atomic<bool> m_userInteracted{false};
 
-        void setBufferReady(bool value)
+        void setBufferReady(const bool value)
         {
-            emscripten_atomic_store_u8((void *)&m_bufferReady, static_cast<bool>(value));
+            m_bufferReady.store(value);
         }
 
-        void setIsRunning(bool value)
+        void setIsRunning(const bool value)
         {
-            emscripten_atomic_store_u8((void *)&m_isRunning, static_cast<bool>(value));
+            m_isRunning.store(value);
         }
 
         // WebAudio-related callbacks
         static void audioWorkletProcessorCreated(EMSCRIPTEN_WEBAUDIO_T context, EM_BOOL success, void *userData);
         static void audioThreadInitialized(EMSCRIPTEN_WEBAUDIO_T context, EM_BOOL success, void *userData);
         static EM_BOOL onWindowClick(int eventType, const EmscriptenMouseEvent *mouseEvent, void *userData);
+        static EM_BOOL onWindowClick2(int eventType, const EmscriptenMouseEvent *mouseEvent, void *userData);
         static EM_BOOL emAudioCallback(int numInputs, const AudioSampleFrame *inputs,
             int numOutputs, AudioSampleFrame *outputs,
             int numParams, const AudioParamFrame *params,
@@ -198,7 +231,7 @@ namespace insound {
         delete m;
     }
 
-    bool EmAudioDevice::open(int frequency, int sampleFrameBufferSize,
+    bool EmAudioDevice::open(const int frequency, const int sampleFrameBufferSize,
         AudioCallback audioCallback, void *userdata)
     {
         return m->open(frequency, sampleFrameBufferSize, audioCallback, userdata);
@@ -255,25 +288,48 @@ namespace insound {
     // ===== Static WebAudio Callbacks ================================================================================
 
     /// Callback for user interaction workaround with web audio
-    EM_BOOL EmAudioDevice::Impl::onWindowClick(int eventType, const EmscriptenMouseEvent *mouseEvent, void *userData)
+    EM_BOOL EmAudioDevice::Impl::onWindowClick(
+        [[maybe_unused]] int eventType,
+        [[maybe_unused]] const EmscriptenMouseEvent *mouseEvent,
+        void *userData)
     {
-        const auto device = static_cast<EmAudioDevice::Impl *>(userData);
-
+        const auto device = static_cast<Impl *>(userData);
+        device->m_userInteracted.store(true);
         device->resumeAsync();
 
-        // Remove this callback
+        INSOUND_LOG("User interaction has enabled the audio device to resume.");
+
+        // Remove the call back so it isn't called every time
         emscripten_set_click_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, nullptr, 0, nullptr);
         return EM_FALSE;
     }
+
+    /// Create and set up the audio device when user clicks. Currently not working, but left here to resume dev.
+    EM_BOOL EmAudioDevice::Impl::onWindowClick2(
+        int eventType, const EmscriptenMouseEvent *mouseEvent, void *userData)
+    {
+        const auto device = static_cast<Impl *>(userData);
+        // Create AudioContext
+        EmscriptenWebAudioCreateAttributes attr;
+        attr.sampleRate = device->m_spec.freq > 0 ? device->m_spec.freq : getDefaultSampleRate();
+        attr.latencyHint = "interactive";
+        const auto context = emscripten_create_audio_context(&attr); // todo: error handling here?
+        emscripten_start_wasm_audio_worklet_thread_async(context, device->m_audioThreadStack, AudioStackSize,
+            &audioThreadInitialized, device);
+
+        emscripten_set_click_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, nullptr, 0, nullptr);
+        return EM_FALSE;
+    }
+
 
     /// Called when audio thread is initialized
     /// @param context associated web audio context
     /// @param success whether audio thread was created successfully
     /// @param userData pointer castable to EmAudioDevice::Impl *
-    void EmAudioDevice::Impl::audioThreadInitialized(EMSCRIPTEN_WEBAUDIO_T context, EM_BOOL success, void *userData)
+    void EmAudioDevice::Impl::audioThreadInitialized(const EMSCRIPTEN_WEBAUDIO_T context, const EM_BOOL success, void *userData)
     {
-        const auto device = static_cast<EmAudioDevice::Impl *>(userData);
-        if (!success)
+        const auto device = static_cast<Impl *>(userData);
+        if (success == EM_FALSE)
         {
             pushError(Result::RuntimeErr, "Failed to init audio thread");
             device->close();
@@ -286,14 +342,15 @@ namespace insound {
         emscripten_create_wasm_audio_worklet_processor_async(context, &opts, &audioWorkletProcessorCreated, userData);
     }
 
-    /// Called when audio worklet processor finishes creating
+    /// Called after audio worklet processor finishes creating.
+    /// Creates the WASM audio worklet node and sets up the user interaction workaround.
     /// @param context associated audio context
     /// @param success whether creation succeeded
-    /// @param userdata pointer castable to EmAudioDevice::Impl *
-    void EmAudioDevice::Impl::audioWorkletProcessorCreated(EMSCRIPTEN_WEBAUDIO_T context, EM_BOOL success, void *userData)
+    /// @param userData pointer castable to EmAudioDevice::Impl *
+    void EmAudioDevice::Impl::audioWorkletProcessorCreated(const EMSCRIPTEN_WEBAUDIO_T context, const EM_BOOL success, void *userData)
     {
-        const auto device = static_cast<EmAudioDevice::Impl *>(userData);
-        if (!success)
+        const auto device = static_cast<Impl *>(userData);
+        if (success == EM_FALSE)
         {
             pushError(Result::RuntimeErr, "Failed to create audio worklet processor");
             device->close();
@@ -301,8 +358,8 @@ namespace insound {
         }
 
         // Set up configurations for AudioWorklet
-        int outputChannelCounts[] = {2};
-        EmscriptenAudioWorkletNodeCreateOptions options = {
+         int outputChannelCounts[] = {2};
+        const EmscriptenAudioWorkletNodeCreateOptions options = {
             .numberOfInputs = 0,
             .numberOfOutputs = 1,
             .outputChannelCounts = outputChannelCounts
@@ -314,7 +371,7 @@ namespace insound {
 
         // Connect AudioWorklet to AudioContext's hardware output
         EM_ASM({
-            emscriptenGetAudioObject($0).connect(emscriptenGetAudioObject($1).destination)
+            emscriptenGetAudioObject($0).connect(emscriptenGetAudioObject($1).destination);
         }, wasmAudioWorklet, context);
 
         // Setup user interaction workaround
@@ -326,16 +383,20 @@ namespace insound {
         device->m_audioWorkletNode = wasmAudioWorklet;
     }
 
-    EM_BOOL EmAudioDevice::Impl::emAudioCallback(int numInputs, const AudioSampleFrame *inputs,
-        int numOutputs, AudioSampleFrame *outputs,
-        int numParams, const AudioParamFrame *params,
-        void *userData)
+    EM_BOOL EmAudioDevice::Impl::emAudioCallback(
+        [[maybe_unused]] const int numInputs,
+        [[maybe_unused]] const AudioSampleFrame *inputs,
+                         const int numOutputs,
+                         AudioSampleFrame *outputs,
+        [[maybe_unused]] int numParams,
+        [[maybe_unused]] const AudioParamFrame *params,
+                         void *userData)
     {
         /// Assert engine format requirement
         assert(numOutputs > 0 && outputs[0].numberOfChannels == 2);
         constexpr auto dataSize = 128 * 2 * sizeof(float);
 
-        const auto device = static_cast<EmAudioDevice::Impl *>(userData);
+        const auto device = static_cast<Impl *>(userData);
         if (!device->isRunning())
         {
             return EM_TRUE;
@@ -343,7 +404,7 @@ namespace insound {
 
         // Read samples from the mixer
         const float *samples{};
-        device->read(&samples, (int)dataSize);
+        device->read(&samples, dataSize);
         assert(samples);
 
         // Reformat the samples from interleaved to block
@@ -367,9 +428,9 @@ namespace insound {
     }
 
     // Callback handling async audio context resume
-    void EmAudioDevice::Impl::audioContextResumed(EMSCRIPTEN_WEBAUDIO_T audioContext, AUDIO_CONTEXT_STATE state, void *userData1)
+    void EmAudioDevice::Impl::audioContextResumed(const EMSCRIPTEN_WEBAUDIO_T audioContext, const AUDIO_CONTEXT_STATE state, void *userData1)
     {
-        const auto device = static_cast<EmAudioDevice::Impl *>(userData1);
+        const auto device = static_cast<Impl *>(userData1);
         if (state == AUDIO_CONTEXT_STATE_RUNNING)
             device->setIsRunning(true);
     }

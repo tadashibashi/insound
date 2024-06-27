@@ -26,7 +26,8 @@ namespace insound {
 
         void read(const float **data, int length);
 
-        /// Convenience function checking if `SharedArrayBuffer` and `WebAudio` are available
+        /// Convenience function checking if `SharedArrayBuffer` and `WebAudio` are available.
+        /// This can only be called from the main thread.
         [[nodiscard]]
         static bool isPlatformSupported();
 
