@@ -1,13 +1,15 @@
 #include "AndroidNative.h"
-#include "insound/core/Error.h"
 
 #ifdef __ANDROID__
+#include <insound/core/Error.h>
 #include <jni.h>
 #include <android/asset_manager.h>
 #include <android/asset_manager_jni.h>
 
 static jobject g_activity;
 static AAssetManager *g_assets;
+static int defaultSampleRate = 48000;
+static int defaultFramesPerBuffer = 512;
 
 extern "C" JNIEXPORT void JNICALL
 Java_io_insound_Insound_nativeInit(JNIEnv *env, jclass clazz, jobject activity)
@@ -27,6 +29,14 @@ Java_io_insound_Insound_provideAssetManager(JNIEnv *env, jclass clazz, jobject a
 {
     g_assets = AAssetManager_fromJava(env, assetMgr);
 }
+
+extern "C" JNIEXPORT void JNICALL
+Java_io_insound_Insound_provideAudioDefaults(JNIEnv *env, jclass clazz, jint sampleRate, jint framesPerBuffer)
+{
+    defaultSampleRate = static_cast<int>(sampleRate);
+    defaultFramesPerBuffer = static_cast<int>(framesPerBuffer);
+}
+
 
 namespace insound {
 
@@ -51,6 +61,16 @@ namespace insound {
     AAsset *openAssetStream(const char *filename)
     {
         return openAssetImpl(filename, AASSET_MODE_STREAMING);
+    }
+
+    int getAndroidDefaultSampleRate()
+    {
+        return defaultSampleRate;
+    }
+
+    int getAndroidDefaultFramesPerBuffer()
+    {
+        return defaultFramesPerBuffer;
     }
 
 }

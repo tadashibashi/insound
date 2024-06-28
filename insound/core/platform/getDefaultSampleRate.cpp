@@ -1,7 +1,8 @@
 #include "getDefaultSampleRate.h"
 #include "../Error.h"
+#include <insound/core/lib.h>
 
-#ifdef __EMSCRIPTEN__
+#if INSOUND_TARGET_EMSCRIPTEN
 #include <emscripten/emscripten.h>
 
 // WebAudio backend
@@ -19,6 +20,13 @@ int insound::getDefaultSampleRate() {
         return -1;
     });
 }
+#elif INSOUND_TARGET_ANDROID
+#include <insound/core/platform/AndroidNative.h>
+int insound::getDefaultSampleRate()
+{
+    return getAndroidDefaultSampleRate();
+}
+
 #else
 #include <SDL2/SDL_audio.h>
 
