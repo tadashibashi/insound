@@ -4,24 +4,25 @@
 
 #include "AudioDecoder.h"
 #include "Error.h"
+#include "io/decodeGME.h"
 #include "io/decodeMp3.h"
+#include "io/decodeWAV.h"
+#include "lib.h"
 
 #include <SDL_audio.h>
-
-#include "io/decodeGME.h"
 
 namespace insound {
 #ifdef INSOUND_DEBUG
 #define INIT_GUARD() do { if (!isOpen()) { \
-    pushError(Result::DecoderNotInit, __FUNCTION__); \
+    INSOUND_PUSH_ERROR(Result::DecoderNotInit, __FUNCTION__); \
     return false; \
 } } while(0)
 #else
-#define INIT_GUARD()
+#define INIT_GUARD() INSOUND_NOOP
 #endif
 
     struct StreamSource::Impl {
-        Impl() : decoder(), stream()
+        Impl() : decoder(), stream(), looping(), isOneShot()
         {
 
         }
@@ -29,6 +30,7 @@ namespace insound {
         AlignedVector<uint8_t, 16> buffer;
         AudioDecoder *decoder;
         SDL_AudioStream *stream; ///< convert audio to target format
+        bool looping, isOneShot;
     };
 
     StreamSource::StreamSource() : m(new Impl)
@@ -58,7 +60,7 @@ namespace insound {
     {
         if (!filepath.has_extension())
         {
-            pushError(Result::InvalidArg,
+            INSOUND_PUSH_ERROR(Result::InvalidArg,
                 "`filepath` must have an extension to infer its filetype");
             return false;
         }
@@ -76,33 +78,13 @@ namespace insound {
         }
 
         // Init audio decoder by file type
-        AudioDecoder *decoder = nullptr;
-        const auto ext = filepath.extension().string();
-        if (ext == ".mp3")
+        AudioDecoder *decoder = AudioDecoder::create(filepath);
+        if (!decoder)
         {
-#if INSOUND_DECODE_MP3
-            decoder = new Mp3Decoder();
-#else
-            pushError(Result::NotSupported, "Mp3 decoding is not supported, "
-                      "make sure to compile with INSOUND_DECODE_MP3 defined");
-            return false;
-#endif      // TODO: add the other decoder types here
-        }
-#if INSOUND_DECODE_GME
-        else
-        {
-            decoder = new GmeDecoder(targetSpec.freq);
-        }
-#endif
-
-
-        if (decoder == nullptr)
-        {
-            pushError(Result::NotSupported, "File extension is not supported");
             return false;
         }
 
-        if (!decoder->open(filepath))
+        if (!decoder->setLooping(m->looping))
         {
             delete decoder;
             return false;
@@ -114,14 +96,14 @@ namespace insound {
             delete decoder;
             return false;
         }
-        std::cout << "SourceSpec: Bits " << (float)sourceSpec.format.bits() << ", isFloat " << sourceSpec.format.isFloat() << ", chans " << sourceSpec.channels << ", freq " << sourceSpec.freq << '\n';
+
         // Init audio stream
         auto stream = SDL_NewAudioStream(
             sourceSpec.format.flags(), sourceSpec.channels, sourceSpec.freq,
             targetSpec.format.flags(), targetSpec.channels, targetSpec.freq);
         if (!stream)
         {
-            pushError(Result::SdlErr, SDL_GetError());
+            INSOUND_PUSH_ERROR(Result::SdlErr, SDL_GetError());
             delete decoder;
             return false;
         }
@@ -165,6 +147,21 @@ namespace insound {
         return SDL_AudioStreamAvailable(m->stream);
     }
 
+    bool StreamSource::isReady(bool *outReady) const
+    {
+        INIT_GUARD();
+
+        uint32_t bufferSize;
+        if (!m_engine->getBufferSize(&bufferSize))
+            return false;
+        if (outReady)
+        {
+            *outReady = bytesAvailable() >= bufferSize;
+        }
+
+        return true;
+    }
+
     int StreamSource::readImpl(uint8_t *output, int length)
     {
         // TODO: Put this in another thread
@@ -174,13 +171,22 @@ namespace insound {
         if (SDL_AudioStreamAvailable(m->stream) < length)
         {
             std::memset(output, 0, length);
+            if (m->isOneShot) // if sound ended and nothing to read, close the source
+            {
+                bool ended;
+                if (m->decoder->isEnded(&ended) && ended)
+                {
+                    close();
+                    return length;
+                }
+            }
             return length;
         }
 
         const auto read = SDL_AudioStreamGet(m->stream, output, length);
         if (read <= 0)
         {
-            pushError(Result::SdlErr, SDL_GetError());
+            INSOUND_PUSH_ERROR(Result::SdlErr, SDL_GetError());
             return 0;
         }
 
@@ -217,6 +223,8 @@ namespace insound {
     {
         if (!Source::init(engine, parentClock, paused))
             return false;
+        m->looping = isLooping;
+        m->isOneShot = isOneShot;
         if (!open(filepath))
         {
             return false;
