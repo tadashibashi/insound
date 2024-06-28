@@ -187,6 +187,14 @@ namespace insound {
 
         return framesRead;
     }
+
+    bool Mp3Decoder::isEnded(bool *outEnded) const
+    {
+        INIT_GUARD();
+        if (outEnded)
+            *outEnded = m->file.atEnd;
+        return true;
+    }
 }
 
 #endif

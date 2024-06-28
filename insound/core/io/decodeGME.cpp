@@ -185,6 +185,12 @@ namespace insound {
         return (gme_tell_samples(m->emu) - lastSamples) / 2;
     }
 
+    bool GmeDecoder::isEnded(bool *outEnded) const
+    {
+        // TODO: support lengths, for now the track just plays until instructions stop
+        return false;
+    }
+
     bool GmeDecoder::getTrackCount(int *outTrackCount) const
     {
         INIT_GUARD();

@@ -28,6 +28,8 @@ namespace insound {
         bool isOpen() const override;
         int read(int sampleFrames, uint8_t *data) override;
 
+        bool isEnded(bool *outEnded) const override;
+
     private:
         struct Impl;
         Impl *m;

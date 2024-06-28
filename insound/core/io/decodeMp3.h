@@ -18,7 +18,7 @@ namespace insound {
 
 
     /// Stream an mp3 pcm data from a file. Does not perform any conversion.
-    class Mp3Decoder : public AudioDecoder {
+    class Mp3Decoder final : public AudioDecoder {
     public:
         Mp3Decoder();
         Mp3Decoder(Mp3Decoder &&other) noexcept;
@@ -32,6 +32,9 @@ namespace insound {
         [[nodiscard]]
         bool isOpen() const override;
         int read(int sampleFrames, uint8_t *data) override;
+
+        [[nodiscard]]
+        bool isEnded(bool *outEnded) const override;
     private:
         struct Impl;
         Impl *m;
