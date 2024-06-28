@@ -45,12 +45,9 @@ bool insound::loadAudio(const fs::path &path, const AudioSpec &targetSpec, uint8
 
     if (ext == ".WAV")
     {
-        if (decodeWAV_v2(fileDataBuf, fileDataSize, &spec, &buffer, &bufferSize, &markers) != WAVResult::Ok)
-        {
-            // fallback to SDL's WAV parser
-            if (!decodeWAV((uint8_t *)fileData.data(), fileDataSize, &spec, &buffer, &bufferSize))
-                return false;
-        }
+        // fallback to SDL's WAV parser
+        if (!decodeWAV((uint8_t *)fileData.data(), fileDataSize, &spec, &buffer, &bufferSize, &markers))
+            return false;
     }
     else if (ext == ".OGG")
     {
