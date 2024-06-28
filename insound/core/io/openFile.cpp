@@ -18,7 +18,7 @@ static bool openFileURLSync(const fs::path &url, std::string *outData)
 {
     if (!outData)
     {
-        insound::pushError(insound::Result::InvalidArg, "openFileURLSync: outData must not be NULL");
+        INSOUND_PUSH_ERROR(insound::Result::InvalidArg, "openFileURLSync: outData must not be NULL");
         return false;
     }
 
@@ -29,7 +29,7 @@ static bool openFileURLSync(const fs::path &url, std::string *outData)
     auto fetch = emscripten_fetch(&attr, url.c_str());
     if (!fetch)
     {
-        insound::pushError(insound::Result::LogicErr, "openFileURLSync may have been called from the main thread");
+        INSOUND_PUSH_ERROR(insound::Result::LogicErr, "openFileURLSync may have been called from the main thread");
         return false;
     }
 
@@ -46,7 +46,7 @@ static bool openFileURLSync(const fs::path &url, std::string *outData)
 
         // TODO: handle redirects, or check if emscripten_fetch handles it for us.
 
-        insound::pushError(insound::Result::RuntimeErr, "Http request received a non-200 status code");
+        INSOUND_PUSH_ERROR(insound::Result::RuntimeErr, "Http request received a non-200 status code");
         emscripten_fetch_close(fetch);
         return false;
     }
@@ -66,14 +66,14 @@ static bool openFileFstream(const fs::path &path, std::string *outData)
     std::ifstream file(path, std::ios::in | std::ios::binary);
     if (!file.is_open())
     {
-        pushError(Result::FileOpenErr, std::strerror(errno));
+        INSOUND_PUSH_ERROR(Result::FileOpenErr, std::strerror(errno));
         return false;
     }
 
     // Seek to the end of the file to get the file size
     if (!file.seekg(0, std::ios_base::end))
     {
-        pushError(Result::RuntimeErr, "openFile: file failed to seek");
+        INSOUND_PUSH_ERROR(Result::RuntimeErr, "openFile: file failed to seek");
         return false;
     }
 
@@ -85,24 +85,24 @@ static bool openFileFstream(const fs::path &path, std::string *outData)
         data.resize((size_t)fileSize, 0);
     }
     catch (const std::length_error &e) {
-        pushError(Result::RuntimeErr, "openFile: file size exceeded max_size()");
+        INSOUND_PUSH_ERROR(Result::RuntimeErr, "openFile: file size exceeded max_size()");
         return false;
     }
     catch(...) {
-        pushError(Result::RuntimeErr, "openFile: failed occurred while resizing data buffer");
+        INSOUND_PUSH_ERROR(Result::RuntimeErr, "openFile: failed occurred while resizing data buffer");
         return false;
     }
 
     // Seek back to the beginning, and perform the read
     if (!file.seekg(0, std::ios_base::beg))
     {
-        pushError(Result::RuntimeErr, "openFile: file failed to seek");
+        INSOUND_PUSH_ERROR(Result::RuntimeErr, "openFile: file failed to seek");
         return false;
     }
 
     if (!file.read(data.data(), fileSize))
     {
-        pushError(Result::RuntimeErr, "openFile: failed to read file");
+        INSOUND_PUSH_ERROR(Result::RuntimeErr, "openFile: failed to read file");
         return false;
     }
 

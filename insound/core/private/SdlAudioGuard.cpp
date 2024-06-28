@@ -15,7 +15,7 @@ insound::detail::SdlAudioGuard::SdlAudioGuard() : m_didInit(false)
     std::lock_guard lockGuard(s_sdlInitMutex);
     if (SDL_InitSubSystem(SDL_INIT_AUDIO) != 0)
     {
-        pushError(Result::RuntimeErr, SDL_GetError());
+        INSOUND_PUSH_ERROR(Result::RuntimeErr, SDL_GetError());
     }
     else
     {

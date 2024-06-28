@@ -33,7 +33,7 @@ struct insound::SdlAudioDevice::Impl {
         const auto deviceID = SDL_OpenAudioDevice(nullptr, false, &desired, &obtained, 0);
         if (deviceID == 0)
         {
-            pushError(Result::SdlErr, SDL_GetError());
+            INSOUND_PUSH_ERROR(Result::SdlErr, SDL_GetError());
             return false;
         }
 
@@ -83,7 +83,7 @@ struct insound::SdlAudioDevice::Impl {
                     device->callback(device->userData, &device->buffer);
                     if (SDL_QueueAudio(device->id, device->buffer.data(),(uint32_t)device->buffer.size()) != 0)
                     {
-                        pushError(Result::SdlErr, SDL_GetError());
+                        INSOUND_PUSH_ERROR(Result::SdlErr, SDL_GetError());
                         break;
                     }
                 }
@@ -163,7 +163,7 @@ struct insound::SdlAudioDevice::Impl {
         const auto deviceID = SDL_OpenAudioDevice(nullptr, false, &desired, &obtained, 0);
         if (deviceID == 0)
         {
-            pushError(Result::SdlErr, SDL_GetError());
+            INSOUND_PUSH_ERROR(Result::SdlErr, SDL_GetError());
             return false;
         }
 

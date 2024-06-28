@@ -331,7 +331,7 @@ namespace insound {
         const auto device = static_cast<Impl *>(userData);
         if (success == EM_FALSE)
         {
-            pushError(Result::RuntimeErr, "Failed to init audio thread");
+            INSOUND_PUSH_ERROR(Result::RuntimeErr, "Failed to init audio thread");
             device->close();
             return;
         }
@@ -352,7 +352,7 @@ namespace insound {
         const auto device = static_cast<Impl *>(userData);
         if (success == EM_FALSE)
         {
-            pushError(Result::RuntimeErr, "Failed to create audio worklet processor");
+            INSOUND_PUSH_ERROR(Result::RuntimeErr, "Failed to create audio worklet processor");
             device->close();
             return;
         }

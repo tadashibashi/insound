@@ -58,7 +58,7 @@ namespace insound {
         const auto result = AAsset_seek64(m_asset, static_cast<off64_t>(position), SEEK_SET);
         if (result == -1)
         {
-            pushError(Result::RuntimeErr, "Failure during AAsset_seek64");
+            INSOUND_PUSH_ERROR(Result::RuntimeErr, "Failure during AAsset_seek64");
             return false;
         }
 

@@ -22,7 +22,7 @@ namespace insound {
 /// Checks that engine is open before performing a function.
 /// Return type of the function called in most be `bool`
 #define ENGINE_INIT_GUARD() do { if (!isOpen()) { \
-        pushError(Result::EngineNotInit, __FUNCTION__); \
+        INSOUND_PUSH_ERROR(Result::EngineNotInit, __FUNCTION__); \
         return false; \
     } } while(0)
 #else
@@ -116,14 +116,14 @@ namespace insound {
 
             if (!buffer || !buffer->isLoaded())
             {
-                pushError(Result::InvalidSoundBuffer, "Failed to play sound");
+                INSOUND_PUSH_ERROR(Result::InvalidSoundBuffer, "Failed to play sound");
                 return false;
             }
 
             auto lockGuard = m_device->mixLockGuard();
             if (bus && !bus.isValid()) // if output bus was passed, and it's invalid => error
             {
-                pushError(Result::InvalidHandle,
+                INSOUND_PUSH_ERROR(Result::InvalidHandle,
                           "Engine::Impl::createBus failed because output Bus was invalid");
                 return false;
             }
@@ -199,7 +199,7 @@ namespace insound {
 
             if (output && !output.isValid()) // if output was passed, and it's invalid => error
             {
-                pushError(Result::InvalidHandle, "Engine::Impl::createBus failed because output Bus was invalid");
+                INSOUND_PUSH_ERROR(Result::InvalidHandle, "Engine::Impl::createBus failed because output Bus was invalid");
                 return false;
             }
 
@@ -233,7 +233,7 @@ namespace insound {
 
             if (!source.isValid())
             {
-                pushError(Result::InvalidHandle, "Engine::releaseBus: bus was invalid");
+                INSOUND_PUSH_ERROR(Result::InvalidHandle, "Engine::releaseBus: bus was invalid");
                 return false;
             }
 
@@ -335,7 +335,7 @@ namespace insound {
                 }
                 else
                 {
-                    pushError(Result::InvalidHandle, "Internal error: master bus is invalidated");
+                    INSOUND_PUSH_ERROR(Result::InvalidHandle, "Internal error: master bus is invalidated");
                     return false;
                 }
 

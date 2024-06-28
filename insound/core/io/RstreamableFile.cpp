@@ -14,7 +14,7 @@ namespace insound {
         m_stream.open(filepath, std::ios::binary | std::ios::in);
         if (!m_stream.is_open())
         {
-            pushError(Result::FileOpenErr, "Failed to open file");
+            INSOUND_PUSH_ERROR(Result::FileOpenErr, "Failed to open file");
             return false;
         }
         return true;
@@ -36,7 +36,7 @@ namespace insound {
         const auto result = static_cast<bool>(m_stream);
         if (!result)
         {
-            pushError(Result::RuntimeErr, "Failure during ifstream::seekg");
+            INSOUND_PUSH_ERROR(Result::RuntimeErr, "Failure during ifstream::seekg");
             return false;
         }
 
@@ -66,7 +66,7 @@ namespace insound {
         const auto result = static_cast<bool>(m_stream);
         if (!result)
         {
-            pushError(Result::RuntimeErr, "std::ifstream::read failed");
+            INSOUND_PUSH_ERROR(Result::RuntimeErr, "std::ifstream::read failed");
             return -1;
         }
 

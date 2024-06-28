@@ -25,7 +25,7 @@ namespace insound {
                         return spec.channels * (spec.format.bits() / CHAR_BIT) * spec.freq * (value / 1000000.0);
 
                     default:
-                        pushError(Result::InvalidArg, "Invalid target TimeUnit");
+                        INSOUND_PUSH_ERROR(Result::InvalidArg, "Invalid target TimeUnit");
                         return -1.0;
                 }
             } break;
@@ -44,7 +44,7 @@ namespace insound {
                         return spec.channels * (spec.format.bits() / CHAR_BIT) * spec.freq * (value / 1000.0);
 
                     default:
-                        pushError(Result::InvalidArg, "Invalid target TimeUnit");
+                        INSOUND_PUSH_ERROR(Result::InvalidArg, "Invalid target TimeUnit");
                         return -1.0;
 
                 }
@@ -64,7 +64,7 @@ namespace insound {
                         return value * spec.channels * (spec.format.bits() / CHAR_BIT);
 
                     default:
-                        pushError(Result::InvalidArg, "Invalid target TimeUnit");
+                        INSOUND_PUSH_ERROR(Result::InvalidArg, "Invalid target TimeUnit");
                         return -1.0;
                 }
             } break;
@@ -83,13 +83,13 @@ namespace insound {
                         return value / spec.channels / (spec.format.bits() / CHAR_BIT);
 
                     default:
-                        pushError(Result::InvalidArg, "Invalid target TimeUnit");
+                        INSOUND_PUSH_ERROR(Result::InvalidArg, "Invalid target TimeUnit");
                         return -1.0;
                 }
             } break;
 
             default:
-                pushError(Result::InvalidArg, "Invalid source TimeUnit");
+                INSOUND_PUSH_ERROR(Result::InvalidArg, "Invalid source TimeUnit");
                 return -1.0;
         }
     }

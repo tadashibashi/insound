@@ -28,14 +28,14 @@ namespace insound {
 #endif
         if (!stream)
         {
-            pushError(Result::RuntimeErr, "Failed to create Rstreamable");
+            INSOUND_PUSH_ERROR(Result::RuntimeErr, "Failed to create Rstreamable");
             delete stream;
             return false;
         }
 
         if (!stream->open(filepath))
         {
-            pushError(Result::RuntimeErr, "Failed to open Rstreamable");
+            INSOUND_PUSH_ERROR(Result::RuntimeErr, "Failed to open Rstreamable");
             delete stream;
             return false;
         }

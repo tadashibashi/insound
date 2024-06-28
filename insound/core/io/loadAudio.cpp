@@ -16,7 +16,7 @@ bool insound::loadAudio(const fs::path &path, const AudioSpec &targetSpec, uint8
     // Detect audio file type by extension
     if (!path.has_extension())
     {
-        pushError(Result::InvalidArg,
+        INSOUND_PUSH_ERROR(Result::InvalidArg,
                   R"(`path` must contain a recognizable extension e.g. ".wav", ".ogg")");
         return false;
     }
@@ -58,7 +58,7 @@ bool insound::loadAudio(const fs::path &path, const AudioSpec &targetSpec, uint8
         if (!decodeVorbis(fileDataBuf, fileDataSize, &spec, &buffer, &bufferSize))
             return false;
 #else
-        pushError(Result::NotSupported, "Vorbis decoding is not supported, make sure to compile with "
+        INSOUND_PUSH_ERROR(Result::NotSupported, "Vorbis decoding is not supported, make sure to compile with "
             "INSOUND_DECODE_VORBIS defined");
 #endif
     }
@@ -68,7 +68,7 @@ bool insound::loadAudio(const fs::path &path, const AudioSpec &targetSpec, uint8
         if (!decodeFLAC(fileDataBuf, fileDataSize, &spec, &buffer, &bufferSize))
             return false;
 #else
-        pushError(Result::NotSupported, "FLAC decoding is not supported, make sure to compile with "
+        INSOUND_PUSH_ERROR(Result::NotSupported, "FLAC decoding is not supported, make sure to compile with "
             "INSOUND_DECODE_FLAC defined");
         return false;
 #endif
@@ -79,7 +79,7 @@ bool insound::loadAudio(const fs::path &path, const AudioSpec &targetSpec, uint8
         if (!decodeMp3(fileDataBuf, fileDataSize, &spec, &buffer, &bufferSize))
             return false;
 #else
-        pushError(Result::NotSupported, "MP3 decoding is not supported, make sure to compile with "
+        INSOUND_PUSH_ERROR(Result::NotSupported, "MP3 decoding is not supported, make sure to compile with "
             "INSOUND_DECODE_MP3 defined");
         return false;
 #endif
@@ -90,7 +90,7 @@ bool insound::loadAudio(const fs::path &path, const AudioSpec &targetSpec, uint8
         if (!decodeGME(fileDataBuf, fileDataSize, targetSpec.freq, 0, -1, &spec, &buffer, &bufferSize))
             return false;
 #else
-        pushError(Result::NotSupported, "GME decoding is not supported, make sure to compile with "
+        INSOUND_PUSH_ERROR(Result::NotSupported, "GME decoding is not supported, make sure to compile with "
             "INSOUND_DECODE_GME defined");
         return false;
 #endif
@@ -143,7 +143,7 @@ bool insound::convertAudio(uint8_t *audioData, const uint32_t length, const Audi
 
     if (cvtResult < 0)
     {
-        pushError(Result::SdlErr, SDL_GetError());
+        INSOUND_PUSH_ERROR(Result::SdlErr, SDL_GetError());
         return false;
     }
 
@@ -172,7 +172,7 @@ bool insound::convertAudio(uint8_t *audioData, const uint32_t length, const Audi
         std::free(cvt.buf);
 
     if (cvtResult != 0)
-        pushError(Result::SdlErr, SDL_GetError());
+        INSOUND_PUSH_ERROR(Result::SdlErr, SDL_GetError());
 
     return cvtResult == 0;
 }

@@ -137,7 +137,7 @@ namespace insound {
 
             default:
             {
-                pushError(Result::InvalidArg, "PanEffect received unknown parameter index");
+                INSOUND_PUSH_ERROR(Result::InvalidArg, "PanEffect received unknown parameter index");
             } break;
         }
     }

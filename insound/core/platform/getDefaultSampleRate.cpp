@@ -28,7 +28,7 @@ int insound::getDefaultSampleRate()
     SDL_AudioSpec defaultSpec;
     if (SDL_GetDefaultAudioInfo(nullptr, &defaultSpec, SDL_FALSE) != 0)
     {
-        pushError(Result::SdlErr, SDL_GetError());
+        INSOUND_PUSH_ERROR(Result::SdlErr, SDL_GetError());
         return -1;
     }
 

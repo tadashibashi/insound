@@ -18,7 +18,7 @@ bool insound::decodeGME(const uint8_t *memory, uint32_t size, int samplerate, in
     Music_Emu *emu;
     if (const auto result = gme_open_data(memory, size, &emu, samplerate); result != nullptr)
     {
-        pushError(Result::GmeErr, result);
+        INSOUND_PUSH_ERROR(Result::GmeErr, result);
         return false;
     }
 
@@ -27,7 +27,7 @@ bool insound::decodeGME(const uint8_t *memory, uint32_t size, int samplerate, in
         gme_info_t *info;
         if (const auto result = gme_track_info(emu, &info, track); result != nullptr)
         {
-            pushError(Result::GmeErr, result);
+            INSOUND_PUSH_ERROR(Result::GmeErr, result);
             gme_delete(emu);
             return false; // todo: allow for fallback value?
         }
@@ -47,7 +47,7 @@ bool insound::decodeGME(const uint8_t *memory, uint32_t size, int samplerate, in
 
     if (const auto result = gme_start_track(emu, track); result != nullptr)
     {
-        pushError(Result::GmeErr, result);
+        INSOUND_PUSH_ERROR(Result::GmeErr, result);
         gme_delete(emu);
         return false;
     }
@@ -62,7 +62,7 @@ bool insound::decodeGME(const uint8_t *memory, uint32_t size, int samplerate, in
     {
         if (const auto result = gme_play(emu, 1024, buf + i); result != nullptr)
         {
-            pushError(Result::GmeErr, result);
+            INSOUND_PUSH_ERROR(Result::GmeErr, result);
             free(buf);
             gme_delete(emu);
             return false;
@@ -72,9 +72,9 @@ bool insound::decodeGME(const uint8_t *memory, uint32_t size, int samplerate, in
     if (i < sampleSize)
     {
         // Get the rest
-        if (const auto result = gme_play(emu, sampleSize - i, buf + i); result != nullptr)
+        if (const auto result = gme_play(emu, static_cast<int>(sampleSize) - i, buf + i); result != nullptr)
         {
-            pushError(Result::GmeErr, result);
+            INSOUND_PUSH_ERROR(Result::GmeErr, result);
             free(buf);
             gme_delete(emu);
             return false;
@@ -113,7 +113,7 @@ bool insound::decodeGME(const uint8_t *memory, uint32_t size, int samplerate, in
 bool insound::decodeGME(const uint8_t *memory, uint32_t size, int samplerate, int track, int lengthMS, AudioSpec *outSpec, uint8_t **outData,
                         uint32_t *outBufferSize)
 {
-    pushError(Result::NotSupported, "libgme decoding is not supported, make sure to compile with "
+    INSOUND_PUSH_ERROR(Result::NotSupported, "libgme decoding is not supported, make sure to compile with "
         "INSOUND_DECODE_GME defined");
     return false;
 }
@@ -122,11 +122,11 @@ bool insound::decodeGME(const uint8_t *memory, uint32_t size, int samplerate, in
 namespace insound {
 #ifdef INSOUND_DEBUG
 #define INIT_GUARD() do { if (!isOpen()) { \
-    pushError(Result::LogicErr, "GmeDecoder::Impl::emu was not init"); \
+    INSOUND_PUSH_ERROR(Result::LogicErr, "GmeDecoder::Impl::emu was not init"); \
     return false; \
 } } while(0)
 #define GME_ERR_CHECK(statement) do { if (const auto result = (statement); result != nullptr) { \
-        pushError(Result::GmeErr, result); \
+        INSOUND_PUSH_ERROR(Result::GmeErr, result); \
         return false; \
     } } while(0)
 #else
@@ -178,7 +178,7 @@ namespace insound {
         if (const auto result = gme_play(m->emu, sampleFrames * 2, (short *)data);
             result != nullptr)
         {
-            pushError(Result::GmeErr, result); // todo: this could lead to a stack overflow
+            INSOUND_PUSH_ERROR(Result::GmeErr, result); // todo: this could lead to a stack overflow
             return 0;
         }
 
@@ -261,13 +261,13 @@ namespace insound {
             char header[4];
             if (m->stream.read(reinterpret_cast<uint8_t *>(header), sizeof(header)) < sizeof(header))
             {
-                pushError(Result::UnexpectedData, "Failed to read file header, not a valid GME file");
+                INSOUND_PUSH_ERROR(Result::UnexpectedData, "Failed to read file header, not a valid GME file");
                 m->stream.close();
                 return false;
             }
             if (!m->stream.seek(0))
             {
-                pushError(Result::RuntimeErr, "Failed to seek back to stream start of GME file");
+                INSOUND_PUSH_ERROR(Result::RuntimeErr, "Failed to seek back to stream start of GME file");
                 m->stream.close();
                 return false;
             }
@@ -275,7 +275,7 @@ namespace insound {
             fileType = gme_identify_extension(gme_identify_header(header));
             if (!fileType)
             {
-                pushError(Result::GmeErr, gme_wrong_file_type);
+                INSOUND_PUSH_ERROR(Result::GmeErr, gme_wrong_file_type);
                 return false;
             }
         }
@@ -284,7 +284,7 @@ namespace insound {
         const auto emu = gme_new_emu(fileType, m_spec.freq);
         if (!emu)
         {
-            pushError(Result::GmeErr, "gme_new_emu_multi_channel failed");
+            INSOUND_PUSH_ERROR(Result::GmeErr, "gme_new_emu_multi_channel failed");
             m->stream.close();
             return false;
         }
@@ -293,7 +293,7 @@ namespace insound {
         if (const auto result = gme_load_custom(emu, &gme_read_rstream, m->stream.size(), m->stream.stream());
             result != nullptr)
         {
-            pushError(Result::GmeErr, result);
+            INSOUND_PUSH_ERROR(Result::GmeErr, result);
             m->stream.close();
             gme_delete(emu);
             return false;
@@ -307,7 +307,7 @@ namespace insound {
 
         if (const auto result = gme_start_track(emu, 0); result != nullptr)
         {
-            pushError(Result::GmeErr, result);
+            INSOUND_PUSH_ERROR(Result::GmeErr, result);
             gme_delete(emu);
             return false;
         }

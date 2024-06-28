@@ -224,7 +224,7 @@ void insound::DelayEffect::receiveFloat(int index, float value)
 
         default:
         {
-            pushError(Result::InvalidArg, "Unknown parameter index passed to DelayEffect::receiveFloat");
+            INSOUND_PUSH_ERROR(Result::InvalidArg, "Unknown parameter index passed to DelayEffect::receiveFloat");
         } break;
     }
 }
@@ -247,7 +247,7 @@ void insound::DelayEffect::receiveInt(int index, int value)
 
         default:
         {
-            pushError(Result::InvalidArg, "Unknown parameter index passed to DelayEffect::receiveInt");
+            INSOUND_PUSH_ERROR(Result::InvalidArg, "Unknown parameter index passed to DelayEffect::receiveInt");
         } break;
     }
 

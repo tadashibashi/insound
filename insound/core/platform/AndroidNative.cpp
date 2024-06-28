@@ -34,7 +34,7 @@ namespace insound {
     {
         if (!g_assets)
         {
-            pushError(Result::RuntimeErr, "The Insound Android Native object was not initialized. "
+            INSOUND_PUSH_ERROR(Result::RuntimeErr, "The Insound Android Native object was not initialized. "
                                           "Pleaese make sure to call io.insound.Insound.ini(this) "
                                           "in an Activity.onCreate");
             return nullptr;

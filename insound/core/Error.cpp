@@ -1,9 +1,7 @@
 #include "Error.h"
-
+#include "logging.h"
 #include <stack>
 #include <utility>
-
-#include <SDL2/SDL.h> // for SDL_Log TODO: remove this dependency? Android won't log from printf...
 
 namespace insound {
     /// Each thread has its own error stack to prevent data races
@@ -36,7 +34,7 @@ namespace insound {
     Result::Result(Code code, const char *message): code(code), message(message)
     { }
 
-    void pushError(Result::Code code, const char *message)
+    void pushError(Result::Code code, const char *message, const char *functionName, const char *fileName, int lineNumber)
     {
 #if INSOUND_DEBUG || INSOUND_LOG_ERRORS
         if (code >= Result::Count)
@@ -46,12 +44,14 @@ namespace insound {
 
         if (message)
         {
-            SDL_LogError(SDL_LOG_PRIORITY_ERROR, "INSOUND ERROR: %s: %s\n", s_codeNames[code],
+            INSOUND_ERR("INSOUND ERROR: in %s:%d: %s: %s: %s\n",
+                fileName, lineNumber, functionName, s_codeNames[code],
                 s_errors.emplace(code, message).message);
         }
         else
         {
-            SDL_LogError(SDL_LOG_PRIORITY_ERROR, "INSOUND ERROR: %s\n", s_codeNames[code]);
+            INSOUND_ERR("INSOUND ERROR: in %s:%d: %s: %s\n", fileName, lineNumber, functionName,
+                s_codeNames[code]);
             s_errors.emplace(code, "");
         }
 #else

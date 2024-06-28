@@ -15,7 +15,7 @@ namespace insound {
 /// (should be thread-safe, since each thread has its own error and system error stacks)
 #define HANDLE_GUARD() do { if (detail::peekSystemError().code == Result::InvalidHandle) { \
         detail::popSystemError(); \
-        pushError(Result::InvalidHandle, __FUNCTION__); \
+        INSOUND_PUSH_ERROR(Result::InvalidHandle, __FUNCTION__); \
         return false; \
     } } while(0)
 
@@ -131,7 +131,7 @@ namespace insound {
 
             default:
             {
-                pushError(Result::InvalidArg, "Unknown pcm source command type");
+                INSOUND_PUSH_ERROR(Result::InvalidArg, "Unknown pcm source command type");
             } break;
         }
     }
@@ -407,9 +407,7 @@ namespace insound {
             // Release sound if it ended and is a oneshot
             if (m_isOneShot && m_position >= (float)frameSize)
             {
-                Handle<PCMSource> handle;
-                if (m_engine->tryFindHandle(this, &handle))
-                    m_engine->releaseSound((Handle<Source>)handle);
+                close();
             }
         }
 

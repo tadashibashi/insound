@@ -19,7 +19,7 @@ namespace insound {
 
         if (!pcmData)
         {
-            pushError(Result::RuntimeErr, "FLAC file failed to decode");
+            INSOUND_PUSH_ERROR(Result::RuntimeErr, "FLAC file failed to decode");
             return false;
         }
 
@@ -55,7 +55,7 @@ namespace insound {
     bool decodeFLAC(const uint8_t *memory, uint32_t size, AudioSpec *outSpec, uint8_t **outData,
         uint32_t *outBufferSize)
     {
-        pushError(Result::NotSupported, "FLAC decoding is not supported, make sure to compile with "
+        INSOUND_PUSH_ERROR(Result::NotSupported, "FLAC decoding is not supported, make sure to compile with "
             "INSOUND_DECODE_FLAC defined");
         return false;
     }

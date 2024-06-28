@@ -66,12 +66,12 @@ namespace insound {
                 ((T *)(pool->data() + id.index * elemSize))->init(std::forward<TArgs>(args)...); // `T` poolable must implement `init`
             }
             catch (const std::exception &err) { // init threw an exception, deallocate
-                pushError(Result::RuntimeErr, err.what());
+                INSOUND_PUSH_ERROR(Result::RuntimeErr, err.what());
                 pool->deallocate(id);
                 return {};
             }
             catch (...) {                       // unknown error thrown, deallocate
-                pushError(Result::RuntimeErr, "constructor threw unknown error");
+                INSOUND_PUSH_ERROR(Result::RuntimeErr, "constructor threw unknown error");
                 pool->deallocate(id);
                 return {};
             }
@@ -99,18 +99,18 @@ namespace insound {
                 }
                 catch (const std::exception &err)
                 {
-                    pushError(Result::RuntimeErr, err.what()); // don't propagate exception, just push as error
+                    INSOUND_PUSH_ERROR(Result::RuntimeErr, err.what()); // don't propagate exception, just push as error
                     dtorThrew = true;
                 }
                 catch (...)
                 {
-                    pushError(Result::RuntimeErr, "Unknown exception thrown in pool object `release()`");
+                    INSOUND_PUSH_ERROR(Result::RuntimeErr, "Unknown exception thrown in pool object `release()`");
                     dtorThrew = true;
                 }
             }
             else
             {
-                pushError(Result::InvalidHandle, "Invalid handle was passed to MultiPool::deallocate");
+                INSOUND_PUSH_ERROR(Result::InvalidHandle, "Invalid handle was passed to MultiPool::deallocate");
                 return false;
             }
 

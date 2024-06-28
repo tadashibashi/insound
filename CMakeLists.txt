@@ -32,8 +32,10 @@ endif()
 # Audio file decoder
 option(INSOUND_DECODE_VORBIS  "Include ogg vorbis file decoding in build."           ON)
 option(INSOUND_DECODE_MP3     "Include mp3 file decoding in build."                  ON)
-option(INSOUND_DECODE_FLAC    "Include flac file decoding in build."                  ON)
-option(INSOUND_DECODE_GME     "Include classic game emu decoding in build."         ON)
+option(INSOUND_DECODE_FLAC    "Include flac file decoding in build."                 ON)
+option(INSOUND_DECODE_GME     "Include classic game emu decoding in build."          ON)
+
+option(INSOUND_LOGGING        "Enable logging in release mode"                       ON)
 
 option(INSOUND_NO_PTHREAD     "Turn pthreads off. (Only affects Emscripten builds)"  OFF)
 

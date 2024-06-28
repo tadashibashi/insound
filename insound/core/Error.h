@@ -30,7 +30,7 @@ namespace insound {
         const char *message;
     };
 
-    void pushError(Result::Code code, const char *message = nullptr);
+    void pushError(Result::Code code, const char *message, const char *functionName, const char *fileName, int lineNumber);
 
     Result popError();
 
@@ -49,3 +49,5 @@ namespace insound {
     }
 
 }
+
+#define INSOUND_PUSH_ERROR(code, message) insound::pushError((code), (message), __FUNCTION__, __FILE__, __LINE__);

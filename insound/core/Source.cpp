@@ -13,7 +13,7 @@ namespace insound {
 
 #define HANDLE_GUARD() do { if (detail::peekSystemError().code == Result::InvalidHandle) { \
     detail::popSystemError(); \
-    pushError(Result::InvalidHandle, __FUNCTION__); \
+    INSOUND_PUSH_ERROR(Result::InvalidHandle, __FUNCTION__); \
     return false; \
 } } while(0)
 

@@ -179,6 +179,10 @@ else()
     set(INSOUND_DEBUG FALSE)
 endif()
 
+if (INSOUND_LOGGING)
+    target_compile_definitions(insound PUBLIC -DINSOUND_LOGGING=1)
+endif()
+
 if (ANDROID)
     target_link_libraries(insound PRIVATE aaudio)
 endif()

@@ -8,7 +8,7 @@
 namespace insound {
 #define HANDLE_GUARD() do { if (detail::peekSystemError().code == Result::InvalidHandle) { \
     detail::popSystemError(); \
-    pushError(Result::InvalidHandle, __FUNCTION__); \
+    INSOUND_PUSH_ERROR(Result::InvalidHandle, __FUNCTION__); \
     return false; \
 } } while(0)
 
@@ -98,7 +98,7 @@ namespace insound {
 
             default:
             {
-                pushError(Result::InvalidArg, "Unknown bus command type");
+                INSOUND_PUSH_ERROR(Result::InvalidArg, "Unknown bus command type");
             } break;
         }
     }
@@ -288,7 +288,7 @@ namespace insound {
 
         if (m_isMaster)
         {
-            pushError(Result::LogicErr, "Cannot release master bus");
+            INSOUND_PUSH_ERROR(Result::LogicErr, "Cannot release master bus");
             return false;
         }
 
@@ -328,7 +328,7 @@ namespace insound {
 
         if (m_isMaster)
         {
-            pushError(Result::LogicErr, "Cannot release master bus");
+            INSOUND_PUSH_ERROR(Result::LogicErr, "Cannot release master bus");
             return false;
         }
 
@@ -362,13 +362,13 @@ namespace insound {
     {
         if (!bus.isValid())
         {
-            pushError(Result::InvalidHandle, "Bus::appendSource: `bus` is invalid");
+            INSOUND_PUSH_ERROR(Result::InvalidHandle, "Bus::appendSource: `bus` is invalid");
             return false;
         }
 
         if (!source.isValid())
         {
-            pushError(Result::InvalidHandle, "Bus::appendSource: `source` is invalid");
+            INSOUND_PUSH_ERROR(Result::InvalidHandle, "Bus::appendSource: `source` is invalid");
             return false;
         }
 
@@ -379,13 +379,13 @@ namespace insound {
     {
         if (!bus.isValid())
         {
-            pushError(Result::InvalidHandle, "Bus::removeSoruce: `bus` is invalid");
+            INSOUND_PUSH_ERROR(Result::InvalidHandle, "Bus::removeSoruce: `bus` is invalid");
             return false;
         }
 
         if (!source.isValid())
         {
-            pushError(Result::InvalidArg, "Bus::removeSource: `source` is invalid");
+            INSOUND_PUSH_ERROR(Result::InvalidArg, "Bus::removeSource: `source` is invalid");
             return false;
         }
 

@@ -14,7 +14,7 @@ namespace insound {
         // Current position already finished reading?
         if (m_pos >= m_size)
         {
-            pushError(Result::EndOfBuffer, "Cannot read string from buffer because BufferView is done reading");
+            INSOUND_PUSH_ERROR(Result::EndOfBuffer, "Cannot read string from buffer because BufferView is done reading");
             return 0;
         }
 
@@ -42,12 +42,12 @@ namespace insound {
         }
         catch(const std::exception &e)
         {
-            pushError(Result::StdExcept, e.what());
+            INSOUND_PUSH_ERROR(Result::StdExcept, e.what());
             return 0;
         }
         catch(...)
         {
-            pushError(Result::UnknownErr, "Failed to read string from buffer: unknown error");
+            INSOUND_PUSH_ERROR(Result::UnknownErr, "Failed to read string from buffer: unknown error");
             throw;
         }
     }
@@ -56,7 +56,7 @@ namespace insound {
     {
         if (m_pos + length > m_size)
         {
-            pushError(Result::EndOfBuffer, "Size of read exceeds buffer size");
+            INSOUND_PUSH_ERROR(Result::EndOfBuffer, "Size of read exceeds buffer size");
             return 0;
         }
 
@@ -70,7 +70,7 @@ namespace insound {
         // Current position already finished reading?
         if (m_pos >= m_size)
         {
-            pushError(Result::EndOfBuffer, "Cannot read string from buffer because BufferView is done reading");
+            INSOUND_PUSH_ERROR(Result::EndOfBuffer, "Cannot read string from buffer because BufferView is done reading");
             return 0;
         }
 
@@ -100,12 +100,12 @@ namespace insound {
         }
         catch(const std::exception &e)
         {
-            pushError(Result::StdExcept, e.what());
+            INSOUND_PUSH_ERROR(Result::StdExcept, e.what());
             return 0;
         }
         catch(...)
         {
-            pushError(Result::UnknownErr, "Failed to read string from buffer: unknown error");
+            INSOUND_PUSH_ERROR(Result::UnknownErr, "Failed to read string from buffer: unknown error");
             throw;
         }
     }
@@ -127,7 +127,7 @@ namespace insound {
 
         if (m_pos + size > m_size)
         {
-            pushError(Result::EndOfBuffer, "Size of read exceeds buffer size");
+            INSOUND_PUSH_ERROR(Result::EndOfBuffer, "Size of read exceeds buffer size");
             return 0;
         }
 
@@ -157,7 +157,7 @@ namespace insound {
 
         if (m_pos + size > m_size)
         {
-            pushError(Result::EndOfBuffer, "Size of read exceeds buffer size");
+            INSOUND_PUSH_ERROR(Result::EndOfBuffer, "Size of read exceeds buffer size");
             return 0;
         }
 
@@ -194,7 +194,7 @@ namespace insound {
     {
         if (length + m_pos + 1 > m_size) // +1 for null terminator
         {
-            pushError(Result::EndOfBuffer, "Size of read exceeds buffer size");
+            INSOUND_PUSH_ERROR(Result::EndOfBuffer, "Size of read exceeds buffer size");
             return 0;
         }
 

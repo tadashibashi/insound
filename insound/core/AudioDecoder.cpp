@@ -4,7 +4,7 @@
 namespace insound {
 #ifdef INSOUND_DEBUG
 #define INIT_GUARD() do { if (!isOpen()) { \
-        pushError(Result::DecoderNotInit, __FUNCTION__); \
+        INSOUND_PUSH_ERROR(Result::DecoderNotInit, __FUNCTION__); \
         return false; \
     } } while(0)
 #else

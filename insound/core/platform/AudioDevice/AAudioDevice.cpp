@@ -38,7 +38,7 @@ namespace insound {
             AAudioStreamBuilder *builder;
             if (const auto result = AAudio_createStreamBuilder(&builder); result != AAUDIO_OK)
             {
-                pushError(Result::RuntimeErr, AAudio_convertResultToText(result));
+                INSOUND_PUSH_ERROR(Result::RuntimeErr, AAudio_convertResultToText(result));
                 return false;
             }
 
@@ -66,7 +66,7 @@ namespace insound {
             if (auto result = AAudioStreamBuilder_openStream(builder, &m_stream); result != AAUDIO_OK)
             {
                 AAudioStreamBuilder_delete(builder);
-                pushError(Result::RuntimeErr, AAudio_convertResultToText(result));
+                INSOUND_PUSH_ERROR(Result::RuntimeErr, AAudio_convertResultToText(result));
                 return false;
             }
 

@@ -21,7 +21,7 @@ namespace insound {
 
         if (!pcmData)
         {
-            pushError(Result::RuntimeErr, "MP3 file failed to decode");
+            INSOUND_PUSH_ERROR(Result::RuntimeErr, "MP3 file failed to decode");
             return false;
         }
 
@@ -54,34 +54,40 @@ namespace insound {
 
 #if INSOUND_DEBUG
 #define INIT_GUARD() do { if (!isOpen()) { \
-        pushError(Result::DecoderNotInit, __FUNCTION__); \
+        INSOUND_PUSH_ERROR(Result::DecoderNotInit, __FUNCTION__); \
         return false; \
     } } while(0)
 #else
 #define INIT_GUARD()
 #endif
-    static size_t drmp3_on_read_rstream(void *userData, void *bufferOut, size_t bytesToRead)
+    static size_t drmp3_on_read_rstream(void *userData, void *bufferOut, const size_t bytesToRead)
     {
-        auto stream = static_cast<Rstreamable *>(userData);
-        return stream->read(reinterpret_cast<uint8_t *>(bufferOut), bytesToRead);
+        const auto stream = static_cast<Rstreamable *>(userData);
+        const auto bytesRead = stream->read(static_cast<uint8_t *>(bufferOut), static_cast<int64_t>(bytesToRead));
+        if (bytesRead < 0)
+        {
+            INSOUND_PUSH_ERROR(Result::RuntimeErr, "Failed to read bytes from Rstreamable");
+            return 0;
+        }
+
+        return bytesRead;
     }
 
-    static drmp3_bool32 drmp3_on_seek_rstream(void *userData, int offset, drmp3_seek_origin origin)
+    static drmp3_bool32 drmp3_on_seek_rstream(void *userData, const int offset, const drmp3_seek_origin origin)
     {
-        auto stream = static_cast<Rstreamable *>(userData);
-        int64_t seekPosition = (origin == drmp3_seek_origin_current) ?
+        const auto stream = static_cast<Rstreamable *>(userData);
+        const auto seekPosition = (origin == drmp3_seek_origin_current) ?
                 offset + stream->position() : offset;
         return stream->seek(seekPosition);
     }
 
     struct Mp3Decoder::Impl {
-        Impl() : file{}, looping{false}, cursor{0}
+        Impl() : file{}, stream{}
         {}
 
         drmp3 file;
         Rstream stream;
-        bool looping;
-        uint32_t cursor;
+        uint64_t lengthPCM;
     };
 
     Mp3Decoder::Mp3Decoder() : m(new Impl)
@@ -116,7 +122,7 @@ namespace insound {
         if (!drmp3_init(&file, drmp3_on_read_rstream, drmp3_on_seek_rstream,
                         m->stream.stream(), nullptr))
         {
-            pushError(Result::RuntimeErr, "Mp3 file failed to open/init");
+            INSOUND_PUSH_ERROR(Result::RuntimeErr, "Mp3 file failed to open/init");
             return false;
         }
 
@@ -142,7 +148,7 @@ namespace insound {
         }
     }
 
-    bool Mp3Decoder::setPosition(TimeUnit units, uint64_t position)
+    bool Mp3Decoder::setPosition(const TimeUnit units, const uint64_t position)
     {
         INIT_GUARD();
         const auto targetPCMFrame = std::round(convert(position, units, TimeUnit::PCM, m_spec));
@@ -151,7 +157,7 @@ namespace insound {
         return static_cast<bool>(result);
     }
 
-    bool Mp3Decoder::getPosition(TimeUnit units, double *outPosition) const
+    bool Mp3Decoder::getPosition(const TimeUnit units, double *outPosition) const
     {
         INIT_GUARD();
         const auto pcmFrame = m->file.currentPCMFrame;

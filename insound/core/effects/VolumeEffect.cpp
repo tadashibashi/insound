@@ -114,7 +114,7 @@ namespace insound {
 
             default:
             {
-                pushError(Result::InvalidArg, "Unknown parameter index");
+                INSOUND_PUSH_ERROR(Result::InvalidArg, "Unknown parameter index");
             } break;
         }
     }

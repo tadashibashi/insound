@@ -22,7 +22,7 @@ namespace insound {
 
         if (sampleCount < 0)
         {
-            pushError(Result::RuntimeErr, "decodeVorbis: failed to decode vorbis file");
+            INSOUND_PUSH_ERROR(Result::RuntimeErr, "decodeVorbis: failed to decode vorbis file");
             return false;
         }
 
@@ -58,7 +58,7 @@ namespace insound {
     bool decodeVorbis(const uint8_t *memory, uint32_t size, AudioSpec *outSpec, uint8_t **outData,
         uint32_t *outBufferSize)
     {
-        pushError(Result::NotSupported, "Vorbis decoding is not supported, make sure to compile with "
+        INSOUND_PUSH_ERROR(Result::NotSupported, "Vorbis decoding is not supported, make sure to compile with "
             "INSOUND_DECODE_VORBIS defined");
         return false;
     }

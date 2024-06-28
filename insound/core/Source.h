@@ -72,7 +72,7 @@ namespace insound {
 
             if (detail::popSystemError().code == Result::InvalidHandle)
             {
-                pushError(Result::InvalidHandle, "Source::addEffect");
+                INSOUND_PUSH_ERROR(Result::InvalidHandle, "Source::addEffect");
                 return {};
             }
 
@@ -82,7 +82,7 @@ namespace insound {
             effect = m_engine->getObjectPool().allocate<T>(std::forward<TArgs>(args)...);
             if (!effect.isValid())
             {
-                pushError(Result::RuntimeErr, "Out of memory");
+                INSOUND_PUSH_ERROR(Result::RuntimeErr, "Out of memory");
                 return {};
             }
 
