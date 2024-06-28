@@ -168,13 +168,20 @@ namespace insound {
         /// Swap out this sound source's internal output buffer
         bool swapBuffers(AlignedVector<uint8_t, 16> *buffer);
 
+        /// Calls release on this through the engine.
+        /// @param recursive if a sound has child sound Sources, such as a bus, this will call close/release on every
+        ///                  child also. Otherwise, this parameter has no meaning.
+        /// @note Changes will not happen instantly, but is deferred until the next call to Engine::update. This
+        ///       protects a Source from interrupting current iterations of audio reading.
+        bool close(bool recursive = false);
     protected:
         Source();
         /// All child classes must implement an init function, and call it's parent's init
         bool init(Engine *engine , uint32_t parentClock, bool paused);
-        /// Clean up logic before Source's pool memory is deallocated
-        virtual bool release();
     private: // private + friend functionality
+        /// Clean up logic before Source's pool memory is deallocated, do not call directly
+        virtual bool release();
+
         friend class Engine;
         friend class Bus;
         friend class MultiPool; // for access to `init` and `release` lifetime functions

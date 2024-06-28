@@ -55,6 +55,13 @@ namespace insound {
         return true;
     }
 
+    bool Source::close(bool recursive)
+    {
+        HANDLE_GUARD();
+
+        return m_engine->releaseSoundRaw(this, recursive);
+    }
+
     bool Source::release()
     {
         HANDLE_GUARD();
@@ -167,7 +174,7 @@ namespace insound {
 
                     if (m_releaseOnPauseClock)
                     {
-                        m_engine->releaseSoundRaw(this, false);
+                        close();
                         break;
                     }
                 }
@@ -460,7 +467,7 @@ namespace insound {
 
         if (position >= m_effects.size() || position < 0)
         {
-            pushError(Result::RangeErr, "Source::getEffect: `position` is out of range");
+            INSOUND_PUSH_ERROR(Result::RangeErr, "Source::getEffect: `position` is out of range");
             return false;
         }
 
@@ -476,7 +483,7 @@ namespace insound {
 
         if (position >= m_effects.size() || position < 0)
         {
-            pushError(Result::RangeErr, "Source::getEffect: `position` is out of range");
+            INSOUND_PUSH_ERROR(Result::RangeErr, "Source::getEffect: `position` is out of range");
             return false;
         }
 
