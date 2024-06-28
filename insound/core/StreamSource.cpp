@@ -78,7 +78,7 @@ namespace insound {
         }
 
         // Init audio decoder by file type
-        AudioDecoder *decoder = AudioDecoder::create(filepath);
+        AudioDecoder *decoder = AudioDecoder::create(filepath, targetSpec);
         if (!decoder)
         {
             return false;
