@@ -175,14 +175,31 @@ namespace insound {
     {
         INIT_GUARD();
 
+        if (!m_looping && m->file.atEnd)
+        {
+            return 0;
+        }
+
+
         auto framesRead = static_cast<int>(drmp3_read_pcm_frames_f32(&m->file, sampleFrames, (float *)data));
         if (m_looping)
         {
-            if (m->file.atEnd)
-                drmp3_seek_to_start_of_stream(&m->file);
+            while (true)
+            {
+                if (m->file.atEnd)
+                {
+                    if (!drmp3_seek_to_start_of_stream(&m->file))
+                    {
+                        INSOUND_PUSH_ERROR(Result::RuntimeErr, "drmp3 failed to seek to first PCM frame");
+                        return framesRead;
+                    }
+                }
 
-            if (framesRead < sampleFrames)
+                if (framesRead >= sampleFrames)
+                    break;
+
                 framesRead += read(sampleFrames - framesRead, (uint8_t *)((float *)data + framesRead/2));
+            }
         }
 
         return framesRead;
