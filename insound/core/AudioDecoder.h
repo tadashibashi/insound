@@ -10,12 +10,12 @@ namespace insound {
     /// Abstract base class for audio decoders for streaming PCM data from files
     class AudioDecoder {
     public:
-        /// Create an audio decoder by filepath name.
+        /// Create an audio decoder by filepath name, and open file at path.
         /// Supported formats: WAV, ADPCM, AIFF, MP3, GME types (TODO: FLAC, OGG VORBIS)
         /// @param filepath path to the audio file
         /// @param outputSpec spec of the audio engine output; needed by formats that generate their own output
-        /// @returns pointer to the AudioDecoder subclass, or `nullptr` if any errors.
-        ///          If null, check `popError()` for more info.
+        /// @returns pointer to the AudioDecoder subclass with opened file, or `nullptr` if any errors.
+        ///          If null, check `popError()` for details on the error.
         static AudioDecoder *create(const fs::path &filepath, const AudioSpec &outputSpec);
         virtual ~AudioDecoder() = default;
 

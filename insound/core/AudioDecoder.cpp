@@ -48,6 +48,13 @@ namespace insound {
         if (decoder == nullptr)
         {
             INSOUND_PUSH_ERROR(Result::NotSupported, "File extension is not supported");
+            return nullptr;
+        }
+
+        if (!decoder->open(filepath))
+        {
+            delete decoder;
+            return nullptr;
         }
 
         return decoder;
