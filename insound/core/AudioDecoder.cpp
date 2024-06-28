@@ -1,6 +1,10 @@
 #include "AudioDecoder.h"
 #include "Error.h"
 
+#include "io/decodeGME.h"
+#include "io/decodeMp3.h"
+#include "io/decodeWAV.h"
+
 namespace insound {
 #ifdef INSOUND_DEBUG
 #define INIT_GUARD() do { if (!isOpen()) { \
@@ -10,6 +14,44 @@ namespace insound {
 #else
 #define INIT_GUARD()
 #endif
+
+    AudioDecoder *AudioDecoder::create(const fs::path &filepath, const AudioSpec &targetSpec)
+    {
+        AudioDecoder *decoder = nullptr;
+
+        // Open decoder by file extension
+        auto ext = filepath.extension().string();
+        for (auto &c : ext) // capitalize for a uniform check
+            c = static_cast<char>(std::toupper(c));
+
+        if (ext == ".WAV" || ext == ".WAVE" || ext == ".AIFF" || ext == ".W64")
+        {
+            decoder = new WavDecoder();
+        }
+        else if (ext == ".MP3")
+        {
+#if INSOUND_DECODE_MP3
+            decoder = new Mp3Decoder();
+#else
+            INSOUND_PUSH_ERROR(Result::NotSupported, "Mp3 decoding is not supported, "
+                      "make sure to compile with INSOUND_DECODE_MP3 defined");
+            return false;
+#endif      // TODO: add the other decoder types here
+        }
+#if INSOUND_DECODE_GME
+        else
+        {
+            decoder = new GmeDecoder(targetSpec.freq);
+        }
+#endif
+
+        if (decoder == nullptr)
+        {
+            INSOUND_PUSH_ERROR(Result::NotSupported, "File extension is not supported");
+        }
+
+        return decoder;
+    }
 
     int AudioDecoder::readBytes(const int bytesToRead, uint8_t *buffer)
     {
