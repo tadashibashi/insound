@@ -51,18 +51,6 @@ namespace insound {
         bool createBus(bool paused, const Handle<Bus> &output, Handle<Bus> *outBus);
         bool createBus(bool paused, Handle<Bus> *outBus);
 
-        template <typename T>
-        bool releaseSound(Handle<T> source)
-        {
-            return releaseSoundImpl((Handle<Source>)source);
-        }
-
-        /// Release a bus
-        /// @param bus bus handle to release
-        /// @param recursive whether to recursively release all bus's children, if `false` all children will be
-        ///                  reattached to the master bus instead. If `true` all children will be released / deleted.
-        bool releaseBus(const Handle<Bus> &bus, bool recursive);
-
         /// Retrieve the engine's device ID. If zero, the audio device is uninitialized.
         bool getDeviceID(uint32_t *outDeviceID) const;
 

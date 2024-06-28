@@ -575,11 +575,6 @@ namespace insound {
         return m->releaseRaw(source, recursive);
     }
 
-    bool Engine::releaseBus(const Handle<Bus> &bus, const bool recursive)
-    {
-        return m->release(static_cast<Handle<Source>>(bus), recursive);
-    }
-
     bool Engine::getDeviceID(uint32_t *outDeviceID) const
     {
         return m->deviceID(outDeviceID);
