@@ -36,7 +36,7 @@ namespace insound {
 
     void pushError(Result::Code code, const char *message, const char *functionName, const char *fileName, int lineNumber)
     {
-#if INSOUND_DEBUG || INSOUND_LOG_ERRORS
+#if INSOUND_DEBUG || INSOUND_LOGGING
         if (code >= Result::Count)
             code = (Result::Code)(Result::Count - 1);
         else if (code < 0)
