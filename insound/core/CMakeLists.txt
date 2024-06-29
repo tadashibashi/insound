@@ -22,14 +22,6 @@ if (NOT TARGET SDL2::SDL2-static) # user can provide their own SDL2 submodule, b
 endif()
 
 if (INSOUND_DECODE_VORBIS)
-    FetchContent_Declare(stb
-        GIT_REPOSITORY https://github.com/nothings/stb.git
-        GIT_TAG        013ac3beddff3dbffafd5177e7972067cd2b5083
-    )
-    FetchContent_MakeAvailable(stb)
-    FetchContent_GetProperties(stb)
-
-    target_include_directories(insound PRIVATE ${stb_SOURCE_DIR})
     target_compile_definitions(insound PRIVATE -DINSOUND_DECODE_VORBIS=1)
 endif()
 

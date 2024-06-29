@@ -1,10 +1,16 @@
 #include "decodeVorbis.h"
 
+#include <vector>
+#include <insound/core/BufferView.h>
+
+
 #ifdef  INSOUND_DECODE_VORBIS
 #include "../AudioSpec.h"
 #include "../Error.h"
+#include "Rstream.h"
+#include "Rstreamable.h"
 
-#include <stb_vorbis.c>
+#include "../external/stb_vorbis.h"
 
 namespace insound {
 
@@ -51,6 +57,103 @@ namespace insound {
         }
 
         return true;
+    }
+
+    struct VorbisDecoder::Impl {
+        stb_vorbis *vorbis;
+        std::vector<uint8_t> buffer;
+    };
+
+    VorbisDecoder::VorbisDecoder() : m(new Impl)
+    {
+    }
+
+    VorbisDecoder::VorbisDecoder(VorbisDecoder &&other) noexcept : m(other.m)
+    {
+        other.m = nullptr;
+    }
+
+    VorbisDecoder::~VorbisDecoder()
+    {
+        delete m;
+    }
+
+    bool VorbisDecoder::open(const fs::path &path)
+    {
+        int error = 0;
+        auto vorbis = stb_vorbis_open_filename(path.c_str(), &error, nullptr);
+        if (!vorbis)
+        {
+            INSOUND_PUSH_ERROR(Result::RuntimeErr, "Vorbis failed to open");
+            return false;
+        }
+        const auto info = stb_vorbis_get_info(vorbis);
+
+        m_spec.channels = 2;
+        m_spec.freq = static_cast<int>(info.sample_rate);
+        m_spec.format = SampleFormat(32, true, false, true);
+
+        if (m->vorbis)
+        {
+            stb_vorbis_close(m->vorbis);
+        }
+
+        m->vorbis = vorbis;
+        return true;
+    }
+
+    void VorbisDecoder::close()
+    {
+        if (m->vorbis)
+        {
+            stb_vorbis_close(m->vorbis);
+            m->vorbis = nullptr;
+            m->buffer.clear();
+        }
+    }
+
+    bool VorbisDecoder::setPosition(const TimeUnit units, const uint64_t position)
+    {
+        const auto sampleFrame = static_cast<unsigned>(std::round(convert(position, units, TimeUnit::PCM, m_spec)));
+        return stb_vorbis_seek(m->vorbis, sampleFrame); // TODO: check if sample frames or samples
+    }
+
+    bool VorbisDecoder::getPosition(TimeUnit units, double *outPosition) const
+    {
+        if (outPosition)
+        {
+            const auto sampleFrame = stb_vorbis_get_sample_offset(m->vorbis) / m->vorbis->channels;
+            *outPosition = convert(sampleFrame, TimeUnit::PCM, units, m_spec);
+        }
+
+        return true;
+    }
+
+    bool VorbisDecoder::isOpen() const
+    {
+        return m && m->vorbis && m->vorbis->f && m->vorbis->f->isOpen();
+    }
+
+    int VorbisDecoder::read(int sampleFrames, uint8_t *data)
+    {
+        const auto targetSamples = sampleFrames * 2;
+        int samplesRead = 0;
+        while (samplesRead < targetSamples)
+        {
+            const auto curSamplesRead = stb_vorbis_get_samples_float_interleaved(
+                m->vorbis, 2, reinterpret_cast<float *>(data) + samplesRead, targetSamples - samplesRead);
+            if (curSamplesRead <= 0) // eof
+                break;
+
+            samplesRead += curSamplesRead * 2;
+        }
+
+        return samplesRead / 2;
+    }
+
+    bool VorbisDecoder::isEnded(bool *outEnded) const
+    {
+        return m->vorbis->eof;
     }
 }
 #else

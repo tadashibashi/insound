@@ -3,6 +3,7 @@
 
 #include "io/decodeGME.h"
 #include "io/decodeMp3.h"
+#include "io/decodeVorbis.h"
 #include "io/decodeWAV.h"
 
 namespace insound {
@@ -37,6 +38,16 @@ namespace insound {
                       "make sure to compile with INSOUND_DECODE_MP3 defined");
             return false;
 #endif      // TODO: add the other decoder types here
+        }
+        else if (ext == ".OGG")
+        {
+#if INSOUND_DECODE_VORBIS
+            decoder = new VorbisDecoder();
+#else
+            INSOUND_PUSH_ERROR(Result::NotSupported, "Ogg Vorbis decoding is not supported, "
+                      "make sure to compile with INSOUND_DECODE_VORBIS defined");
+            return false;
+#endif
         }
 #if INSOUND_DECODE_GME
         else
