@@ -1,15 +1,10 @@
 #include "StreamSource.h"
 
-#include <iostream>
-
 #include "AudioDecoder.h"
 #include "Error.h"
-#include "io/decodeGME.h"
-#include "io/decodeMp3.h"
-#include "io/decodeWAV.h"
-#include "lib.h"
 
 #include <SDL_audio.h>
+#include <iostream>
 
 namespace insound {
 #ifdef INSOUND_DEBUG
@@ -164,6 +159,12 @@ namespace insound {
 
     int StreamSource::readImpl(uint8_t *output, int length)
     {
+        if (!isOpen())
+        {
+            std::memset(output, 0, length);
+            return length;
+        }
+
         // TODO: Put this in another thread
         queueNextBuffer();
 
@@ -241,6 +242,8 @@ namespace insound {
 
     void StreamSource::queueNextBuffer()
     {
+        if (!m->decoder)
+            return;
         const auto bufSize = m->buffer.size();
         if (SDL_AudioStreamAvailable(m->stream) < bufSize * 4)
         {
