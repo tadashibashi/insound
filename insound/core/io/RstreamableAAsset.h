@@ -34,6 +34,7 @@ namespace insound {
     private:
         AAsset *m_asset;
         int64_t m_pos, m_size;
+        bool m_eof;
     };
 
 } // insound

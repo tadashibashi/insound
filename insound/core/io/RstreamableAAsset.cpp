@@ -7,7 +7,7 @@
 #include <android/asset_manager.h>
 
 namespace insound {
-    RstreamableAAsset::RstreamableAAsset() : m_asset(), m_pos(), m_size()
+    RstreamableAAsset::RstreamableAAsset() : m_asset(), m_pos(), m_size(), m_eof(false)
     {}
 
     RstreamableAAsset::~RstreamableAAsset()
@@ -34,6 +34,7 @@ namespace insound {
         m_asset = asset;
         m_pos = 0;
         m_size = AAsset_getLength64(asset);
+        m_eof = false;
         return true;
     }
 
@@ -78,14 +79,25 @@ namespace insound {
 
     int64_t RstreamableAAsset::read(uint8_t *buffer, int64_t byteCount)
     {
+        if (m_pos >= m_size)
+        {
+            m_eof = true;
+            return 0;
+        }
+
         const auto count = AAsset_read(m_asset, buffer, byteCount);
+        if (count == 0 || count < byteCount) // at end or attempted to read past end
+        {
+            m_eof = true;
+        }
+
         m_pos += count;
         return count;
     }
 
     bool RstreamableAAsset::isEof() const
     {
-        return m_pos >= m_size;
+        return m_eof;
     }
 
 
