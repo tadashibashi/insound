@@ -12,30 +12,10 @@ namespace insound {
 
     bool Rstream::open(const fs::path &filepath)
     {
-        Rstreamable *stream = nullptr;
-#ifdef __ANDROID__
-
-        if (filepath.is_absolute())
-        {
-            stream = new RstreamableFile();
-        }
-        else
-        {
-            stream = new RstreamableAAsset();
-        }
-#else
-        stream = new RstreamableFile();
-#endif
+        Rstreamable *stream = Rstreamable::create(filepath);
         if (!stream)
         {
             INSOUND_PUSH_ERROR(Result::RuntimeErr, "Failed to create Rstreamable");
-            delete stream;
-            return false;
-        }
-
-        if (!stream->open(filepath))
-        {
-            INSOUND_PUSH_ERROR(Result::RuntimeErr, "Failed to open Rstreamable");
             delete stream;
             return false;
         }

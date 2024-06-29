@@ -11,6 +11,7 @@ namespace insound {
         Rstream() : m_stream() { }
         ~Rstream();
         bool open(const fs::path &filepath);
+
         [[nodiscard]]
         bool isOpen() const;
         void close();

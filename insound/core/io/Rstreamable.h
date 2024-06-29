@@ -9,6 +9,8 @@ namespace insound {
     /// Low level resource stream: an abstraction around read-only file streams
     class Rstreamable {
     public:
+        /// Create and open an Rstreamable by platform. Returns null on error.
+        static Rstreamable *create(const fs::path &filepath);
         virtual ~Rstreamable() = default;
 
         virtual bool open(const fs::path &filepath) = 0;
