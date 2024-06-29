@@ -59,14 +59,18 @@ namespace insound {
 
     int64_t RstreamableFile::read(uint8_t *buffer, const int64_t bytes)
     {
+        if (!m_stream)
+        {
+            INSOUND_PUSH_ERROR(Result::RuntimeErr, "std::ifstream::read attempted read in bad state");
+            return -1;
+        }
+
         const auto lastPos = m_stream.tellg();
         m_stream.read(
             reinterpret_cast<char *>(buffer),
             static_cast<std::streamsize>(bytes));
-        const auto result = static_cast<bool>(m_stream);
-        if (!result)
+        if (!m_stream) // read resulted in eof or bad bit set
         {
-            INSOUND_PUSH_ERROR(Result::RuntimeErr, "std::ifstream::read failed");
             return -1;
         }
 
