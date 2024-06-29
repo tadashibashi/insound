@@ -138,6 +138,7 @@ PRIVATE
     io/openFile.cpp
     io/openFile.h
     io/loadAudio.cpp
+    io/Rstreamable.cpp
     io/Rstreamable.h
     io/RStream.cpp
     io/RstreamableAAsset.h
