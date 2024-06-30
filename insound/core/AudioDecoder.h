@@ -51,6 +51,8 @@ namespace insound {
 
         virtual bool isEnded(bool *outEnded) const = 0;
 
+        virtual bool getMaxFrames(uint64_t *outMaxFrames) const = 0;
+
     protected:
         AudioDecoder() : m_looping{}, m_spec{} { }
         AudioDecoder(AudioDecoder &&other) noexcept : m_spec(other.m_spec), m_looping(other.m_looping) { }

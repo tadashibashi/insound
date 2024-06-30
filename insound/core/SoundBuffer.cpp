@@ -1,9 +1,5 @@
 #include "SoundBuffer.h"
 #include "AudioSpec.h"
-
-#include <SDL_audio.h>
-
-#include "Error.h"
 #include "io/loadAudio.h"
 
 namespace insound {

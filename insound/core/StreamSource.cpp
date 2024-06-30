@@ -2,8 +2,11 @@
 
 #include "AudioDecoder.h"
 #include "Error.h"
+#include "lib.h"
+#if defined(INSOUND_BACKEND_SDL2)
+#   include <SDL_audio.h>
+#endif
 
-#include <SDL_audio.h>
 #include <iostream>
 
 namespace insound {
@@ -17,14 +20,17 @@ namespace insound {
 #endif
 
     struct StreamSource::Impl {
-        Impl() : decoder(), stream(), looping(), isOneShot()
+        Impl() : decoder(), converter(), looping(), isOneShot()
         {
 
         }
 
         AlignedVector<uint8_t, 16> buffer;
         AudioDecoder *decoder;
-        SDL_AudioStream *stream; ///< convert audio to target format
+
+#if defined(INSOUND_BACKEND_SDL2)
+        SDL_AudioStream *converter; ///< convert audio to target format
+#endif
         bool looping, isOneShot;
     };
 
@@ -92,11 +98,12 @@ namespace insound {
             return false;
         }
 
-        // Init audio stream
-        auto stream = SDL_NewAudioStream(
+#if defined(INSOUND_BACKEND_SDL2)
+        // Init audio converter
+        auto converter = SDL_NewAudioStream(
             sourceSpec.format.flags(), sourceSpec.channels, sourceSpec.freq,
             targetSpec.format.flags(), targetSpec.channels, targetSpec.freq);
-        if (!stream)
+        if (!converter)
         {
             INSOUND_PUSH_ERROR(Result::SdlErr, SDL_GetError());
             delete decoder;
@@ -104,15 +111,15 @@ namespace insound {
         }
 
         // Done, commit changes
-        // Clean up preexisting decoder/stream
-        delete m->decoder;
-        if (m->stream)
+        // Clean up preexisting decoder/converter
+        if (m->converter)
         {
-            SDL_FreeAudioStream(m->stream);
+            SDL_FreeAudioStream(m->converter);
         }
-
+#endif
+        delete m->decoder;
         m->decoder = decoder;
-        m->stream = stream;
+        m->converter = converter;
         m->buffer.resize(bufferSize, 0);
         return true;
     }
@@ -127,19 +134,23 @@ namespace insound {
                 m->decoder = nullptr;
             }
 
-            if (m->stream)
+            if (m->converter)
             {
-                SDL_FreeAudioStream(m->stream);
-                m->stream = nullptr;
+#if defined(INSOUND_BACKEND_SDL2)
+                SDL_FreeAudioStream(m->converter);
+                m->converter = nullptr;
+#endif
             }
         }
     }
 
     int StreamSource::bytesAvailable() const
     {
-        if (!m->stream)
+        if (!m->converter)
             return 0;
-        return SDL_AudioStreamAvailable(m->stream);
+#if defined(INSOUND_BACKEND_SDL2)
+        return SDL_AudioStreamAvailable(m->converter);
+#endif
     }
 
     bool StreamSource::isReady(bool *outReady) const
@@ -165,11 +176,15 @@ namespace insound {
             return length;
         }
 
+        if (m->buffer.size() != length)
+            m->buffer.resize(length);
+
         // TODO: Put this in another thread
         queueNextBuffer();
 
+#if defined(INSOUND_BACKEND_SDL2)
         // Retrieve when there is enough audio ready
-        if (SDL_AudioStreamAvailable(m->stream) < length)
+        if (SDL_AudioStreamAvailable(m->converter) < length)
         {
             std::memset(output, 0, length);
             if (m->isOneShot) // if sound ended and nothing to read, close the source
@@ -184,7 +199,7 @@ namespace insound {
             return length;
         }
 
-        const auto read = SDL_AudioStreamGet(m->stream, output, length);
+        const auto read = SDL_AudioStreamGet(m->converter, output, length);
         if (read <= 0)
         {
             INSOUND_PUSH_ERROR(Result::SdlErr, SDL_GetError());
@@ -192,6 +207,7 @@ namespace insound {
         }
 
         return read;
+#endif
     }
 
     bool StreamSource::getLooping(bool *outLooping) const
@@ -244,16 +260,19 @@ namespace insound {
     {
         if (!m->decoder)
             return;
+
+#if defined(INSOUND_BACKEND_SDL2)
         const auto bufSize = m->buffer.size();
-        if (SDL_AudioStreamAvailable(m->stream) < bufSize * 4)
+        if (SDL_AudioStreamAvailable(m->converter) < bufSize * 4)
         {
             // Reading probably needs to happen inside another thread since
             // reading from disk is slow.
             auto read = m->decoder->readBytes(
                 static_cast<int>(bufSize), m->buffer.data());
             if (read > 0)
-                SDL_AudioStreamPut(m->stream, m->buffer.data(), read);
+                SDL_AudioStreamPut(m->converter, m->buffer.data(), read);
         }
+#endif
     }
 
 }

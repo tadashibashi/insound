@@ -1,9 +1,5 @@
 #include "decodeVorbis.h"
 
-#include <vector>
-#include <insound/core/BufferView.h>
-
-
 #ifdef  INSOUND_DECODE_VORBIS
 #include "../AudioSpec.h"
 #include "../Error.h"
@@ -11,7 +7,8 @@
 #include "Rstreamable.h"
 
 #include "../external/stb_vorbis.h"
-
+#include <insound/core/AlignedVector.h>
+#include <insound/core/BufferView.h>
 namespace insound {
 
     bool decodeVorbis(const uint8_t *memory, uint32_t size, AudioSpec *outSpec, uint8_t **outData,
@@ -25,6 +22,20 @@ namespace insound {
             &channels,
             &samplerate,
             &data);
+
+        // auto vorbis = stb_vorbis_open_memory(memory, size, nullptr, nullptr);
+        // if (!vorbis)
+        // {
+        //     INSOUND_PUSH_ERROR(Result::RuntimeErr, "decodeVorbis: failed to open from memory");
+        //     return false;
+        // }
+        //
+        // auto info = stb_vorbis_get_info(vorbis);
+        // channels = info.channels;
+        // samplerate = info.sample_rate;
+        //
+        // stb_vorbis_get_samples_float_interleaved(vorbis, 2, &)
+
 
         if (sampleCount < 0)
         {
@@ -60,8 +71,8 @@ namespace insound {
     }
 
     struct VorbisDecoder::Impl {
-        stb_vorbis *vorbis;
-        std::vector<uint8_t> buffer;
+        stb_vorbis *vorbis{};
+        AlignedVector<uint8_t, 16> buffer{};
     };
 
     VorbisDecoder::VorbisDecoder() : m(new Impl)
@@ -153,7 +164,17 @@ namespace insound {
 
     bool VorbisDecoder::isEnded(bool *outEnded) const
     {
-        return m->vorbis->eof;
+        *outEnded = m->vorbis->eof;
+        return true;
+    }
+
+    bool VorbisDecoder::getMaxFrames(uint64_t *outMaxFrames) const
+    {
+        if (!m->vorbis)
+            return false;
+        if (outMaxFrames)
+            *outMaxFrames = stb_vorbis_stream_length_in_samples(m->vorbis) / m->vorbis->channels;
+        return true;
     }
 }
 #else

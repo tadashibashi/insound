@@ -1,5 +1,5 @@
 #pragma once
-
+#ifdef INSOUND_BACKEND_SDL2
 namespace insound::detail {
     /// Thread-safe guard that initializes and quits SDL to provide its audio functionality during its lifetime.
     /// It may be instantiated multiple times, as it will count references before fully quitting SDL.
@@ -14,3 +14,4 @@ namespace insound::detail {
                                 ///< 0 during this class's destructor, it will call a full `SDL_Quit`
     };
 }
+#endif

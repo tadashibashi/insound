@@ -31,4 +31,8 @@ namespace insound {
     private:
         uint16_t m_flags;
     };
+
+#if defined(INSOUND_BACKEND_MINIAUDIO)
+    uint32_t toMaFormat(const insound::SampleFormat &spec);
+#endif
 }

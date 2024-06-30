@@ -28,6 +28,8 @@ int insound::getDefaultSampleRate()
 }
 
 #else
+
+#ifdef INSOUND_BACKEND_SDL2
 #include <SDL2/SDL_audio.h>
 
 // SDL backend
@@ -42,4 +44,9 @@ int insound::getDefaultSampleRate()
 
     return defaultSpec.freq;
 }
+#elif INSOUND_BACKEND_MINIAUDIO
+#include <miniaudio.h>
+
+#endif
+
 #endif

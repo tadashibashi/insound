@@ -187,8 +187,17 @@ namespace insound {
 
     bool GmeDecoder::isEnded(bool *outEnded) const
     {
+        if (outEnded)
+            *outEnded = false;
         // TODO: support lengths, for now the track just plays until instructions stop
         return false;
+    }
+
+    bool GmeDecoder::getMaxFrames(uint64_t *outMaxFrames) const
+    {
+        if (outMaxFrames)
+            *outMaxFrames = UINT64_MAX;
+        return true;
     }
 
     bool GmeDecoder::getTrackCount(int *outTrackCount) const

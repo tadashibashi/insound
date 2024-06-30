@@ -2,23 +2,48 @@ project(insound)
 include(FetchContent)
 
 add_library(insound)
+if (INSOUND_BACKEND_SDL2)
+    if (NOT TARGET SDL2::SDL2-static) # user can provide their own SDL2 submodule, but we may want to enforce a minimum version
+        FetchContent_Declare(SDL2
+            GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
+            GIT_TAG        fb1497566c5a05e2babdcf45ef0ab5c7cca2c4ae
+        )
 
-if (NOT TARGET SDL2::SDL2-static) # user can provide their own SDL2 submodule, but we may want to enforce a minimum version
-    FetchContent_Declare(Insound_SDL2
-        GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
-        GIT_TAG        fb1497566c5a05e2babdcf45ef0ab5c7cca2c4ae
-    )
+        set(SDL_STATIC             ON )
+        set(SDL_SHARED             OFF)
+        set(SDL2_DISABLE_UNINSTALL ON )
+        set(SDL2_DISABLE_INSTALL   ON )
+        set(SDL_TEST               OFF)
+        set(SDL_ASSEMBLY           ON)
+        set(SDL_ARMNEON            ON)
+        set(SDL_PTHREADS           NOT ${INSOUND_NO_PTHREAD})
 
-    set(SDL_STATIC             ON )
-    set(SDL_SHARED             OFF)
-    set(SDL2_DISABLE_UNINSTALL ON )
-    set(SDL2_DISABLE_INSTALL   ON )
-    set(SDL_TEST               OFF)
-    set(SDL_ASSEMBLY           ON)
-    set(SDL_ARMNEON            ON)
-    set(SDL_PTHREADS           NOT ${INSOUND_NO_PTHREAD})
+        FetchContent_MakeAvailable(SDL2)
+    endif()
 
-    FetchContent_MakeAvailable(Insound_SDL2)
+    target_link_libraries(insound PRIVATE SDL2::SDL2-static)
+    target_compile_definitions(insound PRIVATE INSOUND_BACKEND_SDL2=1)
+elseif(INSOUND_BACKEND_SDL3)
+    if (NOT TARGET SDL3::SDL3-static) # user can provide their own SDL2 submodule, but we may want to enforce a minimum version
+        FetchContent_Declare(SDL3
+            GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
+            GIT_TAG        17d4f8d6990d2bd92d6a8be4b23c4dc1626fb923
+        )
+
+        set(SDL_STATIC             ON )
+        set(SDL_SHARED             OFF)
+        set(SDL3_DISABLE_UNINSTALL ON )
+        set(SDL3_DISABLE_INSTALL   ON )
+        set(SDL_TEST               OFF)
+        set(SDL_ASSEMBLY           ON)
+        set(SDL_ARMNEON            ON)
+        set(SDL_PTHREADS           NOT ${INSOUND_NO_PTHREAD})
+
+        FetchContent_MakeAvailable(SDL3)
+    endif()
+
+    target_link_libraries(insound PRIVATE SDL3::SDL3-static)
+    target_compile_definitions(insound PRIVATE INSOUND_BACKEND_SDL3=1)
 endif()
 
 if (INSOUND_DECODE_VORBIS)
@@ -119,7 +144,6 @@ PRIVATE
     effects/DelayEffect.cpp
     effects/PanEffect.cpp
     effects/VolumeEffect.cpp
-    external/ctpl_stl.h
     Engine.cpp
     Error.cpp
     io/decodeFLAC.cpp
@@ -162,7 +186,6 @@ PRIVATE
     private/SdlAudioGuard.h
 )
 
-target_link_libraries(insound PRIVATE SDL2::SDL2-static)
 target_include_directories(insound PUBLIC ${INSOUND_ROOT_DIR})
 
 if ("${CMAKE_BUILD_TYPE}" MATCHES "Deb")
@@ -185,7 +208,7 @@ if (EMSCRIPTEN)
     PUBLIC
         -sALLOW_MEMORY_GROWTH=1
         -sINITIAL_MEMORY=2GB
-        -sSTACK_SIZE=131072
+        -sSTACK_SIZE=4MB
         -sASSERTIONS=2
         -sWASM=1
         -sFETCH

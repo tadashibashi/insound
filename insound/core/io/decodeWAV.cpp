@@ -242,7 +242,6 @@ namespace insound {
         {
             while(true)
             {
-                INSOUND_LOG("current: %llu, length: %llu\n", m->wav.readCursorInPCMFrames, m->lengthPCM);
                 if (m->wav.readCursorInPCMFrames >= m->lengthPCM)
                 {
                     if (!drwav_seek_to_first_pcm_frame(&m->wav))
@@ -255,7 +254,7 @@ namespace insound {
                 if (framesRead >= sampleFrames)
                     break;
 
-                framesRead += read(sampleFrames - framesRead, (uint8_t *)((float *)data + framesRead/2));
+                framesRead += read(sampleFrames - framesRead, (uint8_t *)((float *)data + framesRead*2));
             }
         }
 
@@ -267,6 +266,16 @@ namespace insound {
         INIT_GUARD();
         if (outEnded)
             *outEnded = m->wav.readCursorInPCMFrames >= m->lengthPCM;
+        return true;
+    }
+
+    bool WavDecoder::getMaxFrames(uint64_t *outMaxFrames) const
+    {
+        if (!isOpen())
+            return false;
+
+        if (outMaxFrames)
+            *outMaxFrames = m->lengthPCM * m->wav.channels;
         return true;
     }
 }

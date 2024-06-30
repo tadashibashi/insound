@@ -19,8 +19,8 @@ namespace insound {
     bool loadAudio(const fs::path &path, const AudioSpec &targetSpec,
         uint8_t **outBuffer, uint32_t *outLength, std::map<uint32_t, Marker> *outMarkers);
 
-    /// Convert audio from one format to another
-    /// @param audioData       sample data pointer; function takes ownership, and it is no longer valid, retrieve resultant pointer in `outBuffer`
+    /// Convert audio from one format to another. Intended for single use.
+    /// @param audioData  sample data pointer; function takes ownership, and it is no longer valid, retrieve resultant pointer in `outBuffer`
     /// @param length     length of the data buffer
     /// @param dataSpec   specification of the sample data passed in
     /// @param targetSpec target specification to convert to

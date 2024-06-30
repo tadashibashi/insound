@@ -212,6 +212,14 @@ namespace insound {
             *outEnded = m->file.atEnd;
         return true;
     }
+
+    bool Mp3Decoder::getMaxFrames(uint64_t *outMaxFrames) const
+    {
+        INIT_GUARD();
+        if (outMaxFrames)
+            *outMaxFrames = m->lengthPCM * m->file.channels;
+        return true;
+    }
 }
 
 #endif

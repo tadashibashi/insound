@@ -4,7 +4,7 @@
 #ifdef __ANDROID__
 #include <insound/core/Error.h>
 #include <aaudio/AAudio.h>
-#include <SDL_log.h>
+#include <mutex>
 
 #define PI 3.14159265f
 static float g_phase = 0;
@@ -30,11 +30,14 @@ namespace insound {
         AudioCallback m_callback{};
         void *m_userData{};
         AudioSpec m_spec{};
-        AlignedVector<uint8_t, 16> m_buffer;
+        AlignedVector<uint8_t, 16> m_buffer{};
+        mutable std::recursive_mutex m_mutex{};
 
         bool open(int frequency, int sampleFrameBufferSize, AudioCallback audioCallback,
              void *userdata)
         {
+            std::lock_guard lockGuard(m_mutex);
+
             AAudioStreamBuilder *builder;
             if (const auto result = AAudio_createStreamBuilder(&builder); result != AAUDIO_OK)
             {
@@ -48,7 +51,7 @@ namespace insound {
             AAudioStreamBuilder_setSampleRate(builder, frequency);
             AAudioStreamBuilder_setBufferCapacityInFrames(builder,
                                                           sampleFrameBufferSize == 0 ? 512 : sampleFrameBufferSize);
-            AAudioStreamBuilder_setSharingMode(builder, AAUDIO_SHARING_MODE_EXCLUSIVE); // low latency
+            AAudioStreamBuilder_setSharingMode(builder, AAUDIO_SHARING_MODE_SHARED); // low latency
             AAudioStreamBuilder_setDirection(builder, AAUDIO_DIRECTION_OUTPUT);
             AAudioStreamBuilder_setChannelCount(builder, 2);
 #if __ANDROID_MIN_SDK_VERSION__ >= 32
@@ -83,18 +86,21 @@ namespace insound {
 
         void suspend()
         {
+            std::lock_guard lockGuard(m_mutex);
             if (m_stream)
                 AAudioStream_requestPause(m_stream);
         }
 
         void resume()
         {
+            std::lock_guard lockGuard(m_mutex);
             if (m_stream)
                 AAudioStream_requestStart(m_stream);
         }
 
         void close()
         {
+            std::lock_guard lockGuard(m_mutex);
             if (m_stream)
             {
                 AAudioStream_requestStop(m_stream);
@@ -106,6 +112,7 @@ namespace insound {
         [[nodiscard]]
         bool isRunning() const
         {
+            std::lock_guard lockGuard(m_mutex);
             if (!m_stream)
                 return false;
             return AAudioStream_getState(m_stream) == AAUDIO_STREAM_STATE_STARTED;
@@ -114,6 +121,7 @@ namespace insound {
         [[nodiscard]]
         uint32_t id() const
         {
+            std::lock_guard lockGuard(m_mutex);
             if (!m_stream)
                 return 0;
             return AAudioStream_getDeviceId(m_stream);
@@ -122,6 +130,7 @@ namespace insound {
         [[nodiscard]]
         int bufferSize() const
         {
+            std::lock_guard lockGuard(m_mutex);
             if (!m_stream)
                 return 0;
             return AAudioStream_getBufferCapacityInFrames(m_stream) *
@@ -132,6 +141,7 @@ namespace insound {
         [[nodiscard]]
         bool isOpen() const
         {
+            std::lock_guard lockGuard(m_mutex);
             return m_stream != nullptr;
         }
 
@@ -141,8 +151,8 @@ namespace insound {
                                                             int32_t nFrames)
         {
             auto device = static_cast<AAudioDevice::Impl *>(userData);
-
-            if (!device->isRunning())
+            std::lock_guard lockGuard(device->m_mutex);
+            if (AAudioStream_getState(device->m_stream) != AAUDIO_STREAM_STATE_STARTED)
             {
                 return AAUDIO_CALLBACK_RESULT_CONTINUE;
             }

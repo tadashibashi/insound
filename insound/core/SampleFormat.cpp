@@ -32,3 +32,28 @@ namespace insound {
         return m_flags & 0xFFu;
     }
 }
+
+#ifdef INSOUND_BACKEND_MINIAUDIO
+#include <miniaudio.h>
+uint32_t insound::toMaFormat(const insound::SampleFormat &spec)
+{
+    if (spec.isFloat())
+    {
+        return ma_format_f32;
+    }
+
+    switch(spec.bits())
+    {
+        case 8:
+            return ma_format_u8;
+        case 16:
+            return ma_format_s16;
+        case 24:
+            return ma_format_s24;
+        case 32:
+            return ma_format_s32;
+        default:
+            return ma_format_unknown;
+    }
+}
+#endif

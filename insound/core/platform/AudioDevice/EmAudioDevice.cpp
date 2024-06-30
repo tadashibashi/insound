@@ -1,11 +1,11 @@
-#include <insound/core/logging.h>
+
 #ifdef __EMSCRIPTEN__
 
 #include "EmAudioDevice.h"
 #include "../../AudioSpec.h"
 #include "../../Error.h"
 #include "../../platform/getDefaultSampleRate.h"
-
+#include <insound/core/logging.h>
 #include <emscripten/webaudio.h>
 
 #include <atomic>

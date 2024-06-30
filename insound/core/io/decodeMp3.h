@@ -33,8 +33,8 @@ namespace insound {
         bool isOpen() const override;
         int read(int sampleFrames, uint8_t *data) override;
 
-        [[nodiscard]]
         bool isEnded(bool *outEnded) const override;
+        bool getMaxFrames(uint64_t *outMaxFrames) const override;
     private:
         struct Impl;
         Impl *m;

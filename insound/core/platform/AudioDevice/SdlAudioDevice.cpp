@@ -1,3 +1,4 @@
+#ifdef INSOUND_BACKEND_SDL2
 #include "SdlAudioDevice.h"
 
 #include "../../AudioSpec.h"
@@ -274,3 +275,4 @@ namespace insound {
         return m->bufferSize;
     }
 } // insound
+#endif

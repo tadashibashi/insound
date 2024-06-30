@@ -442,6 +442,8 @@ namespace insound {
 
     bool Source::setPaused(const bool paused)
     {
+        HANDLE_GUARD();
+
         return paused ? pauseAt(UINT32_MAX, false) : unpauseAt(UINT32_MAX);
     }
 

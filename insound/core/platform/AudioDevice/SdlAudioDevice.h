@@ -1,4 +1,5 @@
 #pragma once
+#ifdef INSOUND_BACKEND_SDL2
 #include "../../AudioDevice.h"
 
 namespace insound {
@@ -27,3 +28,4 @@ namespace insound {
     };
 
 } // insound
+#endif

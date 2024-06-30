@@ -1,5 +1,5 @@
 #include "SdlAudioGuard.h"
-
+#ifdef INSOUND_BACKEND_SDL2
 #include "../Error.h"
 
 #include <SDL2/SDL.h>
@@ -39,3 +39,4 @@ insound::detail::SdlAudioGuard::~SdlAudioGuard()
         }
     }
 }
+#endif

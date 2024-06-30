@@ -6,8 +6,6 @@
 #include <fstream>
 #include <iostream>
 
-#include <SDL2/SDL_rwops.h>
-
 using namespace insound;
 
 #ifdef __EMSCRIPTEN__
