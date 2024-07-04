@@ -1,7 +1,7 @@
 #pragma once
 
 #ifdef __EMSCRIPTEN__
-#include "../../AudioDevice.h"
+#include <insound/core/AudioDevice.h>
 
 namespace insound {
 
@@ -21,6 +21,7 @@ namespace insound {
         [[nodiscard]] uint32_t id() const override;
         [[nodiscard]] const AudioSpec &spec() const override;
         [[nodiscard]] int bufferSize() const override;
+        [[nodiscard]] int getDefaultSampleRate() const override;
 
     public: // EmAudioDevice-specific functions (somewhat private since the AudioEngine only has a pointer to an AudioDevice)
 

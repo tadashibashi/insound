@@ -8,10 +8,12 @@ namespace insound {
     thread_local static std::stack<Result> s_errors;    // client error stack
     thread_local static std::stack<Result> s_sysErrors; // used by the program
     static const Result NoErrors {Result::Ok, nullptr};
-
+    constexpr int MAX_ERR_STACK_SIZE = 32;
     static const char *s_codeNames[] = {
         "No errors",
         "SDL Error",
+        "PortAudio Error",
+        "MiniAudio Error",
         "Standard exception was thrown",
         "Ran out of system memory",
         "Out of range",
@@ -36,6 +38,8 @@ namespace insound {
 
     void pushError(Result::Code code, const char *message, const char *functionName, const char *fileName, int lineNumber)
     {
+        if (s_sysErrors.size() >= MAX_ERR_STACK_SIZE)
+            return;
 #if INSOUND_DEBUG || INSOUND_LOGGING
         if (code >= Result::Count)
             code = (Result::Code)(Result::Count - 1);
@@ -102,6 +106,8 @@ namespace insound {
 
     void detail::pushSystemError(Result::Code code, const char *message)
     {
+        if (s_sysErrors.size() >= MAX_ERR_STACK_SIZE)
+            return;
         if (code >= Result::Count)
             code = (Result::Code)(Result::Count - 1);
         else if (code < 0)

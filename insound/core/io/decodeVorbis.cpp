@@ -9,6 +9,7 @@
 #include "../external/stb_vorbis.h"
 #include <insound/core/AlignedVector.h>
 #include <insound/core/BufferView.h>
+#include <insound/core/logging.h>
 namespace insound {
 
     bool decodeVorbis(const uint8_t *memory, uint32_t size, AudioSpec *outSpec, uint8_t **outData,
@@ -133,7 +134,8 @@ namespace insound {
     {
         if (outPosition)
         {
-            const auto sampleFrame = stb_vorbis_get_sample_offset(m->vorbis) / m->vorbis->channels;
+            const auto info = stb_vorbis_get_info(m->vorbis);
+            const auto sampleFrame = stb_vorbis_get_sample_offset(m->vorbis) / info.channels;
             *outPosition = convert(sampleFrame, TimeUnit::PCM, units, m_spec);
         }
 
@@ -145,18 +147,20 @@ namespace insound {
         return m && m->vorbis && m->vorbis->f && m->vorbis->f->isOpen();
     }
 
-    int VorbisDecoder::read(int sampleFrames, uint8_t *data)
+    int VorbisDecoder::read(const int sampleFrames, uint8_t *data)
     {
         const auto targetSamples = sampleFrames * 2;
         int samplesRead = 0;
         while (samplesRead < targetSamples)
         {
-            const auto curSamplesRead = stb_vorbis_get_samples_float_interleaved(
+            const auto framesRead = stb_vorbis_get_samples_float_interleaved(
                 m->vorbis, 2, reinterpret_cast<float *>(data) + samplesRead, targetSamples - samplesRead);
-            if (curSamplesRead <= 0) // eof
-                break;
+            if (framesRead <= 0 || m->vorbis->eof) // eof
+            {
+                return samplesRead;
+            }
 
-            samplesRead += curSamplesRead * 2;
+            samplesRead += framesRead * 2;
         }
 
         return samplesRead / 2;

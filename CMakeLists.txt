@@ -26,9 +26,23 @@ else()
     set(INSOUND_IS_ROOT FALSE)
 endif()
 
+if (TARGET SDL2::SDL2)
+    set(INSOUND_USE_CLIENT_SDL2_DEFAULT ON)
+else()
+    set(INSOUND_USE_CLIENT_SDL2_DEFAULT OFF)
+endif()
+
+if (TARGET SDL3::SDL3)
+    set(INSOUND_USE_CLIENT_SDL3_DEFAULT ON)
+else()
+    set(INSOUND_USE_CLIENT_SDL3_DEFAULT OFF)
+endif()
+
 # Insound Audio Engine options
-option(INSOUND_BACKEND_SDL2      "Enable SDL2 backend"                                  ON  )
+option(INSOUND_BACKEND_SDL2      "Enable SDL2 backend"                                  OFF )
+option(INSOUND_USE_CLIENT_SDL2   "Use user's SDL2::SDL2 target"                       ${INSOUND_USER_PROVIDED_SDL2_DEFAULT})
 option(INSOUND_BACKEND_SDL3      "Enable SDL3 backend"                                  OFF )
+option(INSOUND_USE_CLIENT_SDL3   "Use user's SDL3::SDL3 target"                       ${INSOUND_USER_PROVIDED_SDL3_DEFAULT})
 
 # Audio file decoders
 option(INSOUND_DECODE_VORBIS     "Include ogg vorbis file decoding in build."           ON )
@@ -47,10 +61,6 @@ option(INSOUND_CPU_INTRINSICS    "Turn on CPU intrinsics"                       
 
 if (NOT EMSCRIPTEN)
     set (INSOUND_NO_PTHREAD OFF CACHE BOOL "Non-emscripten platforms must have pthreads on" FORCE)
-else()
-    # Force SDL2 backend on Emscripten compilations: there are some issues with miniaudio's implementation.
-    set(INSOUND_BACKEND_SDL2      ON  CACHE BOOL "" FORCE)
-    set(INSOUND_BACKEND_MINIAUDIO OFF CACHE BOOL "" FORCE)
 endif()
 
 add_subdirectory(insound)

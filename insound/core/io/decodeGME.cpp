@@ -1,7 +1,5 @@
 #include "decodeGME.h"
 
-#include <iostream>
-
 #ifdef INSOUND_DECODE_GME
 #include "../Error.h"
 #include "Rstream.h"

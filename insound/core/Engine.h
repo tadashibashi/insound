@@ -96,6 +96,8 @@ namespace insound {
             return getObjectPool().allocate<T>(std::forward<TArgs>(args)...);
         }
 
+        std::lock_guard<std::recursive_mutex> mixLockGuard();
+
         bool releaseSoundImpl(const Handle<Source> &source);
         bool releaseSoundRaw(Source *source, bool recursive);
         void destroySource(const Handle<Source> &source);

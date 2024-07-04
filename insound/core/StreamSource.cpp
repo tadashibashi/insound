@@ -3,11 +3,14 @@
 #include "AudioDecoder.h"
 #include "Error.h"
 #include "lib.h"
+
 #if defined(INSOUND_BACKEND_SDL2)
-#   include <SDL_audio.h>
+#include <SDL2/SDL_audio.h>
+#else
+#include <insound/core/external/miniaudio.h>
 #endif
 
-#include <iostream>
+#include <insound/core/logging.h>
 
 namespace insound {
 #ifdef INSOUND_DEBUG
@@ -20,18 +23,18 @@ namespace insound {
 #endif
 
     struct StreamSource::Impl {
-        Impl() : decoder(), converter(), looping(), isOneShot()
-        {
+        Impl() = default;
 
-        }
-
-        AlignedVector<uint8_t, 16> buffer;
-        AudioDecoder *decoder;
+        AlignedVector<uint8_t, 16> buffer{};
+        AudioDecoder *decoder{};
+        bool looping{}, isOneShot{};
 
 #if defined(INSOUND_BACKEND_SDL2)
-        SDL_AudioStream *converter; ///< convert audio to target format
+        SDL_AudioStream *converter{};
+#else
+        ma_data_converter *converter{};
+        int bytesAvailable{};
 #endif
-        bool looping, isOneShot;
     };
 
     StreamSource::StreamSource() : m(new Impl)
@@ -48,13 +51,12 @@ namespace insound {
 
     StreamSource::~StreamSource()
     {
-        close();
         delete m;
     }
 
     bool StreamSource::isOpen() const
     {
-        return m->decoder != nullptr;
+        return m != nullptr && m->decoder != nullptr;
     }
 
     bool StreamSource::open(const fs::path &filepath)
@@ -98,25 +100,43 @@ namespace insound {
             return false;
         }
 
-#if defined(INSOUND_BACKEND_SDL2)
         // Init audio converter
+#if defined(INSOUND_BACKEND_SDL2)
         auto converter = SDL_NewAudioStream(
             sourceSpec.format.flags(), sourceSpec.channels, sourceSpec.freq,
             targetSpec.format.flags(), targetSpec.channels, targetSpec.freq);
         if (!converter)
         {
             INSOUND_PUSH_ERROR(Result::SdlErr, SDL_GetError());
-            delete decoder;
             return false;
         }
 
-        // Done, commit changes
-        // Clean up preexisting decoder/converter
+        if (m->converter)
+            SDL_FreeAudioStream(converter);
+        m->converter = converter;
+#else
+        auto converter = new ma_data_converter();
+
+        const auto converterConfig = ma_data_converter_config_init(
+            (ma_format)toMaFormat(sourceSpec.format), (ma_format)toMaFormat(targetSpec.format),
+            sourceSpec.channels, targetSpec.channels,
+            sourceSpec.freq, targetSpec.freq);
+
+        if (ma_data_converter_init(&converterConfig, nullptr, converter) != MA_SUCCESS)
+        {
+            INSOUND_PUSH_ERROR(Result::MaErr, "Failed to init data converter");
+            delete converter;
+            return false;
+        }
+
+        // Clean up existing converter
         if (m->converter)
         {
-            SDL_FreeAudioStream(m->converter);
+            ma_data_converter_uninit(m->converter, nullptr);
         }
+        m->bytesAvailable = 0;
 #endif
+
         delete m->decoder;
         m->decoder = decoder;
         m->converter = converter;
@@ -124,7 +144,7 @@ namespace insound {
         return true;
     }
 
-    void StreamSource::close()
+    bool StreamSource::release()
     {
         if (m)
         {
@@ -138,22 +158,29 @@ namespace insound {
             {
 #if defined(INSOUND_BACKEND_SDL2)
                 SDL_FreeAudioStream(m->converter);
-                m->converter = nullptr;
+#else
+                ma_data_converter_uninit(m->converter, nullptr);
+                m->bytesAvailable = 0;
 #endif
+                m->converter = nullptr;
             }
         }
+
+        return true;
     }
 
     int StreamSource::bytesAvailable() const
     {
-        if (!m->converter)
+        if (!m || !m->converter)
             return 0;
 #if defined(INSOUND_BACKEND_SDL2)
         return SDL_AudioStreamAvailable(m->converter);
+#else
+        return m->bytesAvailable;
 #endif
     }
 
-    bool StreamSource::isReady(bool *outReady) const
+    bool StreamSource::isReady(bool *outReady) const // TODO: not necessarily correct across all platforms...
     {
         INIT_GUARD();
 
@@ -176,15 +203,63 @@ namespace insound {
             return length;
         }
 
-        if (m->buffer.size() != length)
-            m->buffer.resize(length);
+#if defined(INSOUND_BACKEND_SDL2)
+        queueNextBuffer();
+
+        if (int bytesAvailable = SDL_AudioStreamAvailable(m->converter); bytesAvailable < length)
+        {
+            std::memset(output, 0, length);
+            if (m->isOneShot) // if sound ended and nothing to read, close the source
+            {
+                bool ended;
+                if (m->decoder->isEnded(&ended) && ended)
+                {
+                    if (SDL_AudioStreamFlush(m->converter) != 0)
+                        INSOUND_PUSH_ERROR(Result::SdlErr, SDL_GetError());
+
+                    if (bytesAvailable = SDL_AudioStreamAvailable(m->converter) > 0;
+                        bytesAvailable > 0)
+                    {
+                        if (SDL_AudioStreamGet(m->converter, output, bytesAvailable) != 0)
+                            INSOUND_PUSH_ERROR(Result::SdlErr, SDL_GetError());
+                    }
+                    close();
+                    return length;
+                }
+            }
+            return length;
+        }
+
+        if (SDL_AudioStreamGet(m->converter, output, length) <= 0)
+        {
+            INSOUND_PUSH_ERROR(Result::SdlErr, SDL_GetError());
+            std::memset(output, 0, length);
+        }
+
+        return length;
+#else
+        constexpr int outK = 2 * sizeof(float); // output frame -> byte constant
+        ma_uint64 outputFramesRequested = length / outK;
+        ma_uint64 inputFramesRequested;
+        if (ma_data_converter_get_required_input_frame_count(m->converter, outputFramesRequested, &inputFramesRequested) != MA_SUCCESS)
+        {
+            INSOUND_PUSH_ERROR(Result::MaErr, "failed to calculate required input frames")
+            return 0;
+        }
+
+        AudioSpec inSpec;
+        m->decoder->getSpec(&inSpec);
+
+        const int inK = inSpec.channels * (inSpec.format.bits() / CHAR_BIT);
+        auto inputBytes = inputFramesRequested * inK;
+        if (m->buffer.size() != inputBytes)
+            m->buffer.resize(inputBytes, 0);
 
         // TODO: Put this in another thread
         queueNextBuffer();
 
-#if defined(INSOUND_BACKEND_SDL2)
         // Retrieve when there is enough audio ready
-        if (SDL_AudioStreamAvailable(m->converter) < length)
+        if (m->bytesAvailable < inputBytes)
         {
             std::memset(output, 0, length);
             if (m->isOneShot) // if sound ended and nothing to read, close the source
@@ -199,14 +274,25 @@ namespace insound {
             return length;
         }
 
-        const auto read = SDL_AudioStreamGet(m->converter, output, length);
-        if (read <= 0)
+        ma_uint64 outBufferFrameSize = outputFramesRequested;
+        ma_uint64 inFramesRead = inputFramesRequested;
+        uint64_t totalInFramesRead = 0;
+
+        while (totalInFramesRead < inputFramesRequested)
         {
-            INSOUND_PUSH_ERROR(Result::SdlErr, SDL_GetError());
-            return 0;
+            ma_uint64 inFramesLeft = inputFramesRequested - totalInFramesRead;
+            if (ma_data_converter_process_pcm_frames(m->converter, m->buffer.data() + totalInFramesRead * inK, &inFramesLeft, output, &outBufferFrameSize) != MA_SUCCESS)
+            {
+                INSOUND_PUSH_ERROR(Result::MaErr, "failed to process pcm frames");
+                return 0;
+            }
+
+            totalInFramesRead += inFramesLeft; // inFramesLeft contains frames consumed
         }
 
-        return read;
+        m->bytesAvailable -= static_cast<int>(inputBytes);
+
+        return length;
 #endif
     }
 
@@ -250,27 +336,28 @@ namespace insound {
         return true;
     }
 
-    bool StreamSource::release()
-    {
-        close();
-        return true;
-    }
-
     void StreamSource::queueNextBuffer()
     {
-        if (!m->decoder)
+        if (!m || !m->decoder)
+            return;
+        const auto bufSize = static_cast<int>(m->buffer.size());
+        if (bufSize == 0)
             return;
 
 #if defined(INSOUND_BACKEND_SDL2)
-        const auto bufSize = m->buffer.size();
-        if (SDL_AudioStreamAvailable(m->converter) < bufSize * 4)
+        if (bytesAvailable() < bufSize * 4)
         {
-            // Reading probably needs to happen inside another thread since
-            // reading from disk is slow.
-            auto read = m->decoder->readBytes(
-                static_cast<int>(bufSize), m->buffer.data());
-            if (read > 0)
-                SDL_AudioStreamPut(m->converter, m->buffer.data(), read);
+            m->decoder->readBytes(bufSize, m->buffer.data());
+            if (SDL_AudioStreamPut(m->converter, m->buffer.data(), bufSize) != 0)
+            {
+                INSOUND_PUSH_ERROR(Result::SdlErr, SDL_GetError());
+            }
+        }
+#else
+        if (m->bytesAvailable < bufSize)
+        {
+            const auto bytesRead = m->decoder->readBytes(bufSize - m->bytesAvailable, m->buffer.data() + m->bytesAvailable);
+            m->bytesAvailable += bytesRead;
         }
 #endif
     }

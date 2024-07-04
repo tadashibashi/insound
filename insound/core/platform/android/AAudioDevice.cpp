@@ -3,6 +3,7 @@
 
 #ifdef __ANDROID__
 #include <insound/core/Error.h>
+#include <insound/core/platform/android/AndroidNative.h>
 #include <aaudio/AAudio.h>
 #include <mutex>
 
@@ -226,6 +227,11 @@ namespace insound {
     bool AAudioDevice::isOpen() const
     {
         return m->isOpen();
+    }
+
+    int AAudioDevice::getDefaultSampleRate() const
+    {
+        return getAndroidDefaultSampleRate();
     }
 } // insound
 

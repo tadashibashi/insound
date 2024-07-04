@@ -1,7 +1,7 @@
 #include "RstreamableAAsset.h"
 
 #ifdef __ANDROID__
-#include "../platform/AndroidNative.h"
+#include "../platform/android/AndroidNative.h"
 #include "../Error.h"
 
 #include <android/asset_manager.h>

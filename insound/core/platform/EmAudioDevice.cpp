@@ -1,10 +1,8 @@
 
 #ifdef __EMSCRIPTEN__
-
 #include "EmAudioDevice.h"
-#include "../../AudioSpec.h"
-#include "../../Error.h"
-#include "../../platform/getDefaultSampleRate.h"
+#include <insound/core/AudioSpec.h>
+#include <insound/core/Error.h>
 #include <insound/core/logging.h>
 #include <emscripten/webaudio.h>
 
@@ -177,6 +175,23 @@ namespace insound {
 
         [[nodiscard]]
         auto bufferSize() const { return m_bufferSize; }
+
+        [[nodiscard]]
+        static int getDefaultSampleRate()
+        {
+            return EM_ASM_INT({
+                var AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (AudioContext)
+                {
+                    var context = new AudioContext();
+                    var sampleRate = context.sampleRate;
+                    context.close();
+                    return sampleRate;
+                }
+
+                return -1;
+            });
+        }
 
     private:
         uint8_t *m_audioThreadStack{};
@@ -433,6 +448,11 @@ namespace insound {
         const auto device = static_cast<Impl *>(userData1);
         if (state == AUDIO_CONTEXT_STATE_RUNNING)
             device->setIsRunning(true);
+    }
+
+    int EmAudioDevice::getDefaultSampleRate() const
+    {
+        return Impl::getDefaultSampleRate();
     }
 
 } // insound

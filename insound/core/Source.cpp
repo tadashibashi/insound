@@ -108,12 +108,12 @@ namespace insound {
 
     int Source::read(const uint8_t **pcmPtr, int length)
     {
-        if (m_inBuffer.size() < length)
+        if (m_inBuffer.size() != length)
         {
             m_inBuffer.resize(length, 0);
         }
 
-        if (m_outBuffer.size() < length)
+        if (m_outBuffer.size() != length)
         {
             m_outBuffer.resize(length, 0);
         }
@@ -152,7 +152,7 @@ namespace insound {
             {
                 // Check if there is a pause clock ahead to see how many samples to read until then
                 const bool pauseThisFrame = (pauseClock < (length - i) / (2 * sizeof(float)) && pauseClock > -1);
-                const int bytesToRead = pauseThisFrame ? (int)pauseClock : length - i;
+                const int bytesToRead = pauseThisFrame ? (int)pauseClock * 2 * sizeof(float) : length - i;
 
                 int bytesRead = 0;
                 // read bytes here

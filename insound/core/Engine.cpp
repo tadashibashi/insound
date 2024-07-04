@@ -15,8 +15,6 @@
 #include <mutex>
 #include <vector>
 
-#include "PerfTimer.h"
-
 namespace insound {
 #ifdef INSOUND_DEBUG
 /// Checks that engine is open before performing a function.
@@ -34,7 +32,7 @@ namespace insound {
         explicit Impl(Engine *engine) : m_engine(engine), m_clock(), m_masterBus(),
                                         m_device(), m_deferredCommands(),
                                         m_immediateCommands(),
-                                        m_discardFlag(false), m_immediateCommandMutex(), m_deferredCommandMutex()
+                                        m_discardFlag(false), m_immediateCommandMutex(), m_deferredCommandMutex(), m_mixMutex()
         {
             m_device = AudioDevice::create();
         }
@@ -71,7 +69,7 @@ namespace insound {
             {
                 if (m_masterBus.isValid())
                 {
-                    auto lockGuard = m_device->mixLockGuard();
+                    auto lockGuard = std::lock_guard(m_mixMutex);
                     m_masterBus->m_isMaster = false; // enable bus deletion
                     release(
                         static_cast<Handle<Source>>(m_masterBus), true);
@@ -120,7 +118,7 @@ namespace insound {
                 return false;
             }
 
-            auto lockGuard = m_device->mixLockGuard();
+            auto lockGuard = std::lock_guard(m_mixMutex);
             if (bus && !bus.isValid()) // if output bus was passed, and it's invalid => error
             {
                 INSOUND_PUSH_ERROR(Result::InvalidHandle,
@@ -165,7 +163,7 @@ namespace insound {
                         Handle<StreamSource> *outSource)
         {
             ENGINE_INIT_GUARD();
-            auto lockGuard = m_device->mixLockGuard();
+            auto lockGuard = std::lock_guard(m_mixMutex);
 
             uint32_t clock;
             bool result = bus ?
@@ -195,7 +193,7 @@ namespace insound {
         bool createBus(bool paused, const Handle<Bus> &output, Handle<Bus> *outBus, const bool isMaster)
         {
             ENGINE_INIT_GUARD();
-            auto lockGuard = m_device->mixLockGuard();
+            auto lockGuard = std::lock_guard(m_mixMutex);
 
             if (output && !output.isValid()) // if output was passed, and it's invalid => error
             {
@@ -255,7 +253,7 @@ namespace insound {
         [[nodiscard]]
         bool deviceID(uint32_t *outDeviceID) const
         {
-            auto lockGuard = m_device->mixLockGuard();
+            auto lockGuard = std::lock_guard(m_mixMutex);
             ENGINE_INIT_GUARD();
 
             if (outDeviceID)
@@ -268,7 +266,7 @@ namespace insound {
         /// @returns true on success, false on error
         bool getSpec(AudioSpec *outSpec) const
         {
-            auto lockGuard = m_device->mixLockGuard();
+            auto lockGuard = std::lock_guard(m_mixMutex);
             ENGINE_INIT_GUARD();
 
             if (outSpec)
@@ -281,7 +279,7 @@ namespace insound {
 
         bool getMasterBus(Handle<Bus> *outBus) const
         {
-            auto lockGuard = m_device->mixLockGuard();
+            auto lockGuard = std::lock_guard(m_mixMutex);
             ENGINE_INIT_GUARD();
 
             if (outBus)
@@ -294,7 +292,7 @@ namespace insound {
 
         bool getPaused(bool *outValue) const
         {
-            auto lockGuard = m_device->mixLockGuard();
+            auto lockGuard = std::lock_guard(m_mixMutex);
             ENGINE_INIT_GUARD();
 
             if (outValue)
@@ -308,7 +306,7 @@ namespace insound {
         bool setPaused(const bool value)
         {
             ENGINE_INIT_GUARD();
-            auto lockGuard = m_device->mixLockGuard();
+            auto lockGuard = std::lock_guard(m_mixMutex);
 
             if (value)
                 m_device->suspend();
@@ -320,8 +318,9 @@ namespace insound {
         bool update()
         {
             ENGINE_INIT_GUARD();
+            m_device->update();
 
-            auto lockGuard = m_device->mixLockGuard();
+            auto lockGuard = std::lock_guard(m_mixMutex);
             {
                 auto deferredCommandGuard = std::lock_guard(m_deferredCommandMutex);
                 processCommands(this, m_deferredCommands);
@@ -428,6 +427,8 @@ namespace insound {
         {
             return *m_device;
         }
+
+        std::lock_guard<std::recursive_mutex> mixLockGuard() { return std::lock_guard(m_mixMutex); }
     private:
 
         /// Process a vector of commands
@@ -485,7 +486,7 @@ namespace insound {
         static void audioCallback(void *userptr, AlignedVector<uint8_t, 16> *outBuffer)
         {
             const auto engine = static_cast<Impl *>(userptr);
-            if (!engine->isOpen())
+            if (!engine->isOpen() || !engine->m_masterBus)
                 return;
 
             // Process commands that require sample-accurate immediacy
@@ -495,6 +496,7 @@ namespace insound {
                     Engine::Impl::processCommands(engine, engine->m_immediateCommands);
             }
 
+            auto lockGuard = std::lock_guard(engine->m_mixMutex);
             const auto size = outBuffer->size();
             engine->m_masterBus->read(nullptr, static_cast<int>(size));
 
@@ -518,6 +520,7 @@ namespace insound {
 
         std::mutex m_immediateCommandMutex;
         std::mutex m_deferredCommandMutex;
+        mutable std::recursive_mutex m_mixMutex;
     };
 
     Engine::Engine() : m(new Impl(this))
@@ -563,6 +566,11 @@ namespace insound {
     bool Engine::createBus(const bool paused, Handle<Bus> *outBus)
     {
         return m->createBus(paused, {}, outBus, false);
+    }
+
+    std::lock_guard<std::recursive_mutex> Engine::mixLockGuard()
+    {
+        return m->mixLockGuard();
     }
 
     bool Engine::releaseSoundImpl(const Handle<Source> &source)

@@ -22,7 +22,6 @@ namespace insound {
         bool release() override;
 
         bool open(const fs::path &filepath);
-        void close();
         [[nodiscard]] bool isOpen() const;
 
         void queueNextBuffer();

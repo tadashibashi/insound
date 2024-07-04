@@ -32,6 +32,7 @@ namespace insound {
 
     bool RstreamableFile::seek(const int64_t position)
     {
+        m_stream.clear();
         m_stream.seekg(static_cast<std::streamoff>(position), std::ios::beg);
         const auto result = static_cast<bool>(m_stream);
         if (!result)

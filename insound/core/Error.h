@@ -5,6 +5,8 @@ namespace insound {
         enum Code : int {
             Ok = 0,        ///< No errors.
             SdlErr,        ///< SDL runtime error.
+            PaErr,         ///< PortAudio error.
+            MaErr,         ///< MiniAudio error.
             StdExcept,     ///< std::exception thrown
             OutOfMemory,   ///< Ran out of system resources
             RangeErr,

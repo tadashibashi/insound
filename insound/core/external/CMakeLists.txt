@@ -1,0 +1,18 @@
+
+add_library(miniaudio STATIC miniaudio.cpp)
+
+if (CMAKE_BUILD_TYPE MATCHES "Deb")
+    if (EMSCRIPTEN)
+        target_link_options(insound PRIVATE -O1 -g -g3 -gsource-map)
+        target_compile_options(insound PRIVATE -O1 -g -g3 -gsource-map)
+    else()
+        target_link_options(insound PRIVATE -O0 -g)
+        target_compile_options(insound PRIVATE -O0 -g)
+    endif()
+elseif(CMAKE_BUILD_TYPE STREQUAL "MinSizeRel")
+    target_link_options(insound PRIVATE -Oz)
+    target_compile_options(insound PRIVATE -Oz)
+else()
+    target_link_options(insound PRIVATE -Ofast -flto)
+    target_compile_options(insound PRIVATE -Ofast -flto)
+endif()

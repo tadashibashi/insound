@@ -43,6 +43,11 @@ namespace insound {
         /// Resume the audio device, unpausing it, if suspended.
         virtual void resume() = 0;
 
+        [[nodiscard]]
+        virtual int getDefaultSampleRate() const = 0;
+
+        virtual void update() {}
+
         /// Whether this device is running (not suspended)
         [[nodiscard]]
         virtual bool isRunning() const = 0;
@@ -59,14 +64,10 @@ namespace insound {
         [[nodiscard]]
         virtual const AudioSpec &spec() const = 0;
 
-        /// Use as a last resort to sync with the mix thread. If you're using this externally, you're probably bypassing the command queue
-        std::lock_guard<std::recursive_mutex> mixLockGuard() const { return std::lock_guard(m_mixMutex); }
-
         /// Target buffer size of output device (may pass smaller size to audio callback)
         [[nodiscard]]
         virtual int bufferSize() const = 0;
     protected:
-        mutable std::recursive_mutex m_mixMutex;
         virtual ~AudioDevice() = default;
     };
 }

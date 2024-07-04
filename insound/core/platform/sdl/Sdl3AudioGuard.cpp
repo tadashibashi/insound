@@ -1,16 +1,16 @@
-#include "SdlAudioGuard.h"
-#ifdef INSOUND_BACKEND_SDL2
-#include "../Error.h"
+#include "Sdl3AudioGuard.h"
+#ifdef INSOUND_BACKEND_SDL3
+#include "../../Error.h"
 
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 
 #include <mutex>
 
-int insound::detail::SdlAudioGuard::s_initCount;
+int insound::detail::Sdl3AudioGuard::s_initCount;
 
 static std::mutex s_sdlInitMutex;
 
-insound::detail::SdlAudioGuard::SdlAudioGuard() : m_didInit(false)
+insound::detail::Sdl3AudioGuard::Sdl3AudioGuard() : m_didInit(false)
 {
     std::lock_guard lockGuard(s_sdlInitMutex);
     if (SDL_InitSubSystem(SDL_INIT_AUDIO) != 0)
@@ -24,7 +24,7 @@ insound::detail::SdlAudioGuard::SdlAudioGuard() : m_didInit(false)
     }
 }
 
-insound::detail::SdlAudioGuard::~SdlAudioGuard()
+insound::detail::Sdl3AudioGuard::~Sdl3AudioGuard()
 {
     std::lock_guard lockGuard(s_sdlInitMutex);
     if (m_didInit)

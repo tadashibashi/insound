@@ -11,6 +11,7 @@
 #include "../Marker.h"
 #include "../io/openFile.h"
 
+
 bool insound::loadAudio(const fs::path &path, const AudioSpec &targetSpec, uint8_t **outBuffer, uint32_t *outLength, std::map<uint32_t, Marker> *outMarkers)
 {
     // Detect audio file type by extension
@@ -174,71 +175,106 @@ bool insound::convertAudio(uint8_t *audioData, const uint32_t length, const Audi
 
     return cvtResult == 0;
 }
-#endif
+#elif INSOUND_BACKEND_SDL3
+#include <SDL3/SDL_audio.h>
+bool insound::convertAudio(uint8_t *audioData, const uint32_t length, const AudioSpec &dataSpec,
+                           const AudioSpec &targetSpec, uint8_t **outBuffer, uint32_t *outLength)
+{
+    SDL_AudioSpec inSpec, outSpec;
+    inSpec.channels = dataSpec.channels;
+    inSpec.freq = dataSpec.freq;
+    inSpec.format = dataSpec.format.flags();
 
-#ifdef INSOUND_BACKEND_MINIAUDIO
+    outSpec.channels = targetSpec.channels;
+    outSpec.freq = targetSpec.freq;
+    outSpec.format = targetSpec.format.flags();
 
+    int outLengthTemp;
+    if (SDL_ConvertAudioSamples(&inSpec, audioData, length, &outSpec, outBuffer, &outLengthTemp) != 0)
+    {
+        INSOUND_PUSH_ERROR(Result::SdlErr, SDL_GetError());
+        return false;
+    }
+
+    if (outLength)
+    {
+        *outLength = static_cast<uint32_t>(outLengthTemp);
+    }
+
+    return true;
+}
+
+#else
+#include <insound/core/external/miniaudio.h>
 #include <insound/core/SampleFormat.h>
-#include <miniaudio.h>
+
+
+static uint8_t maFormatToBytes(const ma_format format)
+{
+    switch(format)
+    {
+        case ma_format_f32: case ma_format_s32:
+            return 4;
+        case ma_format_s24:
+            return 3;
+        case ma_format_s16:
+            return 2;
+        case ma_format_u8:
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+
 
 bool insound::convertAudio(uint8_t *audioData, const uint32_t length, const AudioSpec &dataSpec,
                            const AudioSpec &targetSpec, uint8_t **outBuffer, uint32_t *outLength)
 {
     const auto config = ma_data_converter_config_init(
-        static_cast<ma_format>(toMaFormat(dataSpec.format)),
-        static_cast<ma_format>(toMaFormat(targetSpec.format)),
+        (ma_format)toMaFormat(dataSpec.format), (ma_format)toMaFormat(targetSpec.format),
         dataSpec.channels, targetSpec.channels, dataSpec.freq, targetSpec.freq);
-
     ma_data_converter converter;
     if (ma_data_converter_init(&config, nullptr, &converter) != MA_SUCCESS)
     {
-        INSOUND_PUSH_ERROR(Result::RuntimeErr, "Miniaudio failed to initialize converter");
-
+        INSOUND_PUSH_ERROR(Result::RuntimeErr, "Failed to initialize ma_data_converter");
         return false;
     }
-    ma_uint64 inFrameCount = length / dataSpec.channels / (dataSpec.format.bits() / CHAR_BIT);
-    ma_uint64 expectedOutFrameCount;
-    if (ma_data_converter_get_expected_output_frame_count(&converter, inFrameCount, &expectedOutFrameCount) != MA_SUCCESS)
+
+    ma_uint64 inFrames = length / (dataSpec.channels * (dataSpec.format.bits() / CHAR_BIT));
+    ma_uint64 outFrames;
+    if (ma_data_converter_get_expected_output_frame_count(&converter, inFrames, &outFrames) != MA_SUCCESS)
     {
-        INSOUND_PUSH_ERROR(Result::RuntimeErr, "Miniaudio failed to get required input frame count");
+        INSOUND_PUSH_ERROR(Result::RuntimeErr, "Failed to get expected output frame count");
+        ma_data_converter_uninit(&converter, nullptr);
         return false;
     }
 
-    const auto expectedOutBufferSize = expectedOutFrameCount * targetSpec.channels * (targetSpec.format.bits() / CHAR_BIT);
-    const auto resizedAudioData = (uint8_t *)std::malloc(expectedOutBufferSize);
-    if (!resizedAudioData)
+    size_t outSize = outFrames * targetSpec.channels * (targetSpec.format.bits() / CHAR_BIT);
+
+    auto outMem = (uint8_t *)std::malloc(outSize);
+    if (ma_data_converter_process_pcm_frames(&converter, audioData, &inFrames, outMem, &outFrames) != MA_SUCCESS)
     {
-        INSOUND_PUSH_ERROR(Result::RuntimeErr, "failed to reallocate buffer");
+        INSOUND_PUSH_ERROR(Result::RuntimeErr, "Failed to process pcm frames");
+        ma_data_converter_uninit(&converter, nullptr);
         return false;
     }
-
-
-    ma_uint64 outCount;
-    if (ma_data_converter_process_pcm_frames(&converter, audioData, &inFrameCount, resizedAudioData, &outCount) != MA_SUCCESS)
-    {
-        INSOUND_PUSH_ERROR(Result::RuntimeErr, "Miniaudio failed to convert frames");
-        std::free(resizedAudioData);
-        return false;
-    }
-    std::free(audioData);
 
     if (outLength)
-    {
-        *outLength = static_cast<uint32_t>(outCount * targetSpec.channels * (targetSpec.format.bits() / CHAR_BIT));
-    }
+        *outLength = static_cast<uint32_t>(outSize);
 
     if (outBuffer)
     {
-        *outBuffer = resizedAudioData;
+        *outBuffer = outMem;
     }
     else
     {
-        std::free(resizedAudioData);
+        std::free(outMem);
     }
 
-
+    ma_data_converter_uninit(&converter, nullptr);
+    std::free(audioData);
     return true;
 }
 
 #endif
-

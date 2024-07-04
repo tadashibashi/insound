@@ -68,7 +68,7 @@ namespace insound {
         {
             static_assert(std::is_base_of_v<Effect, T>, "`T` must derive from Effect");
 
-            auto lockGuard = m_engine->device().mixLockGuard();
+            auto lockGuard = m_engine->mixLockGuard();
 
             if (detail::popSystemError().code == Result::InvalidHandle)
             {

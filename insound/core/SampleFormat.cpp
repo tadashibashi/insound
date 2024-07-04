@@ -33,8 +33,8 @@ namespace insound {
     }
 }
 
-#ifdef INSOUND_BACKEND_MINIAUDIO
-#include <miniaudio.h>
+
+#include <insound/core/external/miniaudio.h>
 uint32_t insound::toMaFormat(const insound::SampleFormat &spec)
 {
     if (spec.isFloat())
@@ -56,4 +56,4 @@ uint32_t insound::toMaFormat(const insound::SampleFormat &spec)
             return ma_format_unknown;
     }
 }
-#endif
+

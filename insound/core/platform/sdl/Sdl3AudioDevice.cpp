@@ -1,72 +1,99 @@
-#ifdef INSOUND_BACKEND_SDL2
-#include "SdlAudioDevice.h"
+#ifdef INSOUND_BACKEND_SDL3
+#include "Sdl3AudioDevice.h"
+#include "Sdl3AudioGuard.h"
 
-#include "../../AudioSpec.h"
-#include "../../Error.h"
-#include "../../platform/getDefaultSampleRate.h"
-#include "../../private/SdlAudioGuard.h"
+#include <insound/core/AudioSpec.h>
+#include <insound/core/Error.h>
 
-#include <SDL2/SDL_audio.h>
-
-#include <vector>
+#include <SDL3/SDL_audio.h>
 
 #if defined(INSOUND_THREADING) && !defined(__ANDROID__) // Implementation using pthreads
 #include <thread>
-struct insound::SdlAudioDevice::Impl {
-    explicit Impl(SdlAudioDevice *device) : mixMutex(device->m_mixMutex) { }
 
+struct insound::Sdl3AudioDevice::Impl {
+    explicit Impl(Sdl3AudioDevice *device) : mixMutex(device->m_mixMutex) { }
+    static void sdl3AudioCallback(void *userdata, SDL_AudioStream *stream, int additional_amount, int total_amount)
+    {
+        auto dev = static_cast<Sdl3AudioDevice::Impl *>(userdata);
+        if (dev->buffer.size() < additional_amount)
+            dev->buffer.resize(additional_amount);
+        dev->callback(dev->userData, &dev->buffer);
+        SDL_PutAudioStreamData(stream, dev->buffer.data(), dev->buffer.size());
+    }
     bool open(int frequency, int sampleFrameBufferSize,
               AudioCallback audioCallback,
               void *userdata)
     {
         // Set audio spec configuration
-        SDL_AudioSpec desired;
-        SDL_memset(&desired, 0, sizeof(desired));
+        SDL_AudioSpec desired{};
         desired.channels = 2;
-        desired.format = AUDIO_F32;
+        desired.format = SDL_AUDIO_F32;
         desired.freq = frequency > 0 ? frequency : getDefaultSampleRate();
         if (desired.freq == -1)
             desired.freq = 48000;
-        desired.samples = sampleFrameBufferSize;
-
         // Open device
-        SDL_AudioSpec obtained;
-        const auto deviceID = SDL_OpenAudioDevice(nullptr, false, &desired, &obtained, 0);
-        if (deviceID == 0)
+        stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_OUTPUT, &desired, sdl3AudioCallback, this);
+        if (!stream)
         {
             INSOUND_PUSH_ERROR(Result::SdlErr, SDL_GetError());
             return false;
         }
 
         // Clean up any pre-opened device
-        close();
+        // close();
 
-        // Commit values
-        spec.channels = obtained.channels;
-        spec.freq = obtained.freq;
+        // // Commit values
+        // SDL_AudioSpec obtained;
+        // int sampleBufferFrames;
+        // if (SDL_GetAudioDeviceFormat(deviceID, &obtained, &sampleBufferFrames) != 0)
+        // {
+        //     INSOUND_PUSH_ERROR(Result::SdlErr, SDL_GetError());
+        //     SDL_CloseAudioDevice(deviceID);
+        //     return false;
+        // }
+
+
+        // auto stream = SDL_CreateAudioStream(&desired, &desired);
+        // if (!stream)
+        // {
+        //     INSOUND_PUSH_ERROR(Result::SdlErr, SDL_GetError());
+        //     SDL_CloseAudioDevice(deviceID);
+        //     return false;
+        // }
+        //
+        // if (SDL_BindAudioStream(deviceID, stream) != 0)
+        // {
+        //     INSOUND_PUSH_ERROR(Result::SdlErr, SDL_GetError());
+        //     SDL_CloseAudioDevice(deviceID);
+        //     return false;
+        // }
+
+        spec.channels = desired.channels;
+        spec.freq = desired.freq;
         spec.format = SampleFormat(
-            SDL_AUDIO_BITSIZE(obtained.format), SDL_AUDIO_ISFLOAT(obtained.format),
-            SDL_AUDIO_ISBIGENDIAN(obtained.format), SDL_AUDIO_ISSIGNED(obtained.format)
+            SDL_AUDIO_BITSIZE(desired.format), SDL_AUDIO_ISFLOAT(desired.format),
+            SDL_AUDIO_ISBIGENDIAN(desired.format), SDL_AUDIO_ISSIGNED(desired.format)
         );
 
         bufferSize = sampleFrameBufferSize * (int)sizeof(float) * 2; // target buffer size
         buffer.resize(bufferSize /*128 * 2 * sizeof(float)*/, 0);                   // size of our local buffer (matches web audio)
 
-        id = deviceID;
+        //id = deviceID;
         callback = audioCallback;
         userData = userdata;
+        //this->stream = stream;
 
-        // Start mix thread
-        threadDelayTarget = std::chrono::microseconds((int)((float)sampleFrameBufferSize / (float)obtained.freq * 500000.f) );
-        mixThread = std::thread(mixCallback, this);
-
+        // Start mix thread TODO: use conditional instead of arbitarary sleep period
+        //threadDelayTarget = std::chrono::microseconds((int)((float)sampleFrameBufferSize / (float)obtained.freq * 500000.f) );
+        //mixThread = std::thread(mixCallback, this);
+        SDL_ResumeAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_OUTPUT);
         return true;
     }
 
     /// Code run in the mix thread. It feeds the SDL audio queue with data it retrieves from the mixed data from the user callback.
     static int mixCallback(void *userptr)
     {
-        auto device = (SdlAudioDevice::Impl *)userptr;
+        auto device = (Sdl3AudioDevice::Impl *)userptr;
         while (true)
         {
             const auto startTime = std::chrono::high_resolution_clock::now();
@@ -75,14 +102,14 @@ struct insound::SdlAudioDevice::Impl {
                 break;
 
             // Calculate mix and queue it if device is playing
-            if (auto status = SDL_GetAudioDeviceStatus(device->id); status == SDL_AUDIO_PLAYING)
+            if (!SDL_AudioDevicePaused(device->id))
             {
                 auto lockGuard = std::lock_guard(device->mixMutex);
 
-                while ((int)SDL_GetQueuedAudioSize(device->id) - device->bufferSize * 2 <= 0)
+                while ((int)SDL_GetAudioStreamAvailable(device->stream) - device->bufferSize * 2 <= 0)
                 {
                     device->callback(device->userData, &device->buffer);
-                    if (SDL_QueueAudio(device->id, device->buffer.data(),(uint32_t)device->buffer.size()) != 0)
+                    if (SDL_PutAudioStreamData(device->stream, device->buffer.data(),(uint32_t)device->buffer.size()) != 0)
                     {
                         INSOUND_PUSH_ERROR(Result::SdlErr, SDL_GetError());
                         break;
@@ -125,17 +152,19 @@ struct insound::SdlAudioDevice::Impl {
     std::thread mixThread{};
     std::chrono::microseconds threadDelayTarget{};
 
+    SDL_AudioStream *stream;
+
     // Buffer
     AlignedVector<uint8_t, 16> buffer{};
     int bufferSize{}; // more like the target sdl buffer size
 
-    detail::SdlAudioGuard m_initGuard{};
+    detail::Sdl3AudioGuard m_initGuard{};
 };
 
 #else  // Non-pthread implementation fallback
 
-struct insound::SdlAudioDevice::Impl {
-    Impl(SdlAudioDevice *device) { }
+struct insound::Sdl3AudioDevice::Impl {
+    Impl(Sdl3AudioDevice *device) { }
 
     AudioCallback callback{};
     void *userData{};
@@ -192,7 +221,7 @@ struct insound::SdlAudioDevice::Impl {
     /// SDL audio callback
     static void audioCallback(void *userdata, uint8_t *stream, int length)
     {
-        auto device = (SdlAudioDevice::Impl *)(userdata);
+        auto device = (Sdl3AudioDevice::Impl *)(userdata);
         if (device->buffer.size() != length)
         {
             device->buffer.resize(length, 0);
@@ -215,64 +244,77 @@ struct insound::SdlAudioDevice::Impl {
 
     AlignedVector<uint8_t, 16> buffer{};
     int bufferSize{};
-    detail::SdlAudioGuard m_initGuard{};
+    detail::Sdl3AudioGuard m_initGuard{};
 };
 #endif
 
 namespace insound {
-    SdlAudioDevice::SdlAudioDevice() : m(new Impl(this))
+    Sdl3AudioDevice::Sdl3AudioDevice() : m(new Impl(this))
     {
     }
 
-    SdlAudioDevice::~SdlAudioDevice()
+    Sdl3AudioDevice::~Sdl3AudioDevice()
     {
         delete m;
     }
 
-    bool SdlAudioDevice::open(int frequency, int sampleFrameBufferSize,
+    bool Sdl3AudioDevice::open(int frequency, int sampleFrameBufferSize,
                               AudioCallback engineCallback, void *userdata)
     {
         return m->open(frequency, sampleFrameBufferSize, engineCallback, userdata);
     }
 
-    void SdlAudioDevice::close()
+    void Sdl3AudioDevice::close()
     {
         m->close();
     }
 
-    void SdlAudioDevice::suspend()
+    void Sdl3AudioDevice::suspend()
     {
-        SDL_PauseAudioDevice(m->id, SDL_TRUE);
+        SDL_PauseAudioDevice(m->id);
     }
 
-    void SdlAudioDevice::resume()
+    void Sdl3AudioDevice::resume()
     {
-        SDL_PauseAudioDevice(m->id, SDL_FALSE);
+        SDL_ResumeAudioDevice(m->id);
     }
 
-    bool SdlAudioDevice::isOpen() const
+    bool Sdl3AudioDevice::isOpen() const
     {
         return m->id != 0;
     }
 
-    bool SdlAudioDevice::isRunning() const
+    bool Sdl3AudioDevice::isRunning() const
     {
-        return SDL_GetAudioDeviceStatus(m->id) == SDL_AUDIO_PLAYING;
+        return !SDL_AudioDevicePaused(m->id);
     }
 
-    uint32_t SdlAudioDevice::id() const
+    uint32_t Sdl3AudioDevice::id() const
     {
         return m->id;
     }
 
-    const AudioSpec & SdlAudioDevice::spec() const
+    const AudioSpec & Sdl3AudioDevice::spec() const
     {
         return m->spec;
     }
 
-    int SdlAudioDevice::bufferSize() const
+    int Sdl3AudioDevice::bufferSize() const
     {
         return m->bufferSize;
     }
+
+    int Sdl3AudioDevice::getDefaultSampleRate() const
+    {
+        SDL_AudioSpec defaultSpec;
+        if (SDL_GetAudioDeviceFormat(SDL_AUDIO_DEVICE_DEFAULT_OUTPUT, &defaultSpec, nullptr) != 0)
+        {
+            INSOUND_PUSH_ERROR(Result::SdlErr, SDL_GetError());
+            return -1;
+        }
+
+        return defaultSpec.freq;
+    }
+
 } // insound
 #endif
