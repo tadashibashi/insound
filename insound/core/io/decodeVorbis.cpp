@@ -93,7 +93,8 @@ namespace insound {
     bool VorbisDecoder::open(const fs::path &path)
     {
         int error = 0;
-        auto vorbis = stb_vorbis_open_filename(path.c_str(), &error, nullptr);
+        auto pathStr = path.string(); // todo: abstract path class
+        auto vorbis = stb_vorbis_open_filename(pathStr.c_str(), &error, nullptr);
         if (!vorbis)
         {
             INSOUND_PUSH_ERROR(Result::RuntimeErr, "Vorbis failed to open");

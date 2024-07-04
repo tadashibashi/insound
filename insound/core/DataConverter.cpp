@@ -48,8 +48,8 @@ bool DataConverter::convert(uint8_t **inFrames, uint64_t inFrameCount) {
 
     return cvtResult == 0;;
 #elif defined(INSOUND_BACKEND_SDL3)
-
+    return false; // TODO: implement
 #else
-
+    return false; // TODO: implement
 #endif
 }

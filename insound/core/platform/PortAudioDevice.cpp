@@ -24,6 +24,7 @@ namespace insound {
         public:
             explicit DeviceChangeNotification(Impl *m) : m(m) { }
 
+        private:
             // Implement necessary methods from IMMNotificationClient interface
             STDMETHODIMP OnDefaultDeviceChanged(EDataFlow flow, ERole role, LPCWSTR pwstrDeviceId) override {
                 // Handle default device change
@@ -37,8 +38,38 @@ namespace insound {
 
             // Other methods like OnDeviceStateChanged, OnPropertyValueChanged can also be implemented
 
-        private:
+
             PortAudioDevice::Impl *m;
+
+            // Inherited via IMMNotificationClient
+            HRESULT __stdcall QueryInterface(REFIID riid, void **ppvObject) override
+            {
+                return E_NOTIMPL;
+            }
+            ULONG __stdcall AddRef(void) override
+            {
+                return 0;
+            }
+            ULONG __stdcall Release(void) override
+            {
+                return 0;
+            }
+            HRESULT __stdcall OnDeviceStateChanged(LPCWSTR pwstrDeviceId, DWORD dwNewState) override
+            {
+                return 0;
+            }
+            HRESULT __stdcall OnDeviceAdded(LPCWSTR pwstrDeviceId) override
+            {
+                return 0;
+            }
+            HRESULT __stdcall OnDeviceRemoved(LPCWSTR pwstrDeviceId) override
+            {
+                return 0;
+            }
+            HRESULT __stdcall OnPropertyValueChanged(LPCWSTR pwstrDeviceId, const PROPERTYKEY key) override
+            {
+                return 0;
+            }
         } devNotificationClient{this};
         IMMDeviceEnumerator *devEnumerator{};
 #endif
@@ -196,7 +227,7 @@ namespace insound {
             std::lock_guard lockGuard(this->mutex);
             if (this->stream)
             {
-#ifdef INSOUND_TARGET_APPLE
+#if INSOUND_TARGET_APPLE
                 // Register device change listener
                 AudioObjectPropertyAddress propAddress = {
                     kAudioHardwarePropertyDefaultOutputDevice,

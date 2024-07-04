@@ -268,7 +268,8 @@ namespace insound {
         }
 
         // Find the GME file type
-        gme_type_t fileType = gme_identify_extension(path.c_str());
+        auto pathStr = path.string();
+        gme_type_t fileType = gme_identify_extension(pathStr.c_str());
         if (!fileType)
         {
             char header[4];
