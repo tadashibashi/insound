@@ -23,6 +23,8 @@ namespace insound {
         [[nodiscard]] const AudioSpec &spec() const override;
         [[nodiscard]] int bufferSize() const override;
         [[nodiscard]] int getDefaultSampleRate() const override;
+
+        void update() override;
     private:
         struct Impl;
         Impl *m;

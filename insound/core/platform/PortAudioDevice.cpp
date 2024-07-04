@@ -30,14 +30,14 @@ namespace insound {
                 // Handle default device change
                 printf("Device changed\n");
                 // Implement your logic here
-                m->refreshDefaultDevice();
+                auto lock = std::lock_guard(m->mutex);
+                m->id = -1;
                 return S_OK;
             }
 
             // Implement other methods like OnDeviceAdded, OnDeviceRemoved as needed
 
             // Other methods like OnDeviceStateChanged, OnPropertyValueChanged can also be implemented
-
 
             PortAudioDevice::Impl *m;
 
@@ -93,19 +93,19 @@ namespace insound {
             else
             {
                 paWasInit = true;
-#if INSOUND_PLATFORM_WINDOWS
+#if INSOUND_TARGET_WINDOWS
                 auto result = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL,
                     __uuidof(IMMDeviceEnumerator), (void **)&devEnumerator);
                 if (FAILED(result))
                 {
-                    INSOUND_PUSH_ERROR(Result::RuntimeErr, "mmdevice enumerator failed to create");
+                    INSOUND_PUSH_ERROR(Result::RuntimeErr, "MMDevice enumerator failed to create");
                     return;
                 }
 
                 result = devEnumerator->RegisterEndpointNotificationCallback(&devNotificationClient);
                 if (FAILED(result))
                 {
-                    INSOUND_PUSH_ERROR(Result::RuntimeErr, "mmdevice enumerator failed to register callback");
+                    INSOUND_PUSH_ERROR(Result::RuntimeErr, "MMDevice enumerator failed to register callback");
                     devEnumerator->Release();
                 }
 #endif
@@ -126,28 +126,24 @@ namespace insound {
             // Handle device change
             printf("Default output device has changed.\n");
             auto dev = static_cast<Impl *>(inClientData);
+            auto lockGuard = std::lock_guard(dev->mutex);
             return dev->refreshDefaultDevice() ? noErr : kAudioHardwareBadDeviceError;
         }
 #endif
 
         bool refreshDefaultDevice()
         {
-            std::unique_lock lock(mutex);
             if (this->stream)
             {
-                if (const auto result = Pa_StopStream(this->stream); result != paNoError)
+                if (auto result = Pa_StopStream(this->stream); result != paNoError && result != paStreamIsStopped)
                 {
-                    INSOUND_PUSH_ERROR(Result::PaErr, Pa_GetErrorText(result));
-                    return false;
-                }
-                if (const auto result = Pa_CloseStream(this->stream); result != paNoError)
-                {
-                    INSOUND_PUSH_ERROR(Result::PaErr, Pa_GetErrorText(result));
-                    return false;
+                    result = Pa_AbortStream(this->stream);
+                    if (result != paNoError)
+                        INSOUND_PUSH_ERROR(Result::PaErr, Pa_GetErrorText(result));
                 }
                 this->stream = nullptr;
 
-                if (const auto result = Pa_Terminate(); result != paNoError)
+                if (const auto result = Pa_Terminate(); result != paNoError) // Terminate auto-closes all opened streams
                 {
                     INSOUND_PUSH_ERROR(Result::PaErr, Pa_GetErrorText(result));
                     return false;
@@ -159,7 +155,6 @@ namespace insound {
                     return false;
                 }
             }
-            mutex.unlock();
 
             return open(Pa_GetDefaultOutputDevice(),
                 spec.freq, static_cast<int>(requestedBufferFrames),
@@ -172,7 +167,7 @@ namespace insound {
 
             frequency = frequency ? frequency : 48000;
             PaStream *stream;
-            PaStreamParameters outParams;
+            PaStreamParameters outParams{};
             outParams.device = devId;
             outParams.channelCount = 2;
             outParams.sampleFormat = paFloat32;
@@ -209,7 +204,7 @@ namespace insound {
             this->buffer.resize(sampleFrameBufferSize * sizeof(float) * 2);
             this->id = id;
 
-#ifdef __APPLE__
+#if INSOUND_TARGET_APPLE 
             // Register device change listener
             AudioObjectPropertyAddress propAddress = {
                 kAudioHardwarePropertyDefaultOutputDevice,
@@ -259,15 +254,29 @@ namespace insound {
                            void *userData)
         {
             auto dev = static_cast<Impl *>(userData);
-            std::lock_guard lockGuard(dev->mutex);
-
             const auto bufferByteSize = framesPerBuffer * sizeof(float) * 2;
 
-            if (dev->buffer.size() != bufferByteSize)
-                dev->buffer.resize(bufferByteSize);
-            dev->callback(dev->userdata, &dev->buffer);
+            if (!dev->mutex.try_lock())
+            {
+                return 0;
+            }
 
-            std::memcpy(outputBuffer, dev->buffer.data(), bufferByteSize);
+            try {
+               const auto bufferByteSize = framesPerBuffer * sizeof(float) * 2;
+
+                if (dev->buffer.size() != bufferByteSize)
+                    dev->buffer.resize(bufferByteSize);
+                dev->callback(dev->userdata, &dev->buffer);
+
+                std::memcpy(outputBuffer, dev->buffer.data(), bufferByteSize);
+            }
+            catch (...)
+            {
+                dev->mutex.unlock();
+                return 0;
+            }
+
+            dev->mutex.unlock();
             return 0;
         }
     };
@@ -336,6 +345,18 @@ namespace insound {
         return static_cast<int>(info->defaultSampleRate);
     }
 
+    void PortAudioDevice::update()
+    {
+#if INSOUND_TARGET_WINDOWS
+        std::lock_guard lock(m->mutex);
+        if (m->id != Pa_GetDefaultOutputDevice())
+        {
+            m->refreshDefaultDevice();
+        }
+#endif
+    }
+
 } // insound
 
 #endif
+
