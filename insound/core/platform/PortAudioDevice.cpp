@@ -1,6 +1,7 @@
 #include "PortAudioDevice.h"
 
 #ifdef INSOUND_BACKEND_PORTAUDIO
+#include <insound/core/lib.h>
 #include <insound/core/Error.h>
 #include <insound/core/util.h>
 
@@ -8,12 +9,40 @@
 
 #include <mutex>
 
-#ifdef __APPLE__
+#if INSOUND_TARGET_MACOS
 #include <CoreAudio/CoreAudio.h>
+#endif
+
+#if INSOUND_TARGET_WINDOWS
+#include <mmdeviceapi.h>
 #endif
 
 namespace insound {
     struct PortAudioDevice::Impl {
+#if INSOUND_TARGET_WINDOWS
+        class DeviceChangeNotification : public IMMNotificationClient {
+        public:
+            explicit DeviceChangeNotification(Impl *m) : m(m) { }
+
+            // Implement necessary methods from IMMNotificationClient interface
+            STDMETHODIMP OnDefaultDeviceChanged(EDataFlow flow, ERole role, LPCWSTR pwstrDeviceId) override {
+                // Handle default device change
+                printf("Device changed\n");
+                // Implement your logic here
+                m->refreshDefaultDevice();
+                return S_OK;
+            }
+
+            // Implement other methods like OnDeviceAdded, OnDeviceRemoved as needed
+
+            // Other methods like OnDeviceStateChanged, OnPropertyValueChanged can also be implemented
+
+        private:
+            PortAudioDevice::Impl *m;
+        } devNotificationClient{this};
+        IMMDeviceEnumerator *devEnumerator{};
+#endif
+
         bool paWasInit{};
         PaStream *stream{};
         PaDeviceIndex id{};
@@ -33,6 +62,22 @@ namespace insound {
             else
             {
                 paWasInit = true;
+#if INSOUND_PLATFORM_WINDOWS
+                auto result = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL,
+                    __uuidof(IMMDeviceEnumerator), (void **)&devEnumerator);
+                if (FAILED(result))
+                {
+                    INSOUND_PUSH_ERROR(Result::RuntimeErr, "mmdevice enumerator failed to create");
+                    return;
+                }
+
+                result = devEnumerator->RegisterEndpointNotificationCallback(&devNotificationClient);
+                if (FAILED(result))
+                {
+                    INSOUND_PUSH_ERROR(Result::RuntimeErr, "mmdevice enumerator failed to register callback");
+                    devEnumerator->Release();
+                }
+#endif
             }
         }
 
@@ -44,7 +89,7 @@ namespace insound {
             }
         }
 
-#ifdef __APPLE__
+#if INSOUND_TARGET_APPLE
         static OSStatus deviceChangedListener(AudioObjectID inObjectID, UInt32 inNumberAddresses,
             const AudioObjectPropertyAddress inAddresses[], void *inClientData) {
             // Handle device change
@@ -151,7 +196,7 @@ namespace insound {
             std::lock_guard lockGuard(this->mutex);
             if (this->stream)
             {
-#ifdef __APPLE__
+#ifdef INSOUND_TARGET_APPLE
                 // Register device change listener
                 AudioObjectPropertyAddress propAddress = {
                     kAudioHardwarePropertyDefaultOutputDevice,
@@ -160,6 +205,15 @@ namespace insound {
                 };
 
                 AudioObjectRemovePropertyListener(kAudioObjectSystemObject, &propAddress, deviceChangedListener, this);
+#endif
+
+#if INSOUND_TARGET_WINDOWS
+                if (devEnumerator)
+                {
+                    devEnumerator->UnregisterEndpointNotificationCallback(&devNotificationClient);
+                    devEnumerator->Release();
+                    devEnumerator = nullptr;
+                }
 #endif
                 Pa_StopStream(this->stream);
                 Pa_CloseStream(this->stream);
