@@ -203,8 +203,8 @@ endif()
 
 if (INSOUND_DECODE_GME)
     FetchContent_Declare(libgme
-        GIT_REPOSITORY https://github.com/libgme/game-music-emu.git
-        GIT_TAG        4964e543bc25ac3d7968fb5117aabd99d7ff2073
+        GIT_REPOSITORY https://github.com/tadashibashi/game-music-emu.git
+        GIT_TAG        23e8814d9575b8bf89dd88c9b624df8d1d364a2b
     )
 
     if (EMSCRIPTEN)
