@@ -1,16 +1,15 @@
 #pragma once
 
 #include <cstdint>
-#include <filesystem>
+#include <string>
 
 namespace insound {
-    namespace fs = std::filesystem;
 
     class Rstream {
     public:
         Rstream() : m_stream() { }
         ~Rstream();
-        bool open(const fs::path &filepath);
+        bool open(const std::string &filepath);
 
         [[nodiscard]]
         bool isOpen() const;

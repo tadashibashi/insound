@@ -1,21 +1,23 @@
 #include "loadAudio.h"
 
-#include "decodeFLAC.h"
-#include "decodeGME.h"
-#include "decodeMp3.h"
-#include "decodeVorbis.h"
-#include "decodeWAV.h"
+// #include "decodeFLAC.h"
+// #include "decodeGME.h"
+// #include "decodeMp3.h"
+// #include "decodeVorbis.h"
+// #include "decodeWAV.h"
+
+#include <insound/core/AudioDecoder.h>
 
 #include "../AudioSpec.h"
 #include "../Error.h"
 #include "../Marker.h"
 #include "../io/openFile.h"
+#include "../path.h"
 
-
-bool insound::loadAudio(const fs::path &path, const AudioSpec &targetSpec, uint8_t **outBuffer, uint32_t *outLength, std::map<uint32_t, Marker> *outMarkers)
+bool insound::loadAudio(const std::string &path, const AudioSpec &targetSpec, uint8_t **outBuffer, uint32_t *outLength, std::map<uint32_t, Marker> *outMarkers)
 {
     // Detect audio file type by extension
-    if (!path.has_extension())
+    if (!path::hasExtension(path))
     {
         INSOUND_PUSH_ERROR(Result::InvalidArg,
                   R"(`path` must contain a recognizable extension e.g. ".wav", ".ogg")");
@@ -23,75 +25,34 @@ bool insound::loadAudio(const fs::path &path, const AudioSpec &targetSpec, uint8
     }
 
     // Uppercase extension
-    std::string ext = path.extension().string();
+    const auto extView = path::extension(path);
+    auto ext = std::string(extView.data(), extView.length());
     for (auto &c : ext)
     {
         c = (char)std::toupper(c);
     }
 
-    // Load file data
-    std::string fileData;
-    if (!openFile(path, &fileData))
-    {
-        return false;
-    }
-
-    AudioSpec spec;
-    uint8_t *buffer;
-    uint32_t bufferSize;
     std::map<uint32_t, Marker> markers;
 
-    const auto fileDataBuf = (uint8_t *)fileData.data();
-    const auto fileDataSize = static_cast<uint32_t>(fileData.size());
+    AudioDecoder decoder;
+    if (!decoder.open(path, targetSpec))
+        return false;
 
-    if (ext == ".WAV")
-    {
-        // fallback to SDL's WAV parser
-        if (!decodeWAV((uint8_t *)fileData.data(), fileDataSize, &spec, &buffer, &bufferSize, &markers))
-            return false;
-    }
-    else if (ext == ".OGG")
-    {
-#ifdef INSOUND_DECODE_VORBIS
-        if (!decodeVorbis(fileDataBuf, fileDataSize, &spec, &buffer, &bufferSize))
-            return false;
-#else
-        INSOUND_PUSH_ERROR(Result::NotSupported, "Vorbis decoding is not supported, make sure to compile with "
-            "INSOUND_DECODE_VORBIS defined");
-#endif
-    }
-    else if (ext == ".FLAC")
-    {
-#ifdef INSOUND_DECODE_FLAC
-        if (!decodeFLAC(fileDataBuf, fileDataSize, &spec, &buffer, &bufferSize))
-            return false;
-#else
-        INSOUND_PUSH_ERROR(Result::NotSupported, "FLAC decoding is not supported, make sure to compile with "
-            "INSOUND_DECODE_FLAC defined");
+    AudioSpec spec;
+    if (!decoder.getSpec(&spec))
         return false;
-#endif
-    }
-    else if (ext == ".MP3")
-    {
-#ifdef INSOUND_DECODE_MP3
-        if (!decodeMp3(fileDataBuf, fileDataSize, &spec, &buffer, &bufferSize))
-            return false;
-#else
-        INSOUND_PUSH_ERROR(Result::NotSupported, "MP3 decoding is not supported, make sure to compile with "
-            "INSOUND_DECODE_MP3 defined");
+
+    uint64_t pcmFrameLength;
+    if (!decoder.getPCMFrameLength(&pcmFrameLength))
         return false;
-#endif
-    }
-    else
+
+    uint64_t bufferSize = pcmFrameLength * targetSpec.bytesPerFrame();
+    auto buffer = (uint8_t *)std::malloc(bufferSize);
+
+    if (!decoder.readFrames(static_cast<int>(pcmFrameLength), buffer))
     {
-#ifdef INSOUND_DECODE_GME
-        if (!decodeGME(fileDataBuf, fileDataSize, targetSpec.freq, 0, -1, &spec, &buffer, &bufferSize))
-            return false;
-#else
-        INSOUND_PUSH_ERROR(Result::NotSupported, "GME decoding is not supported, make sure to compile with "
-            "INSOUND_DECODE_GME defined");
+        std::free(buffer);
         return false;
-#endif
     }
 
     uint32_t newSize;
@@ -207,26 +168,6 @@ bool insound::convertAudio(uint8_t *audioData, const uint32_t length, const Audi
 #else
 #include <insound/core/external/miniaudio.h>
 #include <insound/core/SampleFormat.h>
-
-
-static uint8_t maFormatToBytes(const ma_format format)
-{
-    switch(format)
-    {
-        case ma_format_f32: case ma_format_s32:
-            return 4;
-        case ma_format_s24:
-            return 3;
-        case ma_format_s16:
-            return 2;
-        case ma_format_u8:
-            return 1;
-        default:
-            return 0;
-    }
-}
-
-
 
 bool insound::convertAudio(uint8_t *audioData, const uint32_t length, const AudioSpec &dataSpec,
                            const AudioSpec &targetSpec, uint8_t **outBuffer, uint32_t *outLength)

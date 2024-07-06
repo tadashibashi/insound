@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
 project(insound)
 
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW CACHE STRING "")
@@ -39,16 +39,21 @@ else()
 endif()
 
 # Insound Audio Engine options
+
+# SDL (this is currently not working, as all backends do not depend on SDL at the moment)
 option(INSOUND_BACKEND_SDL2      "Enable SDL2 backend"                                  OFF )
-option(INSOUND_USE_CLIENT_SDL2   "Use user's SDL2::SDL2 target"                       ${INSOUND_USER_PROVIDED_SDL2_DEFAULT})
+option(INSOUND_USE_CLIENT_SDL2   "Use user's SDL2::SDL2 target"                       ${INSOUND_USE_CLIENT_SDL2_DEFAULT})
 option(INSOUND_BACKEND_SDL3      "Enable SDL3 backend"                                  OFF )
-option(INSOUND_USE_CLIENT_SDL3   "Use user's SDL3::SDL3 target"                       ${INSOUND_USER_PROVIDED_SDL3_DEFAULT})
+option(INSOUND_USE_CLIENT_SDL3   "Use user's SDL3::SDL3 target"                       ${INSOUND_USE_CLIENT_SDL3_DEFAULT})
 
 # Audio file decoders
-option(INSOUND_DECODE_VORBIS     "Include ogg vorbis file decoding in build."           ON )
 option(INSOUND_DECODE_MP3        "Include mp3 file decoding in build."                  ON )
 option(INSOUND_DECODE_FLAC       "Include flac file decoding in build."                 ON )
+option(INSOUND_DECODE_WAV        "Include wav file decoding in build."                  ON )
+option(INSOUND_DECODE_VORBIS     "Include ogg vorbis file decoding in build."           ON )
 option(INSOUND_DECODE_GME        "Include classic game emu decoding in build."          ON )
+option(INSOUND_DECODE_MODPLUG    "Include modplug format decoding in build."            ON )
+
 
 option(INSOUND_LOGGING           "Enable logging in release mode"                       ON )
 

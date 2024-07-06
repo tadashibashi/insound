@@ -1,19 +1,18 @@
 #pragma once
 
 #include <cstdint>
-#include <filesystem>
+#include <string>
 
 namespace insound {
-    namespace fs = std::filesystem;
 
     /// Low level resource stream: an abstraction around read-only file streams
     class Rstreamable {
     public:
         /// Create and open an Rstreamable by platform. Returns null on error.
-        static Rstreamable *create(const fs::path &filepath);
+        static Rstreamable *create(const std::string &filepath);
         virtual ~Rstreamable() = default;
 
-        virtual bool open(const fs::path &filepath) = 0;
+        virtual bool open(const std::string &filepath) = 0;
 
         [[nodiscard]]
         virtual bool isOpen() const = 0;
@@ -29,7 +28,7 @@ namespace insound {
         [[nodiscard]]
         virtual int64_t position() const = 0;
 
-        /// If return value is -1 an error occurred, otherwise it will return the number of
+        /// If return value is -1 an error occurred, if 0, it is eof, otherwise it will return the number of
         /// bytes read.
         virtual int64_t read(uint8_t *buffer, int64_t bytes) = 0;
 

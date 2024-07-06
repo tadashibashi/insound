@@ -2,6 +2,7 @@
 
 #include "Engine.h"
 #include "external/ctpl_stl.h"
+#include "path.h"
 
 #include <map>
 
@@ -17,20 +18,21 @@ namespace insound {
             m_threads.stop(true);
         }
 
-        const SoundBuffer *load(const fs::path &path)
+        const SoundBuffer *load(const std::string &path)
         {
-            if (const auto it = m_buffers.find(path); it != m_buffers.end())
+            auto finalPath = path::join(m_baseDir, path);
+            if (const auto it = m_buffers.find(finalPath); it != m_buffers.end())
             {
                 return &it->second;
             }
 
             SoundBuffer buffer;
-            if (!buffer.load(path, m_targetSpec))
+            if (!buffer.load(finalPath, m_targetSpec))
             {
                 return nullptr;
             }
 
-            const auto &[emplacedIt, success] = m_buffers.emplace(path.native(), std::move(buffer));
+            const auto &[emplacedIt, success] = m_buffers.emplace(finalPath, std::move(buffer));
             if (!success)
             {
                 return nullptr;
@@ -40,15 +42,15 @@ namespace insound {
             return &emplacedIt->second;
         }
 
-        const SoundBuffer *loadAsync(const fs::path &path, std::future<void> *outFuture)
+        const SoundBuffer *loadAsync(const std::string &path, std::future<void> *outFuture)
         {
-            auto finalPath = m_baseDir / path;
+            auto finalPath = path::join(m_baseDir, path);
             if (const auto it = m_buffers.find(finalPath); it != m_buffers.end())
             {
                 return &it->second;
             }
 
-            const auto &[emplacedIt, success] = m_buffers.emplace(finalPath.native(), SoundBuffer());
+            const auto &[emplacedIt, success] = m_buffers.emplace(finalPath, SoundBuffer());
             if (!success)
             {
                 return nullptr;
@@ -68,10 +70,10 @@ namespace insound {
             return sndBuffer;
         }
 
-        bool unload(const fs::path &path)
+        bool unload(const std::string &path)
         {
-            const auto finalPath = m_baseDir / path;
-            auto it = m_buffers.find(finalPath.native());
+            const auto finalPath = path::join(m_baseDir, path);
+            auto it = m_buffers.find(finalPath);
             if (it != m_buffers.end() && it->second.isLoaded())
             {
                 m_buffers.erase(it);
@@ -106,9 +108,9 @@ namespace insound {
         AudioSpec m_targetSpec;
         ctpl::thread_pool m_threads; ///< threads for handling async loading
 
-        std::map<fs::path::string_type, SoundBuffer> m_buffers;
+        std::map<std::string, SoundBuffer> m_buffers;
         std::atomic<size_t> m_count;
-        fs::path m_baseDir;
+        std::string m_baseDir;
     };
 
     AudioLoader::AudioLoader(const Engine *engine) : m(new Impl(engine))
@@ -121,12 +123,12 @@ namespace insound {
         delete m;
     }
 
-    const SoundBuffer *AudioLoader::load(const fs::path &path)
+    const SoundBuffer *AudioLoader::load(const std::string &path)
     {
         return m->load(path);
     }
 
-    const SoundBuffer *AudioLoader::loadAsync(const fs::path &path, std::future<void> *outFuture)
+    const SoundBuffer *AudioLoader::loadAsync(const std::string &path, std::future<void> *outFuture)
     {
 #ifdef INSOUND_THREADING
         return m->loadAsync(path, outFuture);
@@ -135,7 +137,7 @@ namespace insound {
 #endif
     }
 
-    bool AudioLoader::unload(const fs::path &path)
+    bool AudioLoader::unload(const std::string &path)
     {
         return m->unload(path);
     }
@@ -155,12 +157,12 @@ namespace insound {
         return m->empty();
     }
 
-    const fs::path &AudioLoader::baseDir() const
+    const std::string &AudioLoader::baseDir() const
     {
         return m->m_baseDir;
     }
 
-    void AudioLoader::setBaseDir(const fs::path &path)
+    void AudioLoader::setBaseDir(const std::string &path)
     {
         m->m_baseDir = path;
     }

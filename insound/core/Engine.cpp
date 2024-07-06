@@ -158,7 +158,7 @@ namespace insound {
             return true;
         }
 
-        bool playStream(const fs::path &filepath, bool paused, bool looping,
+        bool playStream(const std::string &filepath, bool paused, bool looping,
                         bool oneshot, const Handle<Bus> &bus,
                         Handle<StreamSource> *outSource)
         {
@@ -653,7 +653,7 @@ namespace insound {
         m->processCommand(command);
     }
 
-    bool Engine::playStream(const fs::path &filepath, bool paused, bool looping,
+    bool Engine::playStream(const std::string &filepath, bool paused, bool looping,
         bool oneshot, const Handle<Bus> &bus, Handle<StreamSource> *outSource)
     {
         return m->playStream(filepath, paused, looping, oneshot, bus, outSource);

@@ -4,13 +4,10 @@
 #include "SourceRefFwd.h"
 
 #include <cstdint>
-#include <filesystem>
 
 
 
 namespace insound {
-    namespace fs = std::filesystem;
-
     struct AudioSpec;
     class BufferPool;
     class Bus;
@@ -42,7 +39,7 @@ namespace insound {
         bool playSound(const SoundBuffer *buffer, bool paused, bool looping, bool oneshot, const Handle<Bus> &bus, Handle<PCMSource> *outPcmSource);
         bool playSound(const SoundBuffer *buffer, bool paused, bool looping, bool oneshot, Handle<PCMSource> *outPcmSource);
 
-        bool playStream(const fs::path &filepath, bool paused, bool looping, bool oneshot, const Handle<Bus> &bus, Handle<StreamSource> *outSource);
+        bool playStream(const std::string &filepath, bool paused, bool looping, bool oneshot, const Handle<Bus> &bus, Handle<StreamSource> *outSource);
 
         /// Create a new bus to use in the mixing graph
         /// @param paused whether bus should start off paused on initialization

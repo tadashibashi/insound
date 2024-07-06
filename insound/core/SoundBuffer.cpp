@@ -7,7 +7,7 @@ namespace insound {
     {
     }
 
-    SoundBuffer::SoundBuffer(const fs::path &filepath, const AudioSpec &targetSpec) :
+    SoundBuffer::SoundBuffer(const std::string &filepath, const AudioSpec &targetSpec) :
         m_bufferSize(), m_buffer(), m_spec()
     {
         load(filepath, targetSpec);
@@ -33,7 +33,7 @@ namespace insound {
         other.m_buffer.store(nullptr);
     }
 
-    bool SoundBuffer::load(const fs::path &filepath, const AudioSpec &targetSpec)
+    bool SoundBuffer::load(const std::string &filepath, const AudioSpec &targetSpec)
     {
         uint8_t *buffer;
         uint32_t byteLength;

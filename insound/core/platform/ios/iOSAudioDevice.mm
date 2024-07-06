@@ -51,29 +51,41 @@ namespace insound {
             if (dev->buffer.size() != byteSize)
                 dev->buffer.resize(byteSize, 0);
 
-            if (dev->bytesReady.load(std::memory_order_acquire))
+            dev->callback(dev->userdata, &dev->buffer);
+            for (int i = 0; i < ioData->mNumberBuffers; ++i)
             {
-                for (int i = 0; i < ioData->mNumberBuffers; ++i)
-                {
-                    // Copy retrieved data to the output buffer
-                    auto &buffer = ioData->mBuffers[i];
-                    std::memcpy(buffer.mData, dev->buffer.data(),
-                                std::min<int>((int)byteSize, buffer.mDataByteSize));
-                }
+                // Copy retrieved data to the output buffer
+                auto &buffer = ioData->mBuffers[i];
+                std::memcpy(buffer.mData, dev->buffer.data(),
+                            std::min<int>((int)byteSize, buffer.mDataByteSize));
+            }
 
-                dev->bytesReady.store(0, std::memory_order_release);
-                dev->nextBufferReady.notify_all();
-            }
-            else
-            {
-                for (int i = 0; i < ioData->mNumberBuffers; ++i)
-                {
-                    // Write silence to the output buffer
-                    auto &buffer = ioData->mBuffers[i];
-                    std::memcpy(buffer.mData, dev->buffer.data(),
-                                std::min<int>((int)byteSize, buffer.mDataByteSize));
-                }
-            }
+
+
+//            if (dev->bytesReady.load(std::memory_order_acquire) >= byteSize)
+//            {
+//                for (int i = 0; i < ioData->mNumberBuffers; ++i)
+//                {
+//                    // Copy retrieved data to the output buffer
+//                    auto &buffer = ioData->mBuffers[i];
+//                    std::memcpy(buffer.mData, dev->buffer.data(),
+//                                std::min<int>((int)byteSize, buffer.mDataByteSize));
+//                }
+//
+//                dev->bytesReady.store(0, std::memory_order_release);
+//                dev->nextBufferReady.notify_all();
+//            }
+//            else
+//            {
+//                INSOUND_LOG("Buffer underrun, silence returned\n");
+//                for (int i = 0; i < ioData->mNumberBuffers; ++i)
+//                {
+//                    // Write silence to the output buffer
+//                    auto &buffer = ioData->mBuffers[i];
+//                    std::memset(buffer.mData, 0,
+//                                std::min<int>((int)byteSize, buffer.mDataByteSize));
+//                }
+//            }
 
             return noErr;
         }
@@ -267,12 +279,13 @@ namespace insound {
         }
 
         // Setup stream format
-        frequency = frequency ? frequency : getDefaultSampleRate();
+        frequency = (frequency > 0) ? frequency : getDefaultSampleRate();
 
         auto streamFormat = AudioStreamBasicDescription{0};
         streamFormat.mSampleRate = frequency;
         streamFormat.mFormatID = kAudioFormatLinearPCM;
-        streamFormat.mFormatFlags = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked;
+        const auto formatFlags = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked;
+        streamFormat.mFormatFlags = formatFlags;
         streamFormat.mBytesPerPacket = sizeof(float) * 2;
         streamFormat.mFramesPerPacket = 1;
         streamFormat.mBytesPerFrame = sizeof(float) * 2;
@@ -325,6 +338,22 @@ namespace insound {
             return false;
         }
 
+        // Set max frames per slice
+        uint32_t maxFramesPerSlice = sampleFrameBufferSize;
+        result = AudioUnitSetProperty(audioUnit,
+                                      kAudioUnitProperty_MaximumFramesPerSlice,
+                                      kAudioUnitScope_Global,
+                                      0,
+                                      &maxFramesPerSlice,
+                                      sizeof(maxFramesPerSlice));
+        if (result != noErr)
+        {
+            INSOUND_PUSH_ERROR(Result::RuntimeErr,
+                               "failed to set audio unit max frames per slice");
+            return false;
+        }
+
+        // Turn off allocation of buffer
         uint32_t flag = 0;
         result = AudioUnitSetProperty(audioUnit,
                                       kAudioUnitProperty_ShouldAllocateBuffer,
@@ -347,6 +376,32 @@ namespace insound {
             return false;
         }
 
+        // Retrieve the actual values back from the audio unit
+        double retrievedSampleRate;
+        uint32_t size = sizeof(retrievedSampleRate);
+        AudioUnitGetProperty(audioUnit,
+                             kAudioUnitProperty_SampleRate,
+                             kAudioUnitScope_Input,
+                             0,
+                             &retrievedSampleRate,
+                             &size);
+        assert(sizeof(retrievedSampleRate) == size);
+        assert(retrievedSampleRate == frequency);
+
+        AudioStreamBasicDescription retrievedStreamDesc;
+        size = sizeof(retrievedStreamDesc);
+        AudioUnitGetProperty(audioUnit,
+                             kAudioUnitProperty_StreamFormat,
+                             kAudioUnitScope_Input,
+                             0,
+                             &retrievedStreamDesc,
+                             &size);
+        assert(sizeof(retrievedStreamDesc) == size);
+        assert(retrievedStreamDesc.mBitsPerChannel == sizeof(float) * CHAR_BIT);
+        assert(retrievedStreamDesc.mFormatID == kAudioFormatLinearPCM);
+        assert(retrievedStreamDesc.mChannelsPerFrame == 2);
+        assert((retrievedStreamDesc.mFormatFlags & formatFlags) == formatFlags);
+
         auto curAudioUnit = m->audioUnit.load(std::memory_order_acquire);
         if (curAudioUnit)
         {
@@ -354,33 +409,34 @@ namespace insound {
             AudioComponentInstanceDispose(curAudioUnit);
         }
 
-        // TODO: retrieve the actual values back from the audio unit
+        // TODO: use converter for output instead of assert / fail?
 
         m->callback = audioCallback;
         m->userdata = userdata;
-        m->spec.freq = frequency;
+        m->spec.freq = retrievedSampleRate;
         m->spec.channels = 2;
         m->spec.format = insound::SampleFormat(sizeof(float) * CHAR_BIT, true,
                                                false, true);
         m->audioUnit.store(audioUnit, std::memory_order_release);
-        m->buffer.resize(sampleFrameBufferSize * sizeof(float) * 2);
+        m->buffer.resize(sampleFrameBufferSize * sizeof(float) * 2, 0);
+        //m->bytesReady.store(m->buffer.size());
 
-        m->thread = std::thread([this]() {
-            while (m->audioUnit.load(std::memory_order_acquire))
-            {
-                std::unique_lock lock(m->mutex);
-                m->nextBufferReady.wait(lock, [this]() {
-                    return m->bytesReady == 0;
-                });
-
-                if (m->nextBuffer.size() != m->buffer.size())
-                    m->nextBuffer.resize(m->buffer.size(), 0);
-
-                m->callback(m->userdata, &m->nextBuffer);
-                m->buffer.swap(m->nextBuffer);
-                m->bytesReady.store((int)m->buffer.size(), std::memory_order_release);
-            }
-        });
+//        m->thread = std::thread([this]() {
+//            while (m->audioUnit.load(std::memory_order_acquire))
+//            {
+//                std::unique_lock lock(m->mutex);
+//                m->nextBufferReady.wait(lock, [this]() {
+//                    return m->bytesReady == 0;
+//                });
+//
+//                if (m->nextBuffer.size() != m->buffer.size())
+//                    m->nextBuffer.resize(m->buffer.size(), 0);
+//
+//                m->callback(m->userdata, &m->nextBuffer);
+//                m->buffer.swap(m->nextBuffer);
+//                m->bytesReady.store((int)m->buffer.size(), std::memory_order_release);
+//            }
+//        });
 
         return true;
     }

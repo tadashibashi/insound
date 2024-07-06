@@ -75,7 +75,7 @@ namespace insound {
 #endif
 
         bool paWasInit{};
-        PaStream *stream{};
+        std::atomic<PaStream *> stream{};
         PaDeviceIndex id{};
         AudioCallback callback{};
         void *userdata{};
@@ -123,25 +123,25 @@ namespace insound {
 #if INSOUND_TARGET_APPLE
         static OSStatus deviceChangedListener(AudioObjectID inObjectID, UInt32 inNumberAddresses,
             const AudioObjectPropertyAddress inAddresses[], void *inClientData) {
-            // Handle device change
-            printf("Default output device has changed.\n");
             auto dev = static_cast<Impl *>(inClientData);
             auto lockGuard = std::lock_guard(dev->mutex);
-            return dev->refreshDefaultDevice() ? noErr : kAudioHardwareBadDeviceError;
+            dev->id = -1;
+            return noErr;
         }
 #endif
 
         bool refreshDefaultDevice()
         {
-            if (this->stream)
+            const auto stream = this->stream.load(std::memory_order_acquire);
+            if (stream)
             {
-                if (auto result = Pa_StopStream(this->stream); result != paNoError && result != paStreamIsStopped)
+                if (auto result = Pa_StopStream(stream); result != paNoError && result != paStreamIsStopped)
                 {
-                    result = Pa_AbortStream(this->stream);
+                    result = Pa_AbortStream(stream);
                     if (result != paNoError)
                         INSOUND_PUSH_ERROR(Result::PaErr, Pa_GetErrorText(result));
                 }
-                this->stream = nullptr;
+                this->stream.store(nullptr, std::memory_order_release);
 
                 if (const auto result = Pa_Terminate(); result != paNoError) // Terminate auto-closes all opened streams
                 {
@@ -204,7 +204,7 @@ namespace insound {
             this->buffer.resize(sampleFrameBufferSize * sizeof(float) * 2);
             this->id = id;
 
-#if INSOUND_TARGET_APPLE 
+#if INSOUND_TARGET_APPLE
             // Register device change listener
             AudioObjectPropertyAddress propAddress = {
                 kAudioHardwarePropertyDefaultOutputDevice,
@@ -220,7 +220,8 @@ namespace insound {
         void close()
         {
             std::lock_guard lockGuard(this->mutex);
-            if (this->stream)
+            auto stream = this->stream.load(std::memory_order_acquire);
+            if (stream)
             {
 #if INSOUND_TARGET_APPLE
                 // Register device change listener
@@ -241,9 +242,9 @@ namespace insound {
                     devEnumerator = nullptr;
                 }
 #endif
-                Pa_StopStream(this->stream);
-                Pa_CloseStream(this->stream);
-                this->stream = nullptr;
+                Pa_StopStream(stream);
+                Pa_CloseStream(stream);
+                this->stream.store(nullptr, std::memory_order_release);
             }
         }
 
@@ -253,8 +254,7 @@ namespace insound {
                            PaStreamCallbackFlags statusFlags,
                            void *userData)
         {
-            auto dev = static_cast<Impl *>(userData);
-            const auto bufferByteSize = framesPerBuffer * sizeof(float) * 2;
+            const auto dev = static_cast<Impl *>(userData);
 
             if (!dev->mutex.try_lock())
             {
@@ -301,26 +301,22 @@ namespace insound {
 
     void PortAudioDevice::suspend()
     {
-        std::lock_guard lockGuard(m->mutex);
-        Pa_StopStream(m->stream);
+        Pa_StopStream(m->stream.load(std::memory_order_acquire));
     }
 
     void PortAudioDevice::resume()
     {
-        std::lock_guard lockGuard(m->mutex);
-        Pa_StartStream(m->stream);
+        Pa_StartStream(m->stream.load(std::memory_order_acquire));
     }
 
     bool PortAudioDevice::isOpen() const
     {
-        std::lock_guard lockGuard(m->mutex);
-        return m->stream != nullptr;
+        return m->stream.load(std::memory_order_acquire) != nullptr;
     }
 
     bool PortAudioDevice::isRunning() const
     {
-        std::lock_guard lockGuard(m->mutex);
-        return Pa_IsStreamStopped(m->stream);
+        return Pa_IsStreamStopped(m->stream.load(std::memory_order_acquire));
     }
 
     uint32_t PortAudioDevice::id() const
@@ -347,13 +343,11 @@ namespace insound {
 
     void PortAudioDevice::update()
     {
-#if INSOUND_TARGET_WINDOWS
         std::lock_guard lock(m->mutex);
         if (m->id != Pa_GetDefaultOutputDevice())
         {
             m->refreshDefaultDevice();
         }
-#endif
     }
 
 } // insound

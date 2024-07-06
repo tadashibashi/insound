@@ -39,6 +39,7 @@
 #define INSOUND_ERR(format, ...) __android_log_print(ANDROID_LOG_ERROR, "Insound", (format) VA_ARGS(__VA_ARGS__))
 
 #else                      // Desktop, iOS logging
+#include <cstdio>
 #define INSOUND_LOG(format, ...) std::fprintf(stdout, (format) VA_ARGS(__VA_ARGS__))
 #define INSOUND_ERR(format, ...) std::fprintf(stderr, (format) VA_ARGS(__VA_ARGS__))
 

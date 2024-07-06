@@ -1,12 +1,10 @@
 #pragma once
-#include <filesystem>
-#include <future>
-
 #include "SoundBuffer.h"
+#include <future>
+#include <string>
+
 
 namespace insound {
-    namespace fs = std::filesystem;
-
     class Engine;
 
     class AudioLoader {
@@ -16,17 +14,17 @@ namespace insound {
 
         /// @param path audio file path to open
         /// @returns loaded sound buffer, or nullptr if there was an error
-        const SoundBuffer *load(const fs::path &path);
+        const SoundBuffer *load(const std::string &path);
 
         /// @param path      audio file path to open
         /// @param outFuture useful to know if the load function finished, if the sound is still !isLoaded(), it failed.
         /// @returns sound buffer, check isLoaded to make sure it is okay to use
-        const SoundBuffer *loadAsync(const fs::path &path, std::future<void> *outFuture = nullptr);
+        const SoundBuffer *loadAsync(const std::string &path, std::future<void> *outFuture = nullptr);
 
         /// Unload a particular audio file from memory
         /// @param path filepath to unload, should match the path passed to `load` or `loadAsync`.
         /// @returns whether file was unloaded for the path provided
-        bool unload(const fs::path &path);
+        bool unload(const std::string &path);
 
         /// Unload all loaded files from memory
         bool unloadAll();
@@ -40,8 +38,8 @@ namespace insound {
         bool empty() const;
 
         [[nodiscard]]
-        const fs::path &baseDir() const;
-        void setBaseDir(const fs::path &path);
+        const std::string &baseDir() const;
+        void setBaseDir(const std::string &path);
     private:
         struct Impl;
         Impl *m;

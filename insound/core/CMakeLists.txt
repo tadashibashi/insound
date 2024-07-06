@@ -6,7 +6,7 @@ endif()
 include(FetchContent)
 
 add_library(insound
-    external/sdl2_audio.h)
+    Path.cpp)
 
 # ===== Audio Backends ========================================================
 
@@ -166,39 +166,38 @@ else()
     set(INSOUND_BACKEND_SDL2 ON)
 endif()
 
-if (NOT INSOUND_BACKEND_SDL2 AND NOT INSOUND_BACKEND_SDL3)
-    # MiniAudio is used for its conversion features only as a lightweight alternative to linking SDL.
-    # If SDL2 or SDL3 are being used as backends its audio stream api is used instead.
-    add_subdirectory(external)
-    target_link_libraries(insound PRIVATE miniaudio)
-endif()
-
 # ===== Decoders ==============================================================
 
-if (INSOUND_DECODE_VORBIS)
-    target_compile_definitions(insound PRIVATE -DINSOUND_DECODE_VORBIS=1)
-    target_sources(insound PUBLIC io/decodeVorbis.h PRIVATE io/decodeVorbis.cpp)
+if (INSOUND_DECODE_FLAC)
+    target_compile_definitions(insound PRIVATE -DINSOUND_DECODE_FLAC=1)
+endif()
+if (INSOUND_DECODE_MP3)
+    target_compile_definitions(insound PRIVATE -DINSOUND_DECODE_MP3=1)
+endif()
+if (INSOUND_DECODE_WAV)
+    target_compile_definitions(insound PRIVATE -DINSOUND_DECODE_WAV=1)
 endif()
 
-if (INSOUND_DECODE_FLAC OR INSOUND_DECODE_MP3)
-    FetchContent_Declare(dr_libs
-        GIT_REPOSITORY https://github.com/mackron/dr_libs.git
-        GIT_TAG        da35f9d6c7374a95353fd1df1d394d44ab66cf01
+if (INSOUND_DECODE_VORBIS)
+    FetchContent_Declare(vorbis
+        GIT_REPOSITORY https://github.com/xiph/vorbis.git
+        GIT_TAG        "v1.3.7"
     )
-    FetchContent_MakeAvailable(dr_libs)
-    FetchContent_GetProperties(dr_libs)
 
-    target_include_directories(insound PRIVATE ${dr_libs_SOURCE_DIR})
+    FetchContent_Declare(ogg
+        GIT_REPOSITORY https://github.com/xiph/ogg.git
+        GIT_TAG        "v1.3.5"
+    )
 
-    if (INSOUND_DECODE_FLAC)
-        target_compile_definitions(insound PRIVATE -DINSOUND_DECODE_FLAC=1)
-        target_sources(insound PUBLIC io/decodeFLAC.h PRIVATE io/decodeFLAC.cpp)
-    endif()
+    set(OGG_LIBRARY $<TARGET_FILE:ogg>)
+    set(OGG_INCLUDE_DIR ${ogg_SOURCE_DIR}/include)
 
-    if (INSOUND_DECODE_MP3)
-        target_compile_definitions(insound PRIVATE -DINSOUND_DECODE_MP3=1)
-        target_sources(insound PUBLIC io/decodeMp3.h PRIVATE io/decodeMp3.cpp)
-    endif()
+    FetchContent_MakeAvailable(ogg)
+    FetchContent_MakeAvailable(vorbis)
+    target_compile_definitions(insound PRIVATE -DINSOUND_DECODE_VORBIS=1)
+    target_link_libraries(insound PRIVATE vorbisfile)
+else()
+    target_compile_definitions(insound PRIVATE -DMA_NO_LIBVORBIS)
 endif()
 
 if (INSOUND_DECODE_GME)
@@ -219,7 +218,11 @@ if (INSOUND_DECODE_GME)
     FetchContent_MakeAvailable(libgme)
     target_link_libraries(insound PUBLIC gme::gme)
     target_compile_definitions(insound PRIVATE -DINSOUND_DECODE_GME=1)
-    target_sources(insound PUBLIC io/decodeGME.h PRIVATE io/decodeGME.cpp)
+    #target_sources(insound PUBLIC io/decodeGME.h PRIVATE io/decodeGME.cpp)
+endif()
+
+if (INSOUND_DECODE_MODPLUG)
+
 endif()
 
 
@@ -228,8 +231,8 @@ endif()
 target_sources(insound
 PUBLIC
     AlignedVector.h
-    AudioDecoder.h
     AudioDevice.h
+    AudioDecoder.h
     AudioLoader.h
     AudioSpec.h
     Bus.h
@@ -245,11 +248,11 @@ PUBLIC
     Error.h
     Handle.h
     io/loadAudio.h
-    io/decodeWAV.h
     io/Rstream.h
     logging.h
     Marker.h
     MultiPool.h
+    path.h
     PCMSource.h
     PerfTimer.h
     Pool.h
@@ -264,8 +267,8 @@ PUBLIC
     util.h
 
 PRIVATE
-    AudioDecoder.cpp
     AudioDevice.cpp
+    AudioDecoder.cpp
     AudioLoader.cpp
     Bus.cpp
     BufferView.cpp
@@ -275,9 +278,10 @@ PRIVATE
     effects/PanEffect.cpp
     effects/VolumeEffect.cpp
     external/ctpl_stl.cpp
+    external/miniaudio.cpp
+    external/miniaudio_libvorbis.cpp
     Engine.cpp
     Error.cpp
-    io/decodeWAV.cpp
     io/openFile.cpp
     io/openFile.h
     io/loadAudio.cpp
@@ -289,8 +293,8 @@ PRIVATE
     io/RstreamableFile.cpp
     io/RstreamableFile.h
     PCMSource.cpp
+    path.cpp
     PerfTimer.cpp
-
     Pool.cpp
     SampleFormat.cpp
     SoundBuffer.cpp

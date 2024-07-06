@@ -1,11 +1,15 @@
 #include "SampleFormat.h"
 
+#include <climits>
+
+#include "util.h"
+
 namespace insound {
     SampleFormat::SampleFormat() : m_flags()
     {
     }
 
-    SampleFormat::SampleFormat(const uint8_t bits, const bool isFloat, const bool isBigEndian, const bool isSigned) :
+    SampleFormat::SampleFormat(const uint32_t bits, const bool isFloat, const bool isBigEndian, const bool isSigned) :
         m_flags()
     {
         m_flags += bits;
@@ -27,9 +31,14 @@ namespace insound {
         return m_flags >> 15 & 1;
     }
 
-    uint8_t SampleFormat::bits() const
+    uint32_t SampleFormat::bits() const
     {
         return m_flags & 0xFFu;
+    }
+
+    uint32_t SampleFormat::bytes() const
+    {
+        return bits() / CHAR_BIT;
     }
 }
 
@@ -57,3 +66,29 @@ uint32_t insound::toMaFormat(const insound::SampleFormat &spec)
     }
 }
 
+static int maFormatToBytes(const int format)
+{
+    switch(format)
+    {
+        case ma_format_f32: case ma_format_s32:
+            return 4;
+        case ma_format_s24:
+            return 3;
+        case ma_format_s16:
+            return 2;
+        case ma_format_u8:
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+insound::SampleFormat insound::toFormat(int maFormat)
+{
+    return {
+        static_cast<uint32_t>(maFormatToBytes(maFormat) * CHAR_BIT),
+        maFormat == ma_format_f32,
+        endian::native == endian::big,
+        maFormat != ma_format_u8
+    };
+}

@@ -1,4 +1,4 @@
-#include "RstreamableAAsset.h"
+#include "../io/RstreamableAAsset.h"
 
 #ifdef __ANDROID__
 #include "../platform/android/AndroidNative.h"

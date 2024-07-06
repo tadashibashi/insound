@@ -1,12 +1,9 @@
 #pragma once
 #include "Source.h"
 
-#include <filesystem>
-
 #include "TimeUnit.h"
 
 namespace insound {
-    namespace fs = std::filesystem;
 
     /// Streams various file types from disk
     class StreamSource : public Source {
@@ -16,12 +13,12 @@ namespace insound {
 
         StreamSource(StreamSource &&other) noexcept;
 
-        bool init(class Engine *engine, const fs::path &filepath,
+        bool init(class Engine *engine, const std::string &filepath,
                   uint32_t parentClock, bool paused,
                   bool isLooping, bool isOneShot);
         bool release() override;
 
-        bool open(const fs::path &filepath);
+        bool open(const std::string &filepath);
         [[nodiscard]] bool isOpen() const;
 
         void queueNextBuffer();

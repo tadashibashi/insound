@@ -5,17 +5,17 @@
 #include "TimeUnit.h"
 
 #include <atomic>
-#include <filesystem>
+
+#include <string>
 #include <vector>
 
 namespace insound {
-    namespace fs = std::filesystem;
 
     /// Container holding PCM sound data
     class SoundBuffer {
     public:
         SoundBuffer();
-        SoundBuffer(const fs::path &filepath, const AudioSpec &targetSpec);
+        SoundBuffer(const std::string &filepath, const AudioSpec &targetSpec);
         SoundBuffer(uint8_t *m_buffer, uint32_t bufferSize, const AudioSpec &spec, std::vector<Marker> &&markers);
         ~SoundBuffer();
 
@@ -25,7 +25,7 @@ namespace insound {
         /// @param filepath    path to the sound file (only WAV supported for now)
         /// @param targetSpec  the specification to convert this buffer to on load, usually of the opened audio device
         ///                    to match the output type
-        bool load(const fs::path &filepath, const AudioSpec &targetSpec);
+        bool load(const std::string &filepath, const AudioSpec &targetSpec);
 
         /// Free sound buffer resources
         void unload();

@@ -1,15 +1,15 @@
-#include "Rstreamable.h"
+#include "../io/Rstreamable.h"
 
 #include "RstreamableAAsset.h"
 #include "RstreamableFile.h"
+#include "../path.h"
 
-
-insound::Rstreamable *insound::Rstreamable::create(const fs::path &filepath)
+insound::Rstreamable *insound::Rstreamable::create(const std::string &filepath)
 {
     Rstreamable *stream = nullptr;
 #ifdef __ANDROID__
 
-    if (filepath.is_absolute())
+    if (path::isAbsolute(filepath))
     {
         stream = new RstreamableFile();
     }

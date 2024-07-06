@@ -4,7 +4,6 @@
 
 #include <cstring>
 #include <fstream>
-#include <iostream>
 
 using namespace insound;
 
@@ -12,7 +11,7 @@ using namespace insound;
 #include <emscripten/fetch.h>
 #include <emscripten/threading.h>
 
-static bool openFileURLSync(const fs::path &url, std::string *outData)
+static bool openFileURLSync(const std::string &url, std::string *outData)
 {
     if (!outData)
     {
@@ -58,7 +57,7 @@ static bool openFileURLSync(const fs::path &url, std::string *outData)
 
 #endif
 
-static bool openFileFstream(const fs::path &path, std::string *outData)
+static bool openFileFstream(const std::string &path, std::string *outData)
 {
     // Open the file
     std::ifstream file(path, std::ios::in | std::ios::binary);
@@ -115,12 +114,12 @@ static bool openFileFstream(const fs::path &path, std::string *outData)
 
 static constexpr int CHUNK_SIZE = 1024;
 
-bool insound::openFile(const fs::path &path, std::string *outData)
+bool insound::openFile(const std::string &path, std::string *outData)
 {
 #ifdef __EMSCRIPTEN__
     if (!emscripten_is_main_browser_thread())
     {
-        const std::string_view pathView(path.native());
+        const std::string_view pathView(path);
         if (pathView.size() > 4 && pathView.substr(0, 4) == "http")
         {
             return openFileURLSync(path, outData);

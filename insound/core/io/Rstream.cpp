@@ -2,7 +2,7 @@
 #include "Rstreamable.h"
 #include "RstreamableFile.h"
 #include "RstreamableAAsset.h"
-#include <insound/core/Error.h>
+#include "../Error.h"
 
 namespace insound {
     Rstream::~Rstream()
@@ -10,7 +10,7 @@ namespace insound {
         delete m_stream;
     }
 
-    bool Rstream::open(const fs::path &filepath)
+    bool Rstream::open(const std::string &filepath)
     {
         Rstreamable *stream = Rstreamable::create(filepath);
         if (!stream)

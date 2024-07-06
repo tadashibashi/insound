@@ -7,7 +7,7 @@ namespace insound {
     public:
         /// Zero-ed null sample format object
         SampleFormat();
-        SampleFormat(uint8_t bits, bool isFloat, bool isBigEndian, bool isSigned);
+        SampleFormat(uint32_t bits, bool isFloat, bool isBigEndian, bool isSigned);
 
         /// @returns whether format is floating point (on true), or integer data (on false)
         [[nodiscard]]
@@ -23,7 +23,10 @@ namespace insound {
 
         /// @returns how many bits per sample - divide by CHAR_BIT to get bytes
         [[nodiscard]]
-        uint8_t bits() const;
+        uint32_t bits() const;
+
+        [[nodiscard]]
+        uint32_t bytes() const;
 
         /// @returns the raw flags
         [[nodiscard]]
@@ -32,6 +35,9 @@ namespace insound {
         uint16_t m_flags;
     };
 
-
-    uint32_t toMaFormat(const insound::SampleFormat &spec);
+    [[nodiscard]]
+    uint32_t toMaFormat(const SampleFormat &spec);
+    [[nodiscard]]
+    /// ma format to format converter
+    SampleFormat toFormat(int maFormat);
 }
