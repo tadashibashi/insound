@@ -4,9 +4,9 @@ else()
     project(insound C CXX)
 endif()
 include(FetchContent)
+set_property(GLOBAL PROPERTY CTEST_TARGETS_ADDED TRUE)
 
-add_library(insound
-    Path.cpp)
+add_library(insound)
 
 # ===== Audio Backends ========================================================
 
@@ -191,6 +191,7 @@ if (INSOUND_DECODE_VORBIS)
 
     set(OGG_LIBRARY $<TARGET_FILE:ogg>)
     set(OGG_INCLUDE_DIR ${ogg_SOURCE_DIR}/include)
+    set(BUILD_TESTING OFF)
 
     FetchContent_MakeAvailable(ogg)
     FetchContent_MakeAvailable(vorbis)
@@ -212,8 +213,6 @@ if (INSOUND_DECODE_GME)
         set(GME_BUILD_SHARED  ON)  # leave this ON to avoid forcing consumer app to be LGPL
     endif()
     set(GME_ENABLE_UBSAN      OFF)
-
-    set_property(GLOBAL PROPERTY CTEST_TARGETS_ADDED TRUE)
 
     FetchContent_MakeAvailable(libgme)
     target_link_libraries(insound PUBLIC gme::gme)
