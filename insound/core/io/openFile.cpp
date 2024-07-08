@@ -120,7 +120,8 @@ bool insound::openFile(const std::string &path, std::string *outData)
     if (!emscripten_is_main_browser_thread())
     {
         const std::string_view pathView(path);
-        if (pathView.size() > 4 && pathView.substr(0, 4) == "http")
+        if ( (pathView.size() > 6 && pathView.substr(0, 6) == "https:") ||
+             (pathView.size() > 5 && pathView.substr(0, 5) == "http:") )
         {
             return openFileURLSync(path, outData);
         }
