@@ -4,13 +4,10 @@
 #include "RstreamableFile.h"
 #include "RstreamableMemory.h"
 #include "../path.h"
+#include "../lib.h"
 
 insound::Rstreamable *insound::Rstreamable::create(const std::string &filepath, bool inMemory)
 {
-#if INSOUND_PLATFORM_EMSCRIPTEN
-    inMemory = true; // force load into memory
-#endif
-
     Rstreamable *stream;
     if (inMemory)
     {
@@ -18,7 +15,7 @@ insound::Rstreamable *insound::Rstreamable::create(const std::string &filepath, 
     }
     else
     {
-#if INSOUND_PLATFORM_ANDROID
+#if INSOUND_TARGET_ANDROID
 
         if (path::isAbsolute(filepath))
         {

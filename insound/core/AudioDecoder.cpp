@@ -243,8 +243,9 @@ namespace insound {
 
                 if (framesRead >= sampleFrames)
                     break;
-
-                framesRead += readFrames(static_cast<int>(sampleFrames - framesRead), buffer + framesRead * m->targetSpec.bytesPerFrame());
+                framesRead += readFrames(
+                    static_cast<int>(sampleFrames - framesRead),
+                    buffer + framesRead * m->targetSpec.bytesPerFrame());
             }
         }
         return static_cast<int>(framesRead);

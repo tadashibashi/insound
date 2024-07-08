@@ -2,15 +2,15 @@
 #include "lib.h"
 
 #if INSOUND_TARGET_EMSCRIPTEN
-#   include "platform/AudioDevice/EmAudioDevice.h"
-#   include "platform/AudioDevice/SdlAudioDevice.h"
+#   include "platform/EmAudioDevice.h"
 
     insound::AudioDevice *insound::AudioDevice::create()
     {
 #   ifdef INSOUND_THREADING // Use AudioWorklet backend
         return new EmAudioDevice();
 #   else                    // Use ScriptProcessorNode backend
-        return new SdlAudioDevice; // TODO: implement SDL backend that uses callback without threads
+#error "Non-threaded emscripten backend platform not supported yet"
+    // TODO: implement ScriptProcessorNode or other non-thread backend
 #   endif
     }
 #elif INSOUND_TARGET_ANDROID

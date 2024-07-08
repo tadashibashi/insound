@@ -33,8 +33,6 @@ namespace insound {
         static bool isPlatformSupported();
 
         [[nodiscard]] bool isOpen() const override;
-
-        void setAudioWorkletNode(int node);
     private:
         struct Impl;
         Impl *m;

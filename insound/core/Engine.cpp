@@ -7,6 +7,7 @@
 #include "Command.h"
 #include "Effect.h"
 #include "Error.h"
+#include "lib.h"
 #include "PCMSource.h"
 #include "SoundBuffer.h"
 #include "StreamSource.h"
@@ -111,21 +112,19 @@ namespace insound {
                        Handle<PCMSource> *outPcmSource)
         {
             ENGINE_INIT_GUARD();
-
+            std::lock_guard lockGuard(m_mixMutex);
             if (!buffer || !buffer->isLoaded())
             {
                 INSOUND_PUSH_ERROR(Result::InvalidSoundBuffer, "Failed to play sound");
                 return false;
             }
 
-            auto lockGuard = std::lock_guard(m_mixMutex);
             if (bus && !bus.isValid()) // if output bus was passed, and it's invalid => error
             {
                 INSOUND_PUSH_ERROR(Result::InvalidHandle,
                           "Engine::Impl::createBus failed because output Bus was invalid");
                 return false;
             }
-
 
             uint32_t clock;
             bool result;
@@ -141,16 +140,9 @@ namespace insound {
 
             const auto newSource = m_objectPool.allocate<PCMSource>(
                 m_engine, buffer, clock, paused, looping, oneshot);
-            if (bus)
-            {
-                bus->applyAppendSource(
-                    static_cast<Handle<Source>>(newSource));
-            }
-            else
-            {
-                m_masterBus->applyAppendSource(
-                    static_cast<Handle<Source>>(newSource));
-            }
+
+            pushImmediateCommand(
+                Command::makeBusAppendSource(bus ? bus : m_masterBus, newSource.cast<Source>()));
 
             if (outPcmSource)
                 *outPcmSource = newSource;
@@ -163,8 +155,12 @@ namespace insound {
                         Handle<StreamSource> *outSource)
         {
             ENGINE_INIT_GUARD();
-            auto lockGuard = std::lock_guard(m_mixMutex);
 
+#if INSOUND_TARGET_EMSCRIPTEN // emscripten can't stream from file
+            inMemory = true;
+#endif
+
+            std::lock_guard lockGuard(m_mixMutex);
             uint32_t clock;
             bool result = bus ?
                 bus->getClock(&clock) : m_masterBus->getClock(&clock);
@@ -174,15 +170,9 @@ namespace insound {
 
             const auto newSource = m_objectPool.allocate<StreamSource>(
                 m_engine, filepath, clock, paused, looping, oneshot, inMemory);
-            if (bus)
-            {
-                bus->applyAppendSource(static_cast<Handle<Source>>(newSource));
-            }
-            else
-            {
-                m_masterBus->applyAppendSource(
-                   static_cast<Handle<Source>>(newSource));
-            }
+
+            pushImmediateCommand(
+                Command::makeBusAppendSource(bus ? bus : m_masterBus, newSource.cast<Source>()));
 
             if (outSource)
                 *outSource = newSource;
@@ -193,8 +183,7 @@ namespace insound {
         bool createBus(bool paused, const Handle<Bus> &output, Handle<Bus> *outBus, const bool isMaster)
         {
             ENGINE_INIT_GUARD();
-            auto lockGuard = std::lock_guard(m_mixMutex);
-
+            std::lock_guard lockGuard(m_mixMutex);
             if (output && !output.isValid()) // if output was passed, and it's invalid => error
             {
                 INSOUND_PUSH_ERROR(Result::InvalidHandle, "Engine::Impl::createBus failed because output Bus was invalid");
@@ -212,7 +201,8 @@ namespace insound {
 
             // Connect bus to output
             if (outputBus)
-                Bus::connect(outputBus, static_cast<Handle<Source>>(newBusHandle));
+                pushImmediateCommand(
+                    Command::makeBusAppendSource(outputBus, newBusHandle.cast<Source>()));
 
             if (isMaster) // flag master
                 newBusHandle->m_isMaster = true;
@@ -253,7 +243,6 @@ namespace insound {
         [[nodiscard]]
         bool deviceID(uint32_t *outDeviceID) const
         {
-            auto lockGuard = std::lock_guard(m_mixMutex);
             ENGINE_INIT_GUARD();
 
             if (outDeviceID)
@@ -266,7 +255,6 @@ namespace insound {
         /// @returns true on success, false on error
         bool getSpec(AudioSpec *outSpec) const
         {
-            auto lockGuard = std::lock_guard(m_mixMutex);
             ENGINE_INIT_GUARD();
 
             if (outSpec)
@@ -279,7 +267,6 @@ namespace insound {
 
         bool getMasterBus(Handle<Bus> *outBus) const
         {
-            auto lockGuard = std::lock_guard(m_mixMutex);
             ENGINE_INIT_GUARD();
 
             if (outBus)
@@ -292,7 +279,6 @@ namespace insound {
 
         bool getPaused(bool *outValue) const
         {
-            auto lockGuard = std::lock_guard(m_mixMutex);
             ENGINE_INIT_GUARD();
 
             if (outValue)
@@ -306,7 +292,6 @@ namespace insound {
         bool setPaused(const bool value)
         {
             ENGINE_INIT_GUARD();
-            auto lockGuard = std::lock_guard(m_mixMutex);
 
             if (value)
                 m_device->suspend();
@@ -320,17 +305,48 @@ namespace insound {
             ENGINE_INIT_GUARD();
             m_device->update();
 
-            auto lockGuard = std::lock_guard(m_mixMutex);
             {
                 auto deferredCommandGuard = std::lock_guard(m_deferredCommandMutex);
-                processCommands(this, m_deferredCommands);
+                if (!m_deferredCommands.empty())
+                {
+                    if (m_mixMutex.try_lock())
+                    {
+                        try
+                        {
+                            processCommands(this, m_deferredCommands);
+                        }
+                        catch(...)
+                        {
+                            m_mixMutex.unlock();
+                            throw;
+                        }
+                        m_mixMutex.unlock();
+                    }
+
+                }
             }
 
             if (m_discardFlag)
             {
                 if (m_masterBus.isValid()) // is this necessary?
                 {
-                    m_masterBus->processRemovals();
+                    auto lockGuard = std::lock_guard(m_mixMutex);
+                    if (m_mixMutex.try_lock())
+                    {
+                        try
+                        {
+                            m_masterBus->processRemovals();
+                        }
+                        catch(...)
+                        {
+                            m_mixMutex.unlock();
+                            throw;
+                        }
+
+                        m_discardFlag = false;
+                        m_mixMutex.unlock();
+                    }
+
                 }
                 else
                 {
@@ -338,7 +354,6 @@ namespace insound {
                     return false;
                 }
 
-                m_discardFlag = false;
             }
 
             return true;
@@ -428,7 +443,7 @@ namespace insound {
             return *m_device;
         }
 
-        std::lock_guard<std::recursive_mutex> mixLockGuard() { return std::lock_guard(m_mixMutex); }
+        std::lock_guard<std::mutex> mixLockGuard() { return std::lock_guard(m_mixMutex); }
     private:
 
         /// Process a vector of commands
@@ -489,21 +504,59 @@ namespace insound {
             if (!engine->isOpen() || !engine->m_masterBus)
                 return;
 
+            auto guard = std::lock_guard(engine->m_mixMutex);
             // Process commands that require sample-accurate immediacy
             {
                 auto deferredCommandGuard = std::lock_guard(engine->m_deferredCommandMutex);
                 if (!engine->m_immediateCommands.empty())
                     Engine::Impl::processCommands(engine, engine->m_immediateCommands);
             }
-
-            auto lockGuard = std::lock_guard(engine->m_mixMutex);
             const auto size = outBuffer->size();
             engine->m_masterBus->read(nullptr, static_cast<int>(size));
-
             engine->m_clock += size / (2 * sizeof(float));
             engine->m_masterBus->updateParentClock(engine->m_clock);
 
             engine->m_masterBus->swapBuffers(outBuffer);
+
+            // if (engine->m_mixMutex.try_lock())
+            // {
+            //     // Process commands that require sample-accurate immediacy
+            //     {
+            //         auto deferredCommandGuard = std::lock_guard(engine->m_deferredCommandMutex);
+            //         if (!engine->m_immediateCommands.empty())
+            //             Engine::Impl::processCommands(engine, engine->m_immediateCommands);
+            //     }
+            //
+            //     try
+            //     {
+            //         const auto size = outBuffer->size();
+            //
+            //         engine->m_masterBus->read(nullptr, static_cast<int>(size));
+            //         engine->m_clock += size / (2 * sizeof(float));
+            //         engine->m_masterBus->updateParentClock(engine->m_clock);
+            //
+            //         engine->m_masterBus->swapBuffers(outBuffer);
+            //     }
+            //     catch(const std::exception &e)
+            //     {
+            //         INSOUND_PUSH_ERROR(Result::StdExcept, e.what());
+            //         engine->m_mixMutex.unlock();
+            //         throw;
+            //     }
+            //     catch(...)
+            //     {
+            //         INSOUND_PUSH_ERROR(Result::StdExcept, "unknown exception thrown during engine mixing");
+            //         engine->m_mixMutex.unlock();
+            //         throw;
+            //     }
+            //
+            //     engine->m_mixMutex.unlock();
+            // }
+            // else
+            // {
+            //     INSOUND_LOG("Engine mix callback is busy\n");
+            // }
+
         }
 
         Engine *m_engine;
@@ -520,7 +573,7 @@ namespace insound {
 
         std::mutex m_immediateCommandMutex;
         std::mutex m_deferredCommandMutex;
-        mutable std::recursive_mutex m_mixMutex;
+        mutable std::mutex m_mixMutex;
     };
 
     Engine::Engine() : m(new Impl(this))
@@ -568,7 +621,7 @@ namespace insound {
         return m->createBus(paused, {}, outBus, false);
     }
 
-    std::lock_guard<std::recursive_mutex> Engine::mixLockGuard()
+    std::lock_guard<std::mutex> Engine::mixLockGuard()
     {
         return m->mixLockGuard();
     }

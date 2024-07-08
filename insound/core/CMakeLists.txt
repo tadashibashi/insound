@@ -34,7 +34,7 @@ elseif (EMSCRIPTEN)
         -sALLOW_MEMORY_GROWTH=1
         -sINITIAL_MEMORY=2GB
         -sSTACK_SIZE=4MB
-        -sASSERTIONS=2
+        -sASSERTIONS=0
         -sWASM=1
         -sFETCH
     )
@@ -58,6 +58,7 @@ elseif (EMSCRIPTEN)
             -sWASM_WORKERS=1
         )
         target_compile_options(insound PUBLIC -pthread)
+        target_link_options(insound PUBLIC -sALLOW_BLOCKING_ON_MAIN_THREAD=1)
     endif()
 elseif ((UNIX OR WIN32) AND NOT IOS)
     # Use PortAudio for desktop platforms
@@ -337,8 +338,8 @@ if (EMSCRIPTEN)
         target_link_options(insound PUBLIC -O1 -g -g3 -gsource-map)
         target_compile_options(insound PUBLIC -O1 -g -g3 -gsource-map)
     else()
-        target_link_options(insound PUBLIC -Ofast)
-        target_compile_options(insound PUBLIC -Ofast)
+        target_link_options(insound PUBLIC -O3)
+        target_compile_options(insound PUBLIC -O3)
     endif()
 else() # Non-emscripten platforms
     if (INSOUND_DEBUG)

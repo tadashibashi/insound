@@ -128,13 +128,13 @@ namespace insound {
 
         void resumeAsync()
         {
-            if (m_userInteracted.load())
+            if (m_userInteracted.load(std::memory_order_acquire))
                 emscripten_resume_audio_context_async(m_context, audioContextResumed, this);
         }
 
         void resume()
         {
-            if (m_userInteracted.load())
+            if (m_userInteracted.load(std::memory_order_acquire))
             {
                 emscripten_resume_audio_context_sync(m_context);
                 setIsRunning(true);
@@ -194,6 +194,7 @@ namespace insound {
         }
 
     private:
+        std::mutex m_readMutex{};
         uint8_t *m_audioThreadStack{};
         AudioCallback m_callback{};
         void *m_userData{};
@@ -309,10 +310,8 @@ namespace insound {
         void *userData)
     {
         const auto device = static_cast<Impl *>(userData);
-        device->m_userInteracted.store(true);
+        device->m_userInteracted.store(true, std::memory_order_release);
         device->resumeAsync();
-
-        INSOUND_LOG("User interaction has enabled the audio device to resume.");
 
         // Remove the call back so it isn't called every time
         emscripten_set_click_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, nullptr, 0, nullptr);

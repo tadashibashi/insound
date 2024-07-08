@@ -28,7 +28,7 @@ bool insound::RstreamableMemory::isOpen() const
 
 void insound::RstreamableMemory::close()
 {
-    m_data = {};
+    m_data = {};  // memory is cleaned up in string dtor
     m_cursor = 0;
     m_eof = false;
 }
@@ -36,13 +36,13 @@ void insound::RstreamableMemory::close()
 bool insound::RstreamableMemory::seek(int64_t position)
 {
     INIT_GUARD();
-    if (position >= m_data.size() || position < 0)
+    if (position > m_data.size() || position < 0) // allow max range since ifstream::seekg allows it to read file size
     {
         INSOUND_PUSH_ERROR(Result::RangeErr, "seek position is out of range");
         return false;
     }
 
-    m_eof = false;
+    m_eof = false;      // reset eof "bit"
     m_cursor = position;
     return true;
 }
@@ -86,11 +86,11 @@ int64_t insound::RstreamableMemory::read(uint8_t *buffer, int64_t requestedBytes
     if (requestedBytes == 0) // avoid zero byte copy
         return 0;
 
-    const int64_t bytesToRead = std::min(requestedBytes, dataSize - (m_cursor + requestedBytes));
+    const int64_t bytesToRead = std::min(requestedBytes, dataSize - m_cursor);
 
     std::memcpy(buffer, m_data.data() + m_cursor, bytesToRead);
 
-    if (requestedBytes > bytesToRead)
+    if (bytesToRead < requestedBytes) // when read exceeds the boundaries of a std stream it raises the eof flag
     {
         m_eof = true;
     }

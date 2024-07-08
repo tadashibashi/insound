@@ -49,7 +49,7 @@ static bool openFileURLSync(const std::string &url, std::string *outData)
     }
     catch(...)
     {
-        std::cout << "Failed in catch block\n";
+        INSOUND_PUSH_ERROR(Result::RuntimeErr, "exception thrown while getting/closing fetch data");
         emscripten_fetch_close(fetch);
         return false;
     }

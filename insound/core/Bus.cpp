@@ -258,7 +258,6 @@ namespace insound {
                 head[i + 3] += data0[i + 3];
             }
         }
-
         return length;
     }
 

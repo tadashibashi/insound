@@ -61,6 +61,9 @@
 #ifndef INSOUND_TARGET_LINUX
 #   define INSOUND_TARGET_LINUX 0
 #endif
+#ifndef INSOUND_TARGET_EMSCRIPTEN
+#   define INSOUND_TARGET_EMSCRIPTEN 0
+#endif
 
 /// ===== Compiler definitions ================================================
 #if defined(__INTEL_COMPILER)           ///< Intel Compiler Classic (ICC)
