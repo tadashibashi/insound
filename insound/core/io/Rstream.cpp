@@ -10,9 +10,9 @@ namespace insound {
         delete m_stream;
     }
 
-    bool Rstream::open(const std::string &filepath)
+    bool Rstream::open(const std::string &filepath, bool inMemory)
     {
-        Rstreamable *stream = Rstreamable::create(filepath);
+        Rstreamable *stream = Rstreamable::create(filepath, inMemory);
         if (!stream)
         {
             INSOUND_PUSH_ERROR(Result::RuntimeErr, "Failed to create Rstreamable");

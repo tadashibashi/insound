@@ -1,16 +1,17 @@
 #include "AudioDecoder.h"
+
+#include "Error.h"
+#include "lib.h"
+#include "io/Rstream.h"
+#include "io/Rstreamable.h"
+
 #include "external/miniaudio.h"
 #include "external/miniaudio_decoder_backends.h"
+
 #include <vector>
 
 static std::vector<ma_decoding_backend_vtable *> customBackendVTables;
 static bool initBackendVTables;
-
-#include "Error.h"
-#include "lib.h"
-#include "path.h"
-#include "io/Rstream.h"
-#include "io/Rstreamable.h"
 
 namespace insound {
 #ifdef INSOUND_DEBUG
@@ -116,14 +117,14 @@ namespace insound {
         return stream->seek(seekPosition) ? MA_SUCCESS : MA_BAD_SEEK;
     }
 
-    bool AudioDecoder::open(const std::string &filepath, const AudioSpec &targetSpec)
+    bool AudioDecoder::open(const std::string &filepath, const AudioSpec &targetSpec, const bool inMemory)
     {
-        if (!m->stream.open(filepath))
+        if (!m->stream.open(filepath, inMemory))
         {
             return false;
         }
 
-        auto decoder = new ma_decoder;
+        const auto decoder = new ma_decoder;
         ma_decoder_config config = ma_decoder_config_init(
             (ma_format)toMaFormat(targetSpec.format),
             targetSpec.channels,
@@ -191,7 +192,6 @@ namespace insound {
     int AudioDecoder::readFrames(int sampleFrames, uint8_t *buffer)
     {
         INIT_GUARD();
-
         uint64_t pcmFrames;
         if (!getPCMFrameLength(&pcmFrames))
         {
@@ -284,14 +284,14 @@ namespace insound {
         }
 
         if (outPosition)
-            *outPosition = convert(cursor, TimeUnit::PCM, units, m->spec);
+            *outPosition = convert(cursor, TimeUnit::PCM, units, m->targetSpec);
         return true;
     }
 
     bool AudioDecoder::setPosition(TimeUnit units, uint64_t position)
     {
         INIT_GUARD();
-        const auto frame = std::round(convert(position, units, TimeUnit::PCM, m->spec));
+        const auto frame = std::round(convert(position, units, TimeUnit::PCM, m->targetSpec));
         if (const auto result = ma_decoder_seek_to_pcm_frame(m->decoder, static_cast<ma_uint64>(frame));
             result != MA_SUCCESS)
         {
@@ -321,7 +321,6 @@ namespace insound {
     bool AudioDecoder::isEnded(bool *outEnded) const
     {
         INIT_GUARD();
-
         uint64_t available;
         if (!getAvailableFrames(&available))
             return false;
@@ -334,7 +333,6 @@ namespace insound {
     bool AudioDecoder::getPCMFrameLength(uint64_t *outMaxFrames) const
     {
         INIT_GUARD();
-
         if (m->pcmLength == UINT64_MAX)
         {
             ma_uint64 frames;
@@ -356,7 +354,6 @@ namespace insound {
     bool AudioDecoder::getCursorPCMFrames(uint64_t *outCursor) const
     {
         INIT_GUARD();
-
         ma_uint64 cursor;
         if (const auto result = ma_decoder_get_cursor_in_pcm_frames(m->decoder, &cursor);
             result != MA_SUCCESS)
@@ -374,7 +371,6 @@ namespace insound {
     bool AudioDecoder::getAvailableFrames(uint64_t *outFrames) const
     {
         INIT_GUARD();
-
         uint64_t pcmLength;
         if (!getPCMFrameLength(&pcmLength))
             return false;

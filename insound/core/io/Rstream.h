@@ -9,7 +9,7 @@ namespace insound {
     public:
         Rstream() : m_stream() { }
         ~Rstream();
-        bool open(const std::string &filepath);
+        bool open(const std::string &filepath, bool inMemory = false);
 
         [[nodiscard]]
         bool isOpen() const;

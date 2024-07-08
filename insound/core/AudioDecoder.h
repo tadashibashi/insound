@@ -24,7 +24,7 @@ namespace insound {
         AudioDecoder &operator=(AudioDecoder &&other) noexcept;
 
         /// Open the file for streaming
-        bool open(const std::string &filepath, const AudioSpec &targetSpec);
+        bool open(const std::string &filepath, const AudioSpec &targetSpec, bool inMemory = false);
         /// Close an open file. Safe to call, even if already closed.
         void close();
         [[nodiscard]]

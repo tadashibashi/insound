@@ -291,8 +291,10 @@ PRIVATE
     io/RstreamableAAsset.cpp
     io/RstreamableFile.cpp
     io/RstreamableFile.h
-    PCMSource.cpp
+    io/RstreamableMemory.h
+    io/RstreamableMemory.cpp
     path.cpp
+    PCMSource.cpp
     PerfTimer.cpp
     Pool.cpp
     SampleFormat.cpp

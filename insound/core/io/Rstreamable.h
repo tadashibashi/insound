@@ -9,7 +9,7 @@ namespace insound {
     class Rstreamable {
     public:
         /// Create and open an Rstreamable by platform. Returns null on error.
-        static Rstreamable *create(const std::string &filepath);
+        static Rstreamable *create(const std::string &filepath, bool inMemory = false);
         virtual ~Rstreamable() = default;
 
         virtual bool open(const std::string &filepath) = 0;

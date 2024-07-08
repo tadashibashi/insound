@@ -2,26 +2,36 @@
 
 #include "RstreamableAAsset.h"
 #include "RstreamableFile.h"
+#include "RstreamableMemory.h"
 #include "../path.h"
 
-insound::Rstreamable *insound::Rstreamable::create(const std::string &filepath)
+insound::Rstreamable *insound::Rstreamable::create(const std::string &filepath, bool inMemory)
 {
-    Rstreamable *stream = nullptr;
-#ifdef __ANDROID__
+#if INSOUND_PLATFORM_EMSCRIPTEN
+    inMemory = true; // force load into memory
+#endif
 
-    if (path::isAbsolute(filepath))
+    Rstreamable *stream;
+    if (inMemory)
     {
-        stream = new RstreamableFile();
+        stream = new RstreamableMemory();
     }
     else
     {
-        stream = new RstreamableAAsset();
-    }
-#else
-    stream = new RstreamableFile();
-#endif
+#if INSOUND_PLATFORM_ANDROID
 
-    if (!stream) return nullptr;
+        if (path::isAbsolute(filepath))
+        {
+            stream = new RstreamableFile();
+        }
+        else
+        {
+            stream = new RstreamableAAsset();
+        }
+#else
+        stream = new RstreamableFile();
+#endif
+    }
 
     if (!stream->open(filepath))
     {

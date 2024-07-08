@@ -60,16 +60,8 @@ namespace insound {
         return m != nullptr && m->decoder.isOpen();
     }
 
-    bool StreamSource::open(const std::string &filepath)
+    bool StreamSource::open(const std::string &filepath, const bool inMemory)
     {
-        if (!path::hasExtension(filepath))
-        {
-            INSOUND_PUSH_ERROR(Result::InvalidArg,
-                "`filepath` is missing a file extension, which StreamSource needs to "
-                "infer its correct audio decoder type");
-            return false;
-        }
-
         AudioSpec targetSpec;
         if (!m_engine->getSpec(&targetSpec))
         {
@@ -84,7 +76,7 @@ namespace insound {
 
         // Init audio decoder by file type
         AudioDecoder decoder;
-        if (!decoder.open(filepath, targetSpec))
+        if (!decoder.open(filepath, targetSpec, inMemory))
         {
             return false;
         }
@@ -239,13 +231,13 @@ namespace insound {
 
 
     bool StreamSource::init(class Engine *engine, const std::string &filepath,
-        uint32_t parentClock, bool paused, bool isLooping, bool isOneShot)
+        uint32_t parentClock, bool paused, bool isLooping, bool isOneShot, bool inMemory)
     {
         if (!Source::init(engine, parentClock, paused))
             return false;
         m->looping = isLooping;
         m->isOneShot = isOneShot;
-        if (!open(filepath))
+        if (!open(filepath, inMemory))
         {
             return false;
         }

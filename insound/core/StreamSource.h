@@ -15,10 +15,10 @@ namespace insound {
 
         bool init(class Engine *engine, const std::string &filepath,
                   uint32_t parentClock, bool paused,
-                  bool isLooping, bool isOneShot);
+                  bool isLooping, bool isOneShot, bool inMemory = false);
         bool release() override;
 
-        bool open(const std::string &filepath);
+        bool open(const std::string &filepath, bool inMemory = false);
         [[nodiscard]] bool isOpen() const;
 
         void queueNextBuffer();

@@ -23,6 +23,7 @@ namespace insound {
         "Invalid Handle",
         "Engine uninitialized",
         "AudioDecoder unitialized",
+        "Stream uninitialized",
         "Feature unsupported",
         "File failed to open",
         "SoundBuffer was null or not loaded",

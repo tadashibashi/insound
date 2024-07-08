@@ -159,7 +159,7 @@ namespace insound {
         }
 
         bool playStream(const std::string &filepath, bool paused, bool looping,
-                        bool oneshot, const Handle<Bus> &bus,
+                        bool oneshot, bool inMemory, const Handle<Bus> &bus,
                         Handle<StreamSource> *outSource)
         {
             ENGINE_INIT_GUARD();
@@ -173,7 +173,7 @@ namespace insound {
                 return false;
 
             const auto newSource = m_objectPool.allocate<StreamSource>(
-                m_engine, filepath, clock, paused, looping, oneshot);
+                m_engine, filepath, clock, paused, looping, oneshot, inMemory);
             if (bus)
             {
                 bus->applyAppendSource(static_cast<Handle<Source>>(newSource));
@@ -654,9 +654,9 @@ namespace insound {
     }
 
     bool Engine::playStream(const std::string &filepath, bool paused, bool looping,
-        bool oneshot, const Handle<Bus> &bus, Handle<StreamSource> *outSource)
+        bool oneshot, bool inMemory, const Handle<Bus> &bus, Handle<StreamSource> *outSource)
     {
-        return m->playStream(filepath, paused, looping, oneshot, bus, outSource);
+        return m->playStream(filepath, paused, looping, oneshot, inMemory, bus, outSource);
     }
 
 }

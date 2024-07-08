@@ -16,6 +16,7 @@ namespace insound {
             InvalidHandle, ///< Attempted to use invalid handle.
             EngineNotInit, ///< Engine was not initialized when depended on.
             DecoderNotInit,///< AudioDecoder was not opened when attempted to use it.
+            StreamNotInit, ///< Attempted to use uninitialized stream.
             NotSupported,  ///< Feature is not supported.
             FileOpenErr,   ///< Error when attempting to open a file
             InvalidSoundBuffer, ///< SoundBuffer provided was null, or not loaded
@@ -52,4 +53,4 @@ namespace insound {
 
 }
 
-#define INSOUND_PUSH_ERROR(code, message) insound::pushError((code), (message), __FUNCTION__, __FILE__, __LINE__);
+#define INSOUND_PUSH_ERROR(code, message) insound::pushError((code), (message), __FUNCTION__, __FILE__, __LINE__)
