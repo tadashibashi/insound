@@ -44,9 +44,9 @@ namespace insound {
         return m_stream->size();
     }
 
-    int64_t Rstream::position() const
+    int64_t Rstream::tell() const
     {
-        return m_stream->position();
+        return m_stream->tell();
     }
 
     bool Rstream::isEof() const

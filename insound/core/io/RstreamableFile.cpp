@@ -61,7 +61,7 @@ namespace insound {
         return sizePosition;
     }
 
-    int64_t RstreamableFile::position() const
+    int64_t RstreamableFile::tell() const
     {
         return m_stream.tellg();
     }

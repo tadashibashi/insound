@@ -26,7 +26,7 @@ namespace insound {
         virtual int64_t size() const = 0;
 
         [[nodiscard]]
-        virtual int64_t position() const = 0;
+        virtual int64_t tell() const = 0;
 
         /// If return value is -1 an error occurred, if 0, it is eof, otherwise it will return the number of
         /// bytes read.

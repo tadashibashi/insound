@@ -138,7 +138,7 @@ static ma_result ma_libvorbis_init_internal(const ma_decoding_backend_config* pC
 static ma_result ma_libvorbis_decoder_tell_func (ma_decoder* pDecoder, ma_int64* pCursor)
 {
     insound::Rstreamable *stream = (insound::Rstreamable *)pDecoder->pUserData;
-    *pCursor = stream->position();
+    *pCursor = stream->tell();
     return MA_SUCCESS;
 }
 

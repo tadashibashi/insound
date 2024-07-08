@@ -100,7 +100,7 @@ namespace insound {
         switch(origin)
         {
             case ma_seek_origin_current:
-                seekPosition = offset + stream->position();
+                seekPosition = offset + stream->tell();
             break;
             case ma_seek_origin_start:
                 seekPosition = offset;

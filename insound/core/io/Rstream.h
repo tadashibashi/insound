@@ -21,7 +21,7 @@ namespace insound {
         int64_t size() const;
 
         [[nodiscard]]
-        int64_t position() const;
+        int64_t tell() const;
 
         [[nodiscard]]
         bool isEof() const;

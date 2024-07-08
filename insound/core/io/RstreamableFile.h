@@ -20,7 +20,7 @@ namespace insound {
         [[nodiscard]]
         int64_t size() const override;
         [[nodiscard]]
-        int64_t position() const override;
+        int64_t tell() const override;
 
         /// If return value is not the number of bytes, and isEof is not true, then
         /// an error occurred.
