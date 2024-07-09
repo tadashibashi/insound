@@ -147,6 +147,9 @@ namespace insound {
         const auto sampleLength = length / sizeof(float);
         const auto frameLength = sampleLength / 2;
 
+        if (sampleSize == 0) // prevent zero copy
+            return 0;
+
         if (m_isLooping && m_position >= frameSize) // prevent accidentally reading past buffer, this read probably occurred before the engine could clean the sound up
             return 0;
 
@@ -380,18 +383,23 @@ namespace insound {
 //         }
 //         else // ====== No interpolation =======================================================
         {
-            // We just need to copy the bytes directly to the out buffer
-            const auto basePosition = (int)m_position;
-            const auto bufferBytePos = basePosition * sizeof(float) * 2;
-            const auto bytesUntilEnd = ((long long)m_buffer->size() - (long long)bufferBytePos);
+            // We just need to copy the bytes directly to the out buffer, accounting for loop mechanic
 
-            // Copy from here until end of requested length, or the end of the buffer
-            std::memcpy(output, m_buffer->data() + bufferBytePos, std::min<size_t>(bytesUntilEnd, length));
+            const auto bufferSize  = static_cast<int64_t>(m_buffer->size());
+            const auto baseBytePos = static_cast<int64_t>(m_position) * 2LL * static_cast<int64_t>(sizeof(float));
 
-            // Add the remaining loop portion until we filled outbuffer
-            if (m_isLooping && bytesUntilEnd - length < 0)
-            {
-                std::memcpy(output + bytesUntilEnd, buffer, length - bytesUntilEnd);
+            int64_t bytesRead = 0;
+            while(bytesRead < length) {
+                auto bufferBytePos = (baseBytePos + bytesRead) % bufferSize;
+                auto bytesToRead = std::min(bufferSize - bufferBytePos, static_cast<int64_t>(length) - bytesRead);
+
+                // Copy from here until end of requested length, or the end of the buffer
+                std::memcpy(output + bytesRead, m_buffer->data() + bufferBytePos, bytesToRead);
+
+                bytesRead += bytesToRead;
+
+                if (!m_isLooping)
+                    break;
             }
         }
 
