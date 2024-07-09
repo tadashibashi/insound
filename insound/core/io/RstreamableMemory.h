@@ -19,7 +19,6 @@ namespace insound {
 
         bool seek(int64_t position) override;
 
-        /// Return -1 if stream is infinite.
         [[nodiscard]]
         int64_t size() const override;
         [[nodiscard]]

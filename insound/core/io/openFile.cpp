@@ -138,6 +138,13 @@ bool insound::openFile(const std::string &path, std::string *outData)
 
     const auto dataSize = file.size();
 
+    if (dataSize == 0)
+    {
+        // since this function is intended for read-only ops, this is considered an error
+        INSOUND_PUSH_ERROR(Result::FileOpenErr, "opened file is empty");
+        return false;
+    }
+
     std::string data;
     data.resize(dataSize, 0);
 
