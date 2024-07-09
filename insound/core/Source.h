@@ -2,12 +2,13 @@
 #include "effects/PanEffect.h"
 #include "effects/VolumeEffect.h"
 #include "Error.h"
+#include "AlignedVector.h"
+#include "Engine.h"
 
 #include <cstdint>
 #include <vector>
 
-#include "AlignedVector.h"
-#include "Engine.h"
+
 
 namespace insound {
     // Forward declarations
@@ -174,6 +175,9 @@ namespace insound {
         /// @note Changes will not happen instantly, but is deferred until the next call to Engine::update. This
         ///       protects a Source from interrupting current iterations of audio reading.
         bool close(bool recursive = false);
+
+        bool getVolumeEffect(Handle<VolumeEffect> *outVolumeEffect);
+        bool getPanEffect(Handle<PanEffect> *outPanEffect);
     protected:
         Source();
         /// All child classes must implement an init function, and call it's parent's init

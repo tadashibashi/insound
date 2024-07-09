@@ -62,6 +62,26 @@ namespace insound {
         return m_engine->releaseSoundRaw(this, recursive);
     }
 
+    bool Source::getVolumeEffect(Handle<VolumeEffect> *outVolumeEffect)
+    {
+        HANDLE_GUARD();
+
+        if(outVolumeEffect)
+            *outVolumeEffect = m_volume;
+
+        return true;
+    }
+
+    bool Source::getPanEffect(Handle<PanEffect> *outPanEffect)
+    {
+        HANDLE_GUARD();
+
+        if (outPanEffect)
+            *outPanEffect = m_panner;
+
+        return true;
+    }
+
     bool Source::release()
     {
         HANDLE_GUARD();
