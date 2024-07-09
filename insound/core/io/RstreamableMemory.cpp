@@ -59,11 +59,15 @@ int64_t insound::RstreamableMemory::tell() const
 
 int64_t insound::RstreamableMemory::read(uint8_t *buffer, int64_t requestedBytes)
 {
-    if (m_eof) // we're already at the end of the file
+    if (requestedBytes == 0)  // no bytes to read == noop
+        return 0;
+
+    // End-of-file check
+    if (m_eof)                // we're already at eof
         return 0;
 
     const auto dataSize = static_cast<int64_t>(m_data.size());
-    if (m_cursor >= dataSize)
+    if (m_cursor >= dataSize) // no more data to read == eof
     {
         m_eof = true;
         m_cursor = dataSize;
@@ -82,9 +86,6 @@ int64_t insound::RstreamableMemory::read(uint8_t *buffer, int64_t requestedBytes
         INSOUND_PUSH_ERROR(Result::InvalidArg, "invalid requestedBytes, must be >= 0");
         return -1;
     }
-
-    if (requestedBytes == 0) // avoid zero byte copy
-        return 0;
 
     const int64_t bytesToRead = std::min(requestedBytes, dataSize - m_cursor);
 
