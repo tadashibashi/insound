@@ -1,13 +1,10 @@
 #pragma once
 
 #include "AudioSpec.h"
-#include "Marker.h"
-#include "TimeUnit.h"
 
 #include <atomic>
 
 #include <string>
-#include <vector>
 
 namespace insound {
 

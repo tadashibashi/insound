@@ -127,9 +127,19 @@ namespace insound {
         return postOpen(targetSpec);
     }
 
+    bool AudioDecoder::openMem(uint8_t *data, size_t dataSize, const AudioSpec &targetSpec, void(*deallocator)(void *data))
+    {
+        if (!m->stream.openMem(data, dataSize, deallocator))
+        {
+            return false;
+        }
+
+        return postOpen(targetSpec);
+    }
+
     bool AudioDecoder::open(const std::string &filepath, const AudioSpec &targetSpec, const bool inMemory)
     {
-        if (!m->stream.open(filepath, inMemory))
+        if (!m->stream.openFile(filepath, inMemory))
         {
             return false;
         }

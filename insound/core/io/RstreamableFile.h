@@ -9,7 +9,7 @@ namespace insound {
         RstreamableFile();
         ~RstreamableFile() override;
 
-        bool open(const std::string &filepath) override;
+        bool openFile(const std::string &filepath) override;
         [[nodiscard]]
         bool isOpen() const override;
         void close() override;

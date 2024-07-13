@@ -10,7 +10,7 @@ namespace insound {
 
     RstreamableFile::~RstreamableFile() = default;
 
-    bool RstreamableFile::open(const std::string &filepath)
+    bool RstreamableFile::openFile(const std::string &filepath)
     {
         m_stream.open(filepath, std::ios::binary | std::ios::in);
         if (!m_stream.is_open())

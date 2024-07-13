@@ -24,7 +24,7 @@ namespace insound {
         return *this;
     }
 
-    bool Rstream::open(const std::string &filepath, bool inMemory)
+    bool Rstream::openFile(const std::string &filepath, bool inMemory)
     {
         Rstreamable *stream = Rstreamable::create(filepath, inMemory);
         if (!stream)
@@ -41,7 +41,20 @@ namespace insound {
     bool Rstream::openConstMem(const uint8_t *data, size_t size)
     {
         auto stream = new RstreamableMemory();
-        if (!stream->open(data, size))
+        if (!stream->openConstMem(data, size))
+        {
+            delete stream;
+            return false;
+        }
+
+        m_stream = stream;
+        return true;
+    }
+
+    bool Rstream::openMem(uint8_t *data, size_t size, void(*deallocator)(void *data))
+    {
+        auto stream = new RstreamableMemory();
+        if (!stream->openMem(data, size, deallocator))
         {
             delete stream;
             return false;

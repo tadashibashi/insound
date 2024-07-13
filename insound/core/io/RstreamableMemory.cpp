@@ -16,38 +16,69 @@
 #define INIT_GUARD() INSOUND_NOOP
 #endif
 
-bool insound::RstreamableMemory::open(const std::string &filepath)
+static void defaultDeallocator(void *data)
+{
+    std::free(data);
+}
+
+bool insound::RstreamableMemory::openFile(const std::string &filepath)
 {
     uint8_t *data;
     size_t size;
-    if (!openFile(filepath, &data, &size))
+    if (!::insound::openFile(filepath, &data, &size))
         return false;
 
-    if (m_data && m_ownsData)
+    if (m_data && m_deallocator)
     {
-        std::free(m_data);
+        m_deallocator(m_data);
     }
 
     m_data = data;
     m_size = size;
     m_cursor = 0;
     m_eof = false;
-    m_ownsData = true;
+    m_deallocator = defaultDeallocator;
     return true;
 }
 
-bool insound::RstreamableMemory::open(const uint8_t *data, size_t size)
+
+bool insound::RstreamableMemory::openConstMem(const uint8_t *data, size_t size)
 {
-    if (m_data && m_ownsData)
+    if (m_data && m_deallocator)
     {
-        std::free(m_data);
+        m_deallocator(m_data);
     }
 
-    m_data = const_cast<uint8_t *>(data); // although constness is removed `m_ownsData` is set to false will prevent deletion
+    // Although constness is removed here, setting `m_deallocator` to `false` prevents cleanup.
+    m_data = const_cast<uint8_t *>(data);
+    m_deallocator = nullptr;
+
     m_size = size;
     m_cursor = 0;
     m_eof = false;
-    m_ownsData = false;
+    return true;
+}
+
+bool insound::RstreamableMemory::openMem(uint8_t *data, size_t size, void(*deallocator)(void *data))
+{
+    if (m_data && m_deallocator)
+    {
+        m_deallocator(m_data);
+    }
+
+    if (deallocator == nullptr)
+    {
+        m_deallocator = defaultDeallocator;
+    }
+    else
+    {
+        m_deallocator = deallocator;
+    }
+
+    m_data = data;
+    m_size = size;
+    m_cursor = 0;
+    m_eof = false;
     return true;
 }
 
@@ -60,15 +91,15 @@ void insound::RstreamableMemory::close()
 {
     if (m_data)
     {
-        if (m_ownsData)
-            std::free(m_data);
+        if (m_deallocator)
+            m_deallocator(m_data);
         m_data = nullptr;
     }
 
     m_size = 0;
     m_cursor = 0;
     m_eof = false;
-    m_ownsData = false;
+    m_deallocator = nullptr;
 }
 
 bool insound::RstreamableMemory::seek(int64_t position)

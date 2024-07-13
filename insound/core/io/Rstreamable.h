@@ -16,7 +16,7 @@ namespace insound {
         /// TODO: URL paths via curl or other client lib.
         /// @param filepath path to open
         /// @returns whether data source was successfully opened.
-        virtual bool open(const std::string &filepath) = 0;
+        virtual bool openFile(const std::string &filepath) = 0;
 
         /// Check if the Rstreamable is currently open.
         [[nodiscard]]

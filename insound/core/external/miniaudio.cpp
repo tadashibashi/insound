@@ -62,7 +62,7 @@ static ma_bool32 dr_wav_seek_callback(void* pUserData, int offset, ma_dr_wav_see
 bool insound_ma_dr_wav_get_markers(const std::string &filepath, std::vector<insound::Marker> *outMarkers)
 {
     insound::Rstream stream;
-    if (!stream.open(filepath))
+    if (!stream.openFile(filepath))
     {
         INSOUND_PUSH_ERROR(insound::Result::FileOpenErr,
             "cannot get marker data because the file failed to open");

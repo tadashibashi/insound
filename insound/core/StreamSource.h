@@ -23,6 +23,7 @@ namespace insound {
         /// Open stram from const memory. Memory pointer must not be moved or invalidated for
         /// the duration that this source is used.
         bool openConstMem(const uint8_t *data, const size_t size);
+        bool openMem(uint8_t *data, size_t size, void(*deallocator)(void *data));
 
         [[nodiscard]] bool isOpen() const;
 

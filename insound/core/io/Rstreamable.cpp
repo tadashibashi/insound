@@ -16,7 +16,7 @@ insound::Rstreamable *insound::Rstreamable::create(const std::string &filepath, 
     else
     {
 #if INSOUND_TARGET_ANDROID
-
+        // Absolute paths use std::ifstream, relative paths read from APK
         if (path::isAbsolute(filepath))
         {
             stream = new RstreamableFile();
@@ -30,7 +30,7 @@ insound::Rstreamable *insound::Rstreamable::create(const std::string &filepath, 
 #endif
     }
 
-    if (!stream->open(filepath))
+    if (!stream->openFile(filepath))
     {
         delete stream;
         return nullptr;

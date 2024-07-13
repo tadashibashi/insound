@@ -1,9 +1,9 @@
 #include "openFile.h"
-#include "../Error.h"
 #include "Rstream.h"
 
+#include "../Error.h"
+
 #include <cstring>
-#include <fstream>
 
 using namespace insound;
 
@@ -11,14 +11,11 @@ using namespace insound;
 #include <emscripten/fetch.h>
 #include <emscripten/threading.h>
 
-static bool openFileURLSync(const std::string &url, std::string *outData)
+static bool openFileURLSync(const std::string &url,
+    void(*allocCallback)(void *, size_t),
+    void *(*getBufCallback)(void *, size_t, size_t),
+    void *userdata)
 {
-    if (!outData)
-    {
-        INSOUND_PUSH_ERROR(insound::Result::InvalidArg, "openFileURLSync: outData must not be NULL");
-        return false;
-    }
-
     emscripten_fetch_attr_t attr;
     emscripten_fetch_attr_init(&attr);
     strcpy(attr.requestMethod, "GET");
@@ -34,8 +31,9 @@ static bool openFileURLSync(const std::string &url, std::string *outData)
     {
         if (fetch->status == 200)
         {
-            outData->resize(fetch->numBytes, 0);
-            std::memcpy(outData->data(), fetch->data, fetch->numBytes);
+            allocCallback(userdata, fetch->numBytes);
+            auto data = getBufCallback(userdata, 0, fetch->numBytes);
+            std::memcpy(data, fetch->data, fetch->numBytes);
 
             emscripten_fetch_close(fetch);
             return true;
@@ -62,12 +60,12 @@ static constexpr int CHUNK_SIZE = 1024;
 
 /// @param path path to file to open
 /// @param allocCallback callback that allocates userdata
-/// @param getBufCallback callback that returns pointer to contiguous data to write to for current byte offset
+/// @param getBufCallback callback that returns pointer to contiguous data to write to for current byte offset, and read amount
 /// @param userdata to act on
 /// @returns size of data retrieved, or 0 on error
 static size_t openFileImpl(const std::string &path,
     void(*allocCallback)(void *, size_t),
-    void *(*getBufCallback)(void *, size_t),
+    void *(*getDataPtrCallback)(void *, size_t, size_t),
     void *userdata)
 {
 #ifdef __EMSCRIPTEN__
@@ -77,7 +75,7 @@ static size_t openFileImpl(const std::string &path,
         if ( (pathView.size() > 6 && pathView.substr(0, 6) == "https:") ||
              (pathView.size() > 5 && pathView.substr(0, 5) == "http:") )
         {
-            return openFileURLSync(path, outData);
+            return openFileURLSync(path, allocCallback, getDataPtrCallback, userdata);
         }
     }
 #else
@@ -85,7 +83,7 @@ static size_t openFileImpl(const std::string &path,
 #endif
 
     Rstream file;
-    if (!file.open(path))
+    if (!file.openFile(path))
     {
         return 0;
     }
@@ -105,7 +103,7 @@ static size_t openFileImpl(const std::string &path,
     int64_t i = 0;
     for (; i <= dataSize - CHUNK_SIZE; i += CHUNK_SIZE) // read file in chunks
     {
-        auto data = getBufCallback(userdata, i);
+        auto data = getDataPtrCallback(userdata, i, CHUNK_SIZE);
         if (file.read((uint8_t *)data, CHUNK_SIZE) <= 0)
         {
             // failure during read
@@ -116,8 +114,9 @@ static size_t openFileImpl(const std::string &path,
     // Get leftovers
     if (i < dataSize)
     {
-        auto data = getBufCallback(userdata, i);
-        if (file.read((uint8_t *)data, dataSize - i) <= 0)
+        const auto bytesToRead = dataSize - i;
+        auto data = getDataPtrCallback(userdata, i, bytesToRead);
+        if (file.read((uint8_t *)data, bytesToRead) <= 0)
         {
             // failure during read
             return 0;
@@ -134,16 +133,16 @@ static inline void alloc_string_callback(void *userdata, size_t byteSize)
 }
 
 /// @returns pointer to memory to write to
-static inline void *get_string_callback(void *userdata, size_t byteOffset)
+static inline void *get_string_dataptr_callback(void *userdata, size_t byteOffset, size_t bytesToRead)
 {
     auto str = static_cast<std::string *>(userdata);
     return str->data() + byteOffset;
 }
 
-bool openFile(const std::string &path, std::string *outData)
+bool insound::openFile(const std::string &path, std::string *outData)
 {
     std::string str;
-    const auto size = openFileImpl(path, alloc_string_callback, get_string_callback, &str);
+    const auto size = openFileImpl(path, alloc_string_callback, get_string_dataptr_callback, &str);
     if (size == 0)
         return false;
 
@@ -159,7 +158,7 @@ static inline void alloc_buffer_callback(void *userdata, size_t byteSize)
     *buf = static_cast<uint8_t *>(std::malloc(byteSize));
 }
 
-static inline void *get_buffer_callback(void *userdata, size_t byteOffset)
+static inline void *get_buffer_callback(void *userdata, size_t byteOffset, size_t bytesToRead)
 {
     auto buf = static_cast<uint8_t **>(userdata);
     return (*buf) + byteOffset;

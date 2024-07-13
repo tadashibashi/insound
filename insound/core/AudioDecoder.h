@@ -30,6 +30,15 @@ namespace insound {
         /// the audio from this memory. Memory pointer must be valid until `AudioDecoder::close` is called.
         bool openConstMem(const uint8_t *data, size_t dataSize, const AudioSpec &targetSpec);
 
+        /// Open a decoder from file data that has already been loaded into memory. Hand over ownership of this data
+        /// to the AudioDecoder.
+        /// on the `data` pointer.
+        /// @param data pointer to the file data to read from
+        /// @param dataSize size of the data buffer in bytes
+        /// @param targetSpec spec to convert the audio to on output
+        /// @param deallocator callback to cleanup the `data` pointer on close, default will call `std::free` on it.
+        bool openMem(uint8_t *data, size_t dataSize, const AudioSpec &targetSpec, void(*deallocator)(void *data) = nullptr);
+
         /// Close an open file. Safe to call, even if already closed.
         void close();
         [[nodiscard]]
