@@ -2,7 +2,7 @@
 #include "../Marker.h"
 
 #include <cstdint>
-#include <map>
+#include <vector>
 
 namespace insound {
     struct AudioSpec;
@@ -14,7 +14,7 @@ namespace insound {
     ///                    in another thread. AudioLoader implements this, as an example.
     /// @param targetSpec  specification to convert this audio format to.
     bool loadAudio(const std::string &path, const AudioSpec &targetSpec,
-        uint8_t **outBuffer, uint32_t *outLength, std::map<uint32_t, Marker> *outMarkers);
+        uint8_t **outBuffer, uint32_t *outLength, std::vector<Marker> *outMarkers);
 
     /// Convert audio from one format to another. Intended for single use.
     /// @param audioData  sample data pointer; function takes ownership, and it is no longer valid, retrieve resultant pointer in `outBuffer`

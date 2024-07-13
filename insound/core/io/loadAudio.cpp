@@ -1,29 +1,17 @@
 #include "loadAudio.h"
 
-// #include "decodeFLAC.h"
-// #include "decodeGME.h"
-// #include "decodeMp3.h"
-// #include "decodeVorbis.h"
-// #include "decodeWAV.h"
-
 #include <insound/core/AudioDecoder.h>
 
 #include "../AudioSpec.h"
 #include "../Error.h"
 #include "../Marker.h"
-#include "../io/openFile.h"
 #include "../path.h"
 
-bool insound::loadAudio(const std::string &path, const AudioSpec &targetSpec, uint8_t **outBuffer, uint32_t *outLength, std::map<uint32_t, Marker> *outMarkers)
-{
-    // Detect audio file type by extension
-    if (!path::hasExtension(path))
-    {
-        INSOUND_PUSH_ERROR(Result::InvalidArg,
-                  R"(`path` must contain a recognizable extension e.g. ".wav", ".ogg")");
-        return false;
-    }
+#include <insound/core/external/miniaudio.h>
+#include <insound/core/external/miniaudio_ext.h>
 
+bool insound::loadAudio(const std::string &path, const AudioSpec &targetSpec, uint8_t **outBuffer, uint32_t *outLength, std::vector<Marker> *outMarkers)
+{
     // Uppercase extension
     const auto extView = path::extension(path);
     auto ext = std::string(extView.data(), extView.length());
@@ -32,7 +20,12 @@ bool insound::loadAudio(const std::string &path, const AudioSpec &targetSpec, ui
         c = (char)std::toupper(c);
     }
 
-    std::map<uint32_t, Marker> markers;
+    std::vector<Marker> markers;
+    if (ext == ".WAV")
+    {
+        if (!insound_ma_dr_wav_get_markers(path, &markers))
+            return false;
+    }
 
     AudioDecoder decoder;
     if (!decoder.open(path, targetSpec))
@@ -55,21 +48,11 @@ bool insound::loadAudio(const std::string &path, const AudioSpec &targetSpec, ui
         return false;
     }
 
-    uint32_t newSize;
-
-    // Convert audio format to the target format.
-    // This is because insound's audio engine depends on the loaded sound buffer formats being the same as its engine's.
-    if (!convertAudio(buffer, bufferSize, spec, targetSpec, &buffer, &newSize))
-    {
-        std::free(buffer);
-        return false;
-    }
-
     // Adjust marker positions to new samplerate
-    if (newSize != bufferSize)
+    if (targetSpec.freq != spec.freq)
     {
-        const auto sizeFactor = (float)newSize / (float)bufferSize;
-        for (auto &[id, marker] : markers)
+        const auto sizeFactor = (float)targetSpec.freq / (float)spec.freq;
+        for (auto &marker : markers)
         {
             marker.position = (uint32_t)std::round((float)marker.position * sizeFactor);
         }
@@ -78,11 +61,12 @@ bool insound::loadAudio(const std::string &path, const AudioSpec &targetSpec, ui
     // Done, return the out values
     if (outBuffer)
         *outBuffer = buffer;
+
     else // if outBuffer is discarded, free the buffer
         std::free(buffer);
 
     if (outLength)
-        *outLength = newSize;
+        *outLength = pcmFrameLength * targetSpec.bytesPerFrame();
 
     if (outMarkers)
         outMarkers->swap(markers);

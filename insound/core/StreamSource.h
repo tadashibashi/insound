@@ -19,25 +19,19 @@ namespace insound {
         bool release() override;
 
         bool open(const std::string &filepath, bool inMemory = false);
-        [[nodiscard]] bool isOpen() const;
 
-        void queueNextBuffer();
+        /// Open stram from const memory. Memory pointer must not be moved or invalidated for
+        /// the duration that this source is used.
+        bool openConstMem(const uint8_t *data, const size_t size);
+
+        [[nodiscard]] bool isOpen() const;
 
         bool setLooping(bool looping);
         bool getLooping(bool *outLooping) const;
 
         bool getPosition(TimeUnit units, double *outPosition) const;
         bool setPosition(TimeUnit units, uint64_t position);
-
-        /// Whether enough data has buffered to begin playing.
-        [[nodiscard]]
-        bool isReady(bool *outReady) const;
-
     private:
-        /// Bytes available to consume in the stream
-        [[nodiscard]]
-        int bytesAvailable() const;
-
         int readImpl(uint8_t *output, int length) override;
         struct Impl;
         Impl *m;

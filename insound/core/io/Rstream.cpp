@@ -1,7 +1,7 @@
 #include "Rstream.h"
 #include "Rstreamable.h"
-#include "RstreamableFile.h"
-#include "RstreamableAAsset.h"
+#include "RstreamableMemory.h"
+
 #include "../Error.h"
 
 namespace insound {
@@ -10,12 +10,39 @@ namespace insound {
         delete m_stream;
     }
 
+    Rstream::Rstream(Rstream &&other) : m_stream(other.m_stream)
+    {
+        other.m_stream = nullptr;
+    }
+
+    Rstream &Rstream::operator=(Rstream &&other)
+    {
+        delete m_stream;
+        m_stream = other.m_stream;
+        other.m_stream = nullptr;
+
+        return *this;
+    }
+
     bool Rstream::open(const std::string &filepath, bool inMemory)
     {
         Rstreamable *stream = Rstreamable::create(filepath, inMemory);
         if (!stream)
         {
             INSOUND_PUSH_ERROR(Result::RuntimeErr, "Failed to create Rstreamable");
+            delete stream;
+            return false;
+        }
+
+        m_stream = stream;
+        return true;
+    }
+
+    bool Rstream::openConstMem(const uint8_t *data, size_t size)
+    {
+        auto stream = new RstreamableMemory();
+        if (!stream->open(data, size))
+        {
             delete stream;
             return false;
         }

@@ -13,6 +13,12 @@ namespace insound {
         ~RstreamableMemory() override = default;
 
         bool open(const std::string &filepath) override;
+
+        /// Open RstreamableMemory using an in-memory data pointer.
+        /// Please make sure that this data pointer is valid during the
+        /// lifetime that RstreamableMemory is open and reading from it.
+        bool open(const uint8_t *data, size_t size);
+
         [[nodiscard]]
         bool isOpen() const override;
         void close() override;
@@ -29,7 +35,10 @@ namespace insound {
         [[nodiscard]]
         bool isEof() const override;
     private:
-        std::string m_data{};
+        uint8_t *m_data{};
+        size_t m_size{};
+        bool m_ownsData{};
+
         int64_t m_cursor{};
         bool m_eof{};
     };

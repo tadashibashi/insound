@@ -8,4 +8,5 @@ namespace insound {
     /// @param outData string buffer to receive the data. We're using string because it automatically appends a
     ///                null terminator in case text should be used like a c-string
     bool openFile(const std::string &path, std::string *outData);
+    bool openFile(const std::string &path, uint8_t **outData, size_t *outSize);
 }

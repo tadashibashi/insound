@@ -57,64 +57,18 @@ static bool openFileURLSync(const std::string &url, std::string *outData)
 
 #endif
 
-static bool openFileFstream(const std::string &path, std::string *outData)
-{
-    // Open the file
-    std::ifstream file(path, std::ios::in | std::ios::binary);
-    if (!file.is_open())
-    {
-        INSOUND_PUSH_ERROR(Result::FileOpenErr, std::strerror(errno));
-        return false;
-    }
-
-    // Seek to the end of the file to get the file size
-    if (!file.seekg(0, std::ios_base::end))
-    {
-        INSOUND_PUSH_ERROR(Result::RuntimeErr, "openFile: file failed to seek");
-        return false;
-    }
-
-    std::string data;
-    const auto fileSize = file.tellg();
-
-    // Prepare the string buffer to fill
-    try {
-        data.resize((size_t)fileSize, 0);
-    }
-    catch (const std::length_error &e) {
-        INSOUND_PUSH_ERROR(Result::RuntimeErr, "openFile: file size exceeded max_size()");
-        return false;
-    }
-    catch(...) {
-        INSOUND_PUSH_ERROR(Result::RuntimeErr, "openFile: failed occurred while resizing data buffer");
-        return false;
-    }
-
-    // Seek back to the beginning, and perform the read
-    if (!file.seekg(0, std::ios_base::beg))
-    {
-        INSOUND_PUSH_ERROR(Result::RuntimeErr, "openFile: file failed to seek");
-        return false;
-    }
-
-    if (!file.read(data.data(), fileSize))
-    {
-        INSOUND_PUSH_ERROR(Result::RuntimeErr, "openFile: failed to read file");
-        return false;
-    }
-
-    // Return the out value
-    if (outData)
-    {
-        outData->swap(data);
-    }
-
-    return true;
-}
 
 static constexpr int CHUNK_SIZE = 1024;
 
-bool insound::openFile(const std::string &path, std::string *outData)
+/// @param path path to file to open
+/// @param allocCallback callback that allocates userdata
+/// @param getBufCallback callback that returns pointer to contiguous data to write to for current byte offset
+/// @param userdata to act on
+/// @returns size of data retrieved, or 0 on error
+static size_t openFileImpl(const std::string &path,
+    void(*allocCallback)(void *, size_t),
+    void *(*getBufCallback)(void *, size_t),
+    void *userdata)
 {
 #ifdef __EMSCRIPTEN__
     if (!emscripten_is_main_browser_thread())
@@ -133,7 +87,7 @@ bool insound::openFile(const std::string &path, std::string *outData)
     Rstream file;
     if (!file.open(path))
     {
-        return false;
+        return 0;
     }
 
     const auto dataSize = file.size();
@@ -145,33 +99,86 @@ bool insound::openFile(const std::string &path, std::string *outData)
         return false;
     }
 
-    std::string data;
-    data.resize(dataSize, 0);
+    allocCallback(userdata, dataSize);
 
+    uint8_t buffer[CHUNK_SIZE];
     int64_t i = 0;
     for (; i <= dataSize - CHUNK_SIZE; i += CHUNK_SIZE) // read file in chunks
     {
-        if (file.read((uint8_t *)data.data() + i, CHUNK_SIZE) <= 0)
+        auto data = getBufCallback(userdata, i);
+        if (file.read((uint8_t *)data, CHUNK_SIZE) <= 0)
         {
             // failure during read
-            return false;
+            return 0;
         }
     }
 
     // Get leftovers
     if (i < dataSize)
     {
-        if (file.read((uint8_t *)data.data() + i, dataSize - i) <= 0)
+        auto data = getBufCallback(userdata, i);
+        if (file.read((uint8_t *)data, dataSize - i) <= 0)
         {
             // failure during read
-            return false;
+            return 0;
         }
     }
 
+    return static_cast<size_t>(dataSize);
+}
+
+static inline void alloc_string_callback(void *userdata, size_t byteSize)
+{
+    auto str = static_cast<std::string *>(userdata);
+    str->resize(byteSize, 0);
+}
+
+/// @returns pointer to memory to write to
+static inline void *get_string_callback(void *userdata, size_t byteOffset)
+{
+    auto str = static_cast<std::string *>(userdata);
+    return str->data() + byteOffset;
+}
+
+bool openFile(const std::string &path, std::string *outData)
+{
+    std::string str;
+    const auto size = openFileImpl(path, alloc_string_callback, get_string_callback, &str);
+    if (size == 0)
+        return false;
+
     if (outData)
-    {
-        outData->swap(data);
-    }
+        outData->swap(str);
+
+    return true;
+}
+
+static inline void alloc_buffer_callback(void *userdata, size_t byteSize)
+{
+    auto buf = static_cast<uint8_t **>(userdata);
+    *buf = static_cast<uint8_t *>(std::malloc(byteSize));
+}
+
+static inline void *get_buffer_callback(void *userdata, size_t byteOffset)
+{
+    auto buf = static_cast<uint8_t **>(userdata);
+    return (*buf) + byteOffset;
+}
+
+bool insound::openFile(const std::string &path, uint8_t **outData, size_t *outSize)
+{
+    uint8_t *data = nullptr;
+    const auto size = openFileImpl(path, alloc_buffer_callback, get_buffer_callback, &data);
+    if (size == 0)
+        return false;
+
+    if (outData)
+        *outData = data;
+    else
+        std::free(data);
+
+    if (outSize)
+        *outSize = size;
 
     return true;
 }

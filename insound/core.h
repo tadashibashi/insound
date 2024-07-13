@@ -20,8 +20,6 @@
 #include "core/SampleFormat.h"
 #include "core/SoundBuffer.h"
 #include "core/Source.h"
-#include "core/SourceRef.h"
-#include "core/SourceRefFwd.h"
 #include "core/StreamSource.h"
 #include "core/TimeUnit.h"
 #include "core/util.h"

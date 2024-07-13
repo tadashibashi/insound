@@ -117,6 +117,16 @@ namespace insound {
         return stream->seek(seekPosition) ? MA_SUCCESS : MA_BAD_SEEK;
     }
 
+    bool AudioDecoder::openConstMem(const uint8_t *data, size_t dataSize, const AudioSpec &targetSpec)
+    {
+        if (!m->stream.openConstMem(data, dataSize))
+        {
+            return false;
+        }
+
+        return postOpen(targetSpec);
+    }
+
     bool AudioDecoder::open(const std::string &filepath, const AudioSpec &targetSpec, const bool inMemory)
     {
         if (!m->stream.open(filepath, inMemory))
@@ -124,6 +134,11 @@ namespace insound {
             return false;
         }
 
+        return postOpen(targetSpec);
+    }
+
+    bool AudioDecoder::postOpen(const AudioSpec &targetSpec)
+    {
         const auto decoder = new ma_decoder;
         ma_decoder_config config = ma_decoder_config_init(
             (ma_format)toMaFormat(targetSpec.format),
@@ -162,7 +177,6 @@ namespace insound {
             ma_decoder_uninit(m->decoder);
             delete m->decoder;
         }
-
 
         m->decoder = decoder;
         m->looping = false;

@@ -10,13 +10,6 @@ namespace insound {
     /// Supported formats: WAV, FLAC, VORBIS, ADPCM, AIFF, MP3, TODO: GME, ModPlug backends
     class AudioDecoder {
     public:
-        /// Create an audio decoder by filepath name, and open file at path.
-
-        /// @param filepath path to the audio file
-        /// @param outputSpec spec of the audio engine output; needed by formats that generate their own output
-        /// @returns pointer to the AudioDecoder subclass with opened file, or `nullptr` if any errors.
-        ///          If null, check `popError()` for details on the error.
-        static AudioDecoder *create(const std::string &filepath, const AudioSpec &outputSpec);
         AudioDecoder();
         AudioDecoder(AudioDecoder &&other) noexcept;
         ~AudioDecoder();
@@ -24,7 +17,19 @@ namespace insound {
         AudioDecoder &operator=(AudioDecoder &&other) noexcept;
 
         /// Open the file for streaming
+        /// @param filepath     path to the file to open
+        /// @param targetSpec   spec to convert the audio to
+        /// @param inMemory     whether to copy entire file into memory, from which to stream;
+        ///                         true:  copy file into memory and stream from memory
+        ///                         false: stream directly from file (default)
+        /// @note use `openConstMem` to stream from const memory where file data is already
+        ///       loaded into memory
         bool open(const std::string &filepath, const AudioSpec &targetSpec, bool inMemory = false);
+
+        /// Open a decoder from file data that has already been loaded into memory. It will stream
+        /// the audio from this memory. Memory pointer must be valid until `AudioDecoder::close` is called.
+        bool openConstMem(const uint8_t *data, size_t dataSize, const AudioSpec &targetSpec);
+
         /// Close an open file. Safe to call, even if already closed.
         void close();
         [[nodiscard]]
@@ -60,6 +65,7 @@ namespace insound {
         bool getCursorPCMFrames(uint64_t *outCursor) const;
         bool getAvailableFrames(uint64_t *outFrames) const;
     private:
+        bool postOpen(const AudioSpec &targetSpec);
         struct Impl;
         Impl *m;
     };

@@ -4,6 +4,9 @@
 #include <insound/core/Error.h>
 #include <insound/core/lib.h>
 
+/// INIT_GUARD
+/// Ensures that RstreamableMemory is loaded before entering function.
+/// Returns false if not, and pushes appropriate error.
 #ifdef INSOUND_DEBUG
 #define INIT_GUARD() do { if (!isOpen()) { \
     INSOUND_PUSH_ERROR(Result::StreamNotInit, "RstreamableMemory not init"); \
@@ -15,33 +18,64 @@
 
 bool insound::RstreamableMemory::open(const std::string &filepath)
 {
-    std::string data;
-    if (!openFile(filepath, &data))
+    uint8_t *data;
+    size_t size;
+    if (!openFile(filepath, &data, &size))
         return false;
 
-    m_data.swap(data); // old data is cleaned up via RAII after this scope
+    if (m_data && m_ownsData)
+    {
+        std::free(m_data);
+    }
+
+    m_data = data;
+    m_size = size;
     m_cursor = 0;
     m_eof = false;
+    m_ownsData = true;
+    return true;
+}
+
+bool insound::RstreamableMemory::open(const uint8_t *data, size_t size)
+{
+    if (m_data && m_ownsData)
+    {
+        std::free(m_data);
+    }
+
+    m_data = const_cast<uint8_t *>(data); // although constness is removed `m_ownsData` is set to false will prevent deletion
+    m_size = size;
+    m_cursor = 0;
+    m_eof = false;
+    m_ownsData = false;
     return true;
 }
 
 bool insound::RstreamableMemory::isOpen() const
 {
-    return !m_data.empty();
+    return !m_data;
 }
 
 void insound::RstreamableMemory::close()
 {
-    m_data = {};   // old data is cleaned up via RAII
+    if (m_data)
+    {
+        if (m_ownsData)
+            std::free(m_data);
+        m_data = nullptr;
+    }
+
+    m_size = 0;
     m_cursor = 0;
     m_eof = false;
+    m_ownsData = false;
 }
 
 bool insound::RstreamableMemory::seek(int64_t position)
 {
     INIT_GUARD();
 
-    if (position > m_data.size() || position < 0) // allow max range since ifstream::seekg allows it to read file size
+    if (position > m_size || position < 0) // allow max range since ifstream::seekg allows it to read file size
     {
         INSOUND_PUSH_ERROR(Result::RangeErr, "seek position is out of range");
         return false;
@@ -54,7 +88,7 @@ bool insound::RstreamableMemory::seek(int64_t position)
 
 int64_t insound::RstreamableMemory::size() const
 {
-    return static_cast<int64_t>(m_data.size());
+    return static_cast<int64_t>(m_size);
 }
 
 int64_t insound::RstreamableMemory::tell() const
@@ -71,7 +105,7 @@ int64_t insound::RstreamableMemory::read(uint8_t *buffer, int64_t requestedBytes
     if (m_eof)                // we're already at eof
         return 0;
 
-    const auto dataSize = static_cast<int64_t>(m_data.size());
+    const auto dataSize = static_cast<int64_t>(m_size);
     if (m_cursor >= dataSize) // no more data to read == eof
     {
         m_eof = true;
@@ -94,7 +128,7 @@ int64_t insound::RstreamableMemory::read(uint8_t *buffer, int64_t requestedBytes
 
     // Copy bytes
     const int64_t bytesToRead = std::min(requestedBytes, dataSize - m_cursor);
-    std::memcpy(buffer, m_data.data() + m_cursor, bytesToRead);
+    std::memcpy(buffer, m_data + m_cursor, bytesToRead);
 
     // Reads past the end of file (but not at the end) results in setting the eof flag
     if (bytesToRead < requestedBytes)

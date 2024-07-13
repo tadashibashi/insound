@@ -8,8 +8,13 @@ namespace insound {
     class Rstream {
     public:
         Rstream() : m_stream() { }
+        Rstream(Rstream &&other);
         ~Rstream();
+
+        Rstream &operator=(Rstream &&other);
+
         bool open(const std::string &filepath, bool inMemory = false);
+        bool openConstMem(const uint8_t *data, size_t size);
 
         [[nodiscard]]
         bool isOpen() const;

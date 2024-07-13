@@ -259,8 +259,6 @@ PUBLIC
     SampleFormat.h
     SoundBuffer.h
     Source.h
-    SourceRef.h
-    SourceRefFwd.h
     StreamManager.h
     StreamSource.h
     TimeUnit.h

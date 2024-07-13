@@ -1,11 +1,8 @@
 #pragma once
 #include "AudioDevice.h"
 #include "MultiPool.h"
-#include "SourceRefFwd.h"
 
 #include <cstdint>
-
-
 
 namespace insound {
     struct AudioSpec;
@@ -26,6 +23,7 @@ namespace insound {
         bool open(int samplerate, int bufferFrameSize);
         void close();
 
+        /// Whether engine is currently open from a prior call to `Engine::open`
         [[nodiscard]]
         bool isOpen() const;
 
@@ -38,6 +36,7 @@ namespace insound {
         /// @param outPcmSource pointer to receive pcm source, nullable if you don't need it e.g. a oneshot sound
         bool playSound(const SoundBuffer *buffer, bool paused, bool looping, bool oneshot, const Handle<Bus> &bus, Handle<PCMSource> *outPcmSource);
         bool playSound(const SoundBuffer *buffer, bool paused, bool looping, bool oneshot, Handle<PCMSource> *outPcmSource);
+        //bool playSound(const std::string &filepath, Source::InitFlags flags, bool paused, const Handle<Bus> &bus, Handle<Source> *outSource);
 
         bool playStream(const std::string &filepath, bool paused, bool looping, bool oneshot, bool inMemory, const Handle<Bus> &bus, Handle<StreamSource> *outSource);
 
