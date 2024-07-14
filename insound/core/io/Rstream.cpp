@@ -17,9 +17,12 @@ namespace insound {
 
     Rstream &Rstream::operator=(Rstream &&other)
     {
-        delete m_stream;
-        m_stream = other.m_stream;
-        other.m_stream = nullptr;
+        if (this != &other)
+        {
+            delete m_stream;
+            m_stream = other.m_stream;
+            other.m_stream = nullptr;
+        }
 
         return *this;
     }

@@ -1,29 +1,10 @@
+#ifdef __ANDROID__
 #include "AAudioDevice.h"
 
-
-#ifdef __ANDROID__
 #include <insound/core/Error.h>
 #include <insound/core/platform/android/AndroidNative.h>
 #include <aaudio/AAudio.h>
 #include <mutex>
-
-#define PI 3.14159265f
-static float g_phase = 0;
-
-static void generate_stereo_sine_wave(float* buffer, int num_frames, float sample_rate, float frequency, float volume) {
-    // Calculate the angular frequency
-    float angular_frequency = 2.0f * PI * frequency;
-
-    // Generate sine wave samples for both left and right channels
-    for (int i = 0; i < num_frames; ++i) {
-        float time = i / sample_rate;
-        float sample = volume * sinf(g_phase + angular_frequency * time);
-
-        // Interleave the samples for stereo output
-        buffer[2 * i] = sample;      // Left channel
-        buffer[2 * i + 1] = sample;  // Right channel
-    }
-}
 
 namespace insound {
     struct AAudioDevice::Impl {
@@ -55,7 +36,7 @@ namespace insound {
             AAudioStreamBuilder_setSharingMode(builder, AAUDIO_SHARING_MODE_SHARED); // low latency
             AAudioStreamBuilder_setDirection(builder, AAUDIO_DIRECTION_OUTPUT);
             AAudioStreamBuilder_setChannelCount(builder, 2);
-#if __ANDROID_MIN_SDK_VERSION__ >= 32
+#if __ANDROID_MIN_SDK_VERSION__ >= 32 // channel mask only available in 32+
             AAudioStreamBuilder_setChannelMask(builder, AAUDIO_CHANNEL_STEREO);
 #endif
             AAudioStreamBuilder_setFormat(builder, AAUDIO_FORMAT_PCM_FLOAT);
@@ -162,11 +143,6 @@ namespace insound {
             if (device->m_buffer.size() != byteSize)
                 device->m_buffer.resize(byteSize);
 
-//            generate_stereo_sine_wave((float *)audioData, nFrames, device->m_spec.freq, 440, .25f);
-//            g_phase += 2.0f * PI * 440.0f * (float)nFrames / device->m_spec.freq;
-//            if (g_phase > 2.0f * PI) {
-//                g_phase -= 2.0f * PI;
-//            }
             device->m_callback(device->m_userData, &device->m_buffer);
             std::memcpy(audioData, device->m_buffer.data(), byteSize);
 

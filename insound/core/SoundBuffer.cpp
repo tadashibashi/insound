@@ -23,7 +23,30 @@ namespace insound {
     {
         other.m_spec = {};
         other.m_bufferSize = 0;
-        other.m_buffer.store(nullptr);
+        other.m_buffer.store(nullptr, std::memory_order_release);
+    }
+
+    SoundBuffer &SoundBuffer::operator=(SoundBuffer &&other) noexcept
+    {
+        if (this != &other)
+        {
+            // Clean up existing data
+            unload();
+
+            // Move other SoundBuffer data over here
+            m_spec = other.m_spec;
+            m_bufferSize = other.m_bufferSize;
+            other.m_buffer.store(
+                other.m_buffer.load(std::memory_order_acquire),
+                std::memory_order_release);
+
+            // Invalidate other SoundBuffer
+            other.m_spec = {};
+            other.m_bufferSize = 0;
+            other.m_buffer.store(nullptr, std::memory_order_release);
+        }
+
+        return *this;
     }
 
     bool SoundBuffer::load(const std::string &filepath, const AudioSpec &targetSpec)

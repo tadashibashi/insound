@@ -4,7 +4,7 @@
 
 namespace insound {
 
-    class PortAudioDevice final : public AudioDevice {
+    class PortAudioDevice : public AudioDevice {
     public:
         PortAudioDevice();
         ~PortAudioDevice() override;

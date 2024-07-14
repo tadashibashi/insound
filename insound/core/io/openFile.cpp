@@ -11,6 +11,7 @@ using namespace insound;
 #include <emscripten/fetch.h>
 #include <emscripten/threading.h>
 
+// Open URLs to retrieve file data using the browser/Emscripten fetch API
 static bool openFileURLSync(const std::string &url,
     void(*allocCallback)(void *, size_t),
     void *(*getBufCallback)(void *, size_t, size_t),
@@ -55,19 +56,22 @@ static bool openFileURLSync(const std::string &url,
 
 #endif
 
-
+/// Read file in chunks of data this size (in bytes)
 static constexpr int CHUNK_SIZE = 1024;
 
+/// Open a file using allocation callbacks, enabling setup of various data types.
 /// @param path path to file to open
 /// @param allocCallback callback that allocates userdata
 /// @param getBufCallback callback that returns pointer to contiguous data to write to for current byte offset, and read amount
 /// @param userdata to act on
 /// @returns size of data retrieved, or 0 on error
-static size_t openFileImpl(const std::string &path,
+static size_t openFileImpl(
+    const std::string &path,
     void(*allocCallback)(void *, size_t),
     void *(*getDataPtrCallback)(void *, size_t, size_t),
     void *userdata)
 {
+    // On Emscripten, fetches from URL if prefixed by "http:" or "https:"
 #ifdef __EMSCRIPTEN__
     if (!emscripten_is_main_browser_thread())
     {
@@ -126,13 +130,15 @@ static size_t openFileImpl(const std::string &path,
     return static_cast<size_t>(dataSize);
 }
 
+// ===== Open File into a std::string =========================================
+
 static inline void alloc_string_callback(void *userdata, size_t byteSize)
 {
     auto str = static_cast<std::string *>(userdata);
     str->resize(byteSize, 0);
 }
 
-/// @returns pointer to memory to write to
+
 static inline void *get_string_dataptr_callback(void *userdata, size_t byteOffset, size_t bytesToRead)
 {
     auto str = static_cast<std::string *>(userdata);
@@ -151,6 +157,8 @@ bool insound::openFile(const std::string &path, std::string *outData)
 
     return true;
 }
+
+// ===== Open File into a data buffer =========================================
 
 static inline void alloc_buffer_callback(void *userdata, size_t byteSize)
 {

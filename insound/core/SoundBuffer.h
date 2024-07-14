@@ -16,6 +16,7 @@ namespace insound {
         ~SoundBuffer();
 
         SoundBuffer(SoundBuffer &&other) noexcept;
+        SoundBuffer &operator=(SoundBuffer &&other) noexcept;
 
         /// Load sound and convert to target specification
         /// @param filepath    path to the sound file (only WAV supported for now)

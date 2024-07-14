@@ -35,20 +35,24 @@ PoolBase::PoolBase(PoolBase &&other) noexcept : m_memory(other.m_memory), m_meta
 
 PoolBase &PoolBase::operator=(PoolBase &&other) noexcept
 {
-    // clean up existing memory
-    std::free(m_memory);
-    std::free(m_meta);
+    if (this != &other)
+    {
+        // clean up existing memory
+        std::free(m_memory);
+        std::free(m_meta);
 
-    m_memory = other.m_memory;
-    m_meta = other.m_meta;
-    m_size = other.m_size;
-    m_nextFree = other.m_nextFree;
-    m_elemSize = other.m_elemSize;
-    m_idCounter = other.m_idCounter;
+        m_memory = other.m_memory;
+        m_meta = other.m_meta;
+        m_size = other.m_size;
+        m_nextFree = other.m_nextFree;
+        m_elemSize = other.m_elemSize;
+        m_idCounter = other.m_idCounter;
 
-    other.m_memory = nullptr;
-    other.m_meta = nullptr;
-    other.m_size = 0;
+        other.m_memory = nullptr;
+        other.m_meta = nullptr;
+        other.m_size = 0;
+    }
+
     return *this;
 }
 

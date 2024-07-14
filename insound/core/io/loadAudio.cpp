@@ -12,71 +12,88 @@
 
 bool insound::loadAudio(const std::string &path, const AudioSpec &targetSpec, uint8_t **outBuffer, uint32_t *outLength, std::vector<Marker> *outMarkers)
 {
-    // Uppercase extension
-    const auto extView = path::extension(path);
-    auto ext = std::string(extView.data(), extView.length());
-    for (auto &c : ext)
-    {
-        c = (char)std::toupper(c);
-    }
-
-    std::vector<Marker> markers;
-    if (ext == ".WAV")
-    {
-        if (!insound_ma_dr_wav_get_markers(path, &markers))
-            return false;
-    }
-
+    // Open audio decoder to read PCM data
     AudioDecoder decoder;
     if (!decoder.open(path, targetSpec))
-        return false;
-
-    AudioSpec spec;
-    if (!decoder.getSpec(&spec))
         return false;
 
     uint64_t pcmFrameLength;
     if (!decoder.getPCMFrameLength(&pcmFrameLength))
         return false;
 
+    // Allocate buffer to store frames
     uint64_t bufferSize = pcmFrameLength * targetSpec.bytesPerFrame();
     auto buffer = (uint8_t *)std::malloc(bufferSize);
 
+    // Get the PCM data
     if (!decoder.readFrames(static_cast<int>(pcmFrameLength), buffer))
     {
         std::free(buffer);
         return false;
     }
 
-    // Adjust marker positions to new samplerate
-    if (targetSpec.freq != spec.freq)
+    // Collect and return markers if out value provided
+    if (outMarkers)
     {
-        const auto sizeFactor = (float)targetSpec.freq / (float)spec.freq;
-        for (auto &marker : markers)
+        std::vector<Marker> markers;
+
+        // Uppercase extension for uniform check
+        const auto extView = path::extension(path);
+        auto ext = std::string(extView.data(), extView.length());
+        for (auto &c : ext)
         {
-            marker.position = (uint32_t)std::round((float)marker.position * sizeFactor);
+            c = (char)std::toupper(c);
         }
+
+        if (ext == ".WAV") // for now only .WAV files are supported
+        {
+            if (!insound_ma_dr_wav_get_markers(path, &markers))
+            {
+                std::free(buffer);
+                return false;
+            }
+        }
+
+        // Adjust marker positions to new samplerate, if necessary
+        AudioSpec spec;
+        if (!decoder.getSpec(&spec))
+        {
+            std::free(buffer);
+            return false;
+        }
+
+        if (targetSpec.freq != spec.freq)
+        {
+            const auto sizeFactor = (float)targetSpec.freq / (float)spec.freq;
+            for (auto &marker : markers)
+            {
+                marker.position = (uint32_t)std::round((float)marker.position * sizeFactor);
+            }
+        }
+
+        outMarkers->swap(markers);
     }
 
-    // Done, return the out values
+    // Done, return the other out-values
     if (outBuffer)
         *outBuffer = buffer;
-
     else // if outBuffer is discarded, free the buffer
         std::free(buffer);
 
-    if (outLength)
+    if (outLength) // return the total byte length of the buffer
         *outLength = pcmFrameLength * targetSpec.bytesPerFrame();
-
-    if (outMarkers)
-        outMarkers->swap(markers);
 
     return true;
 }
 
+// ===== convertAudio =========================================================
+
+
 #ifdef INSOUND_BACKEND_SDL2
 #include <SDL2/SDL_audio.h>
 
+/// In-place conversion for SDL2, if available, which is more economical
+/// regarding buffer allocation
 bool insound::convertAudio(uint8_t *audioData, const uint32_t length, const AudioSpec &dataSpec,
                            const AudioSpec &targetSpec, uint8_t **outBuffer, uint32_t *outLength)
 {
@@ -120,8 +137,13 @@ bool insound::convertAudio(uint8_t *audioData, const uint32_t length, const Audi
 
     return cvtResult == 0;
 }
+
+
 #elif INSOUND_BACKEND_SDL3
 #include <SDL3/SDL_audio.h>
+
+/// In-place conversion implementation for SDL3, if available, which is more economical
+/// regarding buffer allocation.
 bool insound::convertAudio(uint8_t *audioData, const uint32_t length, const AudioSpec &dataSpec,
                            const AudioSpec &targetSpec, uint8_t **outBuffer, uint32_t *outLength)
 {
@@ -153,6 +175,7 @@ bool insound::convertAudio(uint8_t *audioData, const uint32_t length, const Audi
 #include <insound/core/external/miniaudio.h>
 #include <insound/core/SampleFormat.h>
 
+/// Default miniaudio conversion, which requires an additional buffer allocation
 bool insound::convertAudio(uint8_t *audioData, const uint32_t length, const AudioSpec &dataSpec,
                            const AudioSpec &targetSpec, uint8_t **outBuffer, uint32_t *outLength)
 {
